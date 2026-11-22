@@ -8,7 +8,7 @@ import (
 
 func set(t *testing.T, kv map[string]string) {
 	t.Helper()
-	for _, k := range []string{"DATABASE_URL", "BASE_URL", "SMTP_URL", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "COOKIE_SECURE"} {
+	for _, k := range []string{"DATABASE_URL", "BASE_URL", "SMTP_URL", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "COOKIE_SECURE", "MIGRATE_DATABASE_URL", "SMTP_FROM"} {
 		t.Setenv(k, "")
 	}
 	for k, v := range kv {
@@ -19,14 +19,14 @@ func set(t *testing.T, kv map[string]string) {
 func TestLoadReadsEveryField(t *testing.T) {
 	set(t, map[string]string{
 		"DATABASE_URL": "postgres://app@localhost/hotel", "BASE_URL": "https://app.example.com",
-		"SMTP_URL": "smtp://mail:25", "GOOGLE_CLIENT_ID": "id", "GOOGLE_CLIENT_SECRET": "secret", "COOKIE_SECURE": "false",
+		"SMTP_URL": "smtp://mail:25", "GOOGLE_CLIENT_ID": "id", "GOOGLE_CLIENT_SECRET": "secret", "COOKIE_SECURE": "false", "MIGRATE_DATABASE_URL": "postgres://migrator@localhost/hotel", "SMTP_FROM": "Hotel <hi@example.com>",
 	})
 	c, err := config.Load()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if c.DatabaseURL != "postgres://app@localhost/hotel" || c.BaseURL != "https://app.example.com" || c.SMTPURL != "smtp://mail:25" ||
-		c.GoogleClientID != "id" || c.GoogleClientSecret != "secret" || c.CookieSecure {
+		c.GoogleClientID != "id" || c.GoogleClientSecret != "secret" || c.CookieSecure || c.MigrateURL != "postgres://migrator@localhost/hotel" || c.SMTPFrom != "Hotel <hi@example.com>" {
 		t.Fatalf("%+v", c)
 	}
 }
@@ -50,5 +50,13 @@ func TestCookieSecureRejectsGarbage(t *testing.T) {
 	set(t, map[string]string{"DATABASE_URL": "postgres://x", "COOKIE_SECURE": "maybe"})
 	if _, err := config.Load(); err == nil {
 		t.Fatal("garbage accepted")
+	}
+}
+
+func TestSMTPFromHasADefault(t *testing.T) {
+	set(t, map[string]string{"DATABASE_URL": "postgres://app@localhost/hotel"})
+	c, err := config.Load()
+	if err != nil || c.SMTPFrom == "" {
+		t.Fatalf("%+v %v", c, err)
 	}
 }

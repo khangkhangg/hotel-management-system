@@ -11,6 +11,8 @@ import (
 type Config struct {
 	DatabaseURL        string
 	BaseURL            string
+	MigrateURL         string // an owner-role connection, used only to run migrations
+	SMTPFrom           string
 	SMTPURL            string
 	GoogleClientID     string
 	GoogleClientSecret string
@@ -22,6 +24,8 @@ func Load() (Config, error) {
 	c := Config{
 		DatabaseURL:        os.Getenv("DATABASE_URL"),
 		BaseURL:            os.Getenv("BASE_URL"),
+		MigrateURL:         os.Getenv("MIGRATE_DATABASE_URL"),
+		SMTPFrom:           os.Getenv("SMTP_FROM"),
 		SMTPURL:            os.Getenv("SMTP_URL"),
 		GoogleClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
 		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
@@ -29,6 +33,9 @@ func Load() (Config, error) {
 	}
 	if c.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
+	}
+	if c.SMTPFrom == "" {
+		c.SMTPFrom = "Hotel PMS <no-reply@localhost>"
 	}
 	if v := os.Getenv("COOKIE_SECURE"); v != "" {
 		b, err := strconv.ParseBool(v)

@@ -1,6 +1,7 @@
 package staff
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -293,3 +294,18 @@ func (h *handler) acceptInvite(w http.ResponseWriter, r *http.Request) {
 }
 
 var errRefused = errors.New("staff: input refused")
+
+// NewOwnerInvite adds an invite for an organization's first owner and returns its token, which is not stored.
+// It is for "server setup", where no person exists yet to send the invite, and it works inside the transaction
+// that created the organization.
+func NewOwnerInvite(ctx context.Context, tx pgx.Tx, org uuid.UUID, email string, now time.Time) (token string, err error) {
+	token, hash, err := newToken()
+	if err != nil {
+		return "", err
+	}
+	_, err = tx.Exec(ctx,
+		`insert into invite (id, organization_id, property_id, email, role, token_hash, invited_by, created_at, expires_at)
+		 values ($1, $2, null, $3, 'owner', $4, null, $5, $6)`,
+		ids.New(), org, account.NormalizeEmail(email), hash, now, now.Add(inviteLifetime))
+	return token, err
+}
