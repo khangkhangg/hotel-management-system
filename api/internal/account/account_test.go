@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -148,5 +149,64 @@ func TestOwnerMembershipWithoutPropertyIsUniquePerOrganization(t *testing.T) {
 	}
 	if err := addMember(pool, org, user, nil, "owner"); err == nil {
 		t.Fatal("a second organization-wide membership was accepted")
+	}
+}
+
+func TestSetPasswordIsReadBackByEmail(t *testing.T) {
+	pool := testdb.New(t)
+	id, _ := create(pool, "mai@hotel.com")
+	var before, after account.User
+	err := db.WithoutOrg(ctx, pool, func(tx pgx.Tx) (e error) {
+		before, e = account.ByEmail(ctx, tx, "mai@hotel.com")
+		if e != nil {
+			return
+		}
+		if e = account.SetPassword(ctx, tx, id, "$argon2id$fake-hash"); e != nil {
+			return
+		}
+		after, e = account.ByEmail(ctx, tx, "mai@hotel.com")
+		return
+	})
+	if err != nil || before.PasswordHash != "" || after.PasswordHash != "$argon2id$fake-hash" {
+		t.Fatalf("before %q after %q err %v", before.PasswordHash, after.PasswordHash, err)
+	}
+}
+
+func TestSetPasswordForAnUnknownUserIsErrNotFound(t *testing.T) {
+	pool := testdb.New(t)
+	err := db.WithoutOrg(ctx, pool, func(tx pgx.Tx) error { return account.SetPassword(ctx, tx, uuid.New(), "x") })
+	if !errors.Is(err, account.ErrNotFound) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestTouchSignInRecordsTheTime(t *testing.T) {
+	pool := testdb.New(t)
+	id, _ := create(pool, "mai@hotel.com")
+	at := time.Date(2026, 11, 23, 9, 0, 0, 0, time.UTC)
+	var got *time.Time
+	err := db.WithoutOrg(ctx, pool, func(tx pgx.Tx) error {
+		if err := account.TouchSignIn(ctx, tx, id, at); err != nil {
+			return err
+		}
+		return tx.QueryRow(ctx, `select last_sign_in_at from app_user where id = $1`, id).Scan(&got)
+	})
+	if err != nil || got == nil || !got.Equal(at) {
+		t.Fatalf("%v %v", got, err)
+	}
+}
+
+func TestByIDFindsTheRightUser(t *testing.T) {
+	pool := testdb.New(t)
+	a, _ := create(pool, "a@hotel.com")
+	create(pool, "b@hotel.com")
+	var got account.User
+	err := db.WithoutOrg(ctx, pool, func(tx pgx.Tx) (e error) { got, e = account.ByID(ctx, tx, a); return })
+	if err != nil || got.ID != a || got.Email != "a@hotel.com" {
+		t.Fatalf("%+v %v", got, err)
+	}
+	err = db.WithoutOrg(ctx, pool, func(tx pgx.Tx) error { _, e := account.ByID(ctx, tx, uuid.New()); return e })
+	if !errors.Is(err, account.ErrNotFound) {
+		t.Fatalf("unknown id: %v", err)
 	}
 }
