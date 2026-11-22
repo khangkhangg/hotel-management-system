@@ -48,10 +48,10 @@ type app struct {
 	main *site
 }
 
-func newApp(t *testing.T) *app {
+func newApp(t *testing.T, extra ...httpx.Mount) *app {
 	t.Helper()
 	a := &app{t: t, pool: testdb.New(t), mail: mail.NewFake(), now: time.Date(2026, 11, 23, 9, 0, 0, 0, time.UTC)}
-	a.srv = httptest.NewServer(httpx.NewRouter(httpx.Deps{Pool: a.pool, Mail: a.mail, Now: a.clock}, signin.Mount))
+	a.srv = httptest.NewServer(httpx.NewRouter(httpx.Deps{Pool: a.pool, Mail: a.mail, Now: a.clock}, append([]httpx.Mount{signin.Mount}, extra...)...))
 	t.Cleanup(a.srv.Close)
 	return a
 }

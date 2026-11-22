@@ -89,17 +89,7 @@ func (h *handler) signIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var trusted bool
-	var sess session.Session
-	err = db.WithoutOrg(ctx, h.Pool, func(tx pgx.Tx) (e error) {
-		trusted = session.IsTrusted(ctx, tx, user.ID, session.ReadDeviceCookie(r), now)
-		stage := session.StagePending
-		if trusted {
-			stage = session.StageFull
-		}
-		sess, e = session.Create(ctx, tx, user.ID, stage, DescribeBrowser(r.UserAgent()), now)
-		return
-	})
+	sess, trusted, err := h.begin(r, user)
 	if err != nil {
 		httpx.InternalError(w, err)
 		return
@@ -115,12 +105,32 @@ func (h *handler) signIn(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]string{"next": "code"})
 }
 
+// begin creates the session for a person whose first step passed: full on a trusted device, otherwise pending.
+func (h *handler) begin(r *http.Request, user account.User) (sess session.Session, trusted bool, err error) {
+	ctx, now := r.Context(), h.Clock()
+	err = db.WithoutOrg(ctx, h.Pool, func(tx pgx.Tx) (e error) {
+		trusted = session.IsTrusted(ctx, tx, user.ID, session.ReadDeviceCookie(r), now)
+		stage := session.StagePending
+		if trusted {
+			stage = session.StageFull
+		}
+		sess, e = session.Create(ctx, tx, user.ID, stage, DescribeBrowser(r.UserAgent()), now)
+		return
+	})
+	return
+}
+
+func (h *handler) issueCode(r *http.Request, user account.User) error {
+	return otp.Issue(r.Context(), h.Pool, h.Mail, user, otp.Where{Browser: DescribeBrowser(r.UserAgent())}, h.Clock())
+}
+
 // sendCode emails a code and answers the error itself. It reports whether the code was sent.
 func (h *handler) sendCode(w http.ResponseWriter, r *http.Request, user account.User) bool {
-	err := otp.Issue(r.Context(), h.Pool, h.Mail, user, otp.Where{Browser: DescribeBrowser(r.UserAgent())}, h.Clock())
-	switch {
-	case err == nil:
+	err := h.issueCode(r, user)
+	if err == nil {
 		return true
+	}
+	switch {
 	case errors.Is(err, otp.ErrTooMany):
 		httpx.Error(w, http.StatusTooManyRequests, "too_many_codes", "You asked for 5 codes this hour. Try again later.")
 	case errors.Is(err, otp.ErrSendFailed):
@@ -191,19 +201,7 @@ func (h *handler) code(w http.ResponseWriter, r *http.Request) {
 
 // finish runs once a full session exists: it records the sign-in and settles which organization the person works in.
 func (h *handler) finish(w http.ResponseWriter, r *http.Request, user account.User, s session.Session) {
-	ctx := r.Context()
-	orgs, err := h.organizations(r, user.ID)
-	if err == nil {
-		err = db.WithoutOrg(ctx, h.Pool, func(tx pgx.Tx) error {
-			if err := account.TouchSignIn(ctx, tx, user.ID, h.Clock()); err != nil {
-				return err
-			}
-			if len(orgs) == 1 {
-				return session.SetOrganization(ctx, tx, s.ID, orgs[0].ID)
-			}
-			return nil
-		})
-	}
+	orgs, err := h.settle(r, user, s)
 	if err != nil {
 		httpx.InternalError(w, err)
 		return
@@ -213,6 +211,26 @@ func (h *handler) finish(w http.ResponseWriter, r *http.Request, user account.Us
 		return
 	}
 	httpx.JSON(w, http.StatusOK, map[string]string{"next": "done"})
+}
+
+// settle records the sign-in and, when the person belongs to exactly one organization, chooses it.
+// It returns the organizations the person belongs to.
+func (h *handler) settle(r *http.Request, user account.User, s session.Session) ([]orgRef, error) {
+	ctx := r.Context()
+	orgs, err := h.organizations(r, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	err = db.WithoutOrg(ctx, h.Pool, func(tx pgx.Tx) error {
+		if err := account.TouchSignIn(ctx, tx, user.ID, h.Clock()); err != nil {
+			return err
+		}
+		if len(orgs) == 1 {
+			return session.SetOrganization(ctx, tx, s.ID, orgs[0].ID)
+		}
+		return nil
+	})
+	return orgs, err
 }
 
 func (h *handler) organizations(r *http.Request, userID uuid.UUID) (orgs []orgRef, err error) {
