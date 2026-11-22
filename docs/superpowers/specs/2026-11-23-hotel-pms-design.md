@@ -104,7 +104,7 @@ One PostgreSQL database is the single source of truth. Every booking changes the
 | Database | PostgreSQL 16 or later | PostgreSQL licence |
 | API and workers | Go, standard `net/http`, `pgx` driver, `sqlc` for typed queries | BSD, MIT |
 | Job queue | River, which stores jobs in PostgreSQL | MPL 2.0 |
-| Web app | SvelteKit, TypeScript, Tailwind CSS | MIT |
+| Web app | SvelteKit, TypeScript, plain CSS driven by design tokens (no CSS framework) | MIT |
 | Accessible UI primitives | Bits UI | MIT |
 | Icons | Lucide | ISC |
 | Font | IBM Plex Sans, plus Noto Sans for scripts Plex lacks | OFL |

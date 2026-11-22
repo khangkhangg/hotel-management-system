@@ -39,7 +39,18 @@ A reset returns the property to the default colour.
 
 ## Design tokens
 
-These values are the only ones allowed. They are defined once as CSS variables and Tailwind theme values.
+These values are the only ones allowed. They are defined once, in `web/src/lib/tokens.css`, as CSS custom properties. There is no CSS framework. Components style themselves with `var(--token)` in their own scoped CSS, so one file controls the whole look.
+
+### One source of truth
+
+The owner asked for design elements and colours to be centralised as far as possible. The rules:
+
+1. **Two layers.** Raw values (the palette, the size scale) are named by what they are, for example `--palette-green-700`. Meaning tokens are named by what they do, for example `--color-action`, `--color-text-muted`, `--color-status-success-bg`. Components use only meaning tokens.
+2. **Everything that varies is a token:** colour, font family, font size and line height, weight, spacing, radius, control height, border width, shadow, motion duration and easing, breakpoints, z-index layers, and icon size.
+3. **No literal values in components.** A component file contains no hex colour, no `px` value for spacing, radius or type, no duration and no `z-index` number. A test scans every `.svelte` and `.css` file except `tokens.css` and fails on any of these.
+4. **Branding is a token override.** The hotel's brand colour (this spec, above) is one value, `--brand`. The action tokens and the hover, tint and ink shades are derived from it in OKLCH, so nothing else is set by hand. Set `--brand` on the page root for the whole page, or on an element marked `data-brand-scope` to brand one part, such as a live preview. Status colours are never derived from the brand. CSS resolves `var()` where a property is declared, so the derived tokens are declared again under `[data-brand-scope]`, and a test checks that every token derived from `--brand` is.
+5. **Themes later.** A dark theme or a high-contrast theme is a second set of meaning-token values under `[data-theme]`. It needs no change to any component.
+6. **The mockup and the app share the tokens.** The mockup canvas used literal values per file. That was acceptable for a mockup and is the reason the token table below exists: it is the list the mockup used, now promoted to named tokens.
 
 | Token | Values |
 | --- | --- |

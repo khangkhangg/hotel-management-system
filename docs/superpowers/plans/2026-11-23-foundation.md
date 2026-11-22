@@ -6,7 +6,7 @@
 
 **Architecture:** One Go API with PostgreSQL as the only store. Every request runs in a transaction that sets the organization for row-level security, carries a trace ID, and writes its audit row in the same transaction as the change. A SvelteKit web app talks to the API over JSON and receives live notifications over server-sent events.
 
-**Tech Stack:** Go 1.23+, PostgreSQL 16+, `pgx/v5`, `sqlc`, `goose` migrations, River job queue, `coreos/go-oidc`, `golang.org/x/oauth2`, `golang.org/x/crypto/argon2`. SvelteKit 2, Svelte 5, TypeScript, Tailwind CSS 4, Bits UI, Lucide, Paraglide JS, Vitest, Playwright, axe.
+**Tech Stack:** Go 1.23+, PostgreSQL 16+, `pgx/v5`, `sqlc`, `goose` migrations, River job queue, `coreos/go-oidc`, `golang.org/x/oauth2`, `golang.org/x/crypto/argon2`. SvelteKit 2, Svelte 5, TypeScript, plain CSS driven by design tokens (no CSS framework), Bits UI, Lucide, Paraglide JS, Vitest, Playwright, axe.
 
 **Spec:** [Design doc](../specs/2026-11-23-hotel-pms-design.md), and specs [01 Roles and access](../../specs/01-roles-and-access.md), [02 Sign-in and security](../../specs/02-sign-in-and-security.md), [03 Data model](../../specs/03-data-model.md), [08 Branding and interface](../../specs/08-branding-and-interface.md), [10 Notifications and activity trail](../../specs/10-notifications-and-activity-trail.md). The mockup canvas is https://claude.ai/artifact/XLfV5xcXb79z6Wy6HymYiU.
 
@@ -28,7 +28,8 @@ These belong to later milestone plans: rooms, rates, reservations, the calendar,
 - Sign-in answers the same way for a known and an unknown email.
 - The audit table rejects `UPDATE` and `DELETE` from the application's database role.
 - Roles are exactly: `owner`, `manager`, `front_desk`, `revenue`, `housekeeping`.
-- Design tokens: font IBM Plex Sans; sizes 12, 14, 16, 20, 28 px; weights 400, 500, 600; spacing 4, 8, 12, 16, 24, 32 px; radius 4, 8, 12 px and full; control height 44 px; page `#F4F5F3`; surface `#FFFFFF`; borders `#E2E5E1` and `#8B9590`; text `#17201D` and `#56615C`; accent `#1F5F4F`.
+- Styling: no CSS framework. Every colour, font, size, space, radius, border, shadow, duration, easing, breakpoint and layer is a named design token in `web/src/lib/tokens.css`. Components use `var(--token)` only and contain no hex colour, no `px` value for spacing, radius or type, no duration and no `z-index` number. A test enforces this.
+- Design token values: font IBM Plex Sans; sizes 12, 14, 16, 20, 28 px; weights 400, 500, 600; spacing 4, 8, 12, 16, 24, 32 px; radius 4, 8, 12 px and full; control height 44 px; page `#F4F5F3`; surface `#FFFFFF`; borders `#E2E5E1` and `#8B9590`; text `#17201D` and `#56615C`; accent `#1F5F4F`.
 - Breakpoints: phone under 640 px, tablet 640 to 1023 px, desktop 1024 px and up. Sidebar 240 px, rail 68 px.
 - Motion: 200 ms screen change, 150 ms colour change, easing `cubic-bezier(0.2, 0, 0, 1)`, reduced motion respected.
 - Interface text is sentence case, in Paraglide message files, never glued from pieces.
@@ -109,7 +110,7 @@ func TestHealth(t *testing.T) {
 
 - [ ] **Step 4: Run `go test ./...` in `api/`.** Expected: FAIL, `httpx` undefined.
 - [ ] **Step 5: Implement `config.Load`, `httpx.NewRouter` and `cmd/server/main.go`** using `net/http` with Go 1.22 pattern routes.
-- [ ] **Step 6: Scaffold the web app** with `npx sv create web` (SvelteKit minimal, TypeScript), then add Tailwind CSS 4, Bits UI, `lucide-svelte`, Paraglide JS, Vitest and Playwright.
+- [ ] **Step 6: Scaffold the web app** with `npx sv create web` (SvelteKit minimal, TypeScript), then add Bits UI, `lucide-svelte`, Paraglide JS, Vitest and Playwright.
 - [ ] **Step 7: Write `ci.yml`** with three jobs: `go test ./...` against a PostgreSQL 16 service, `npm run check && npm test` in `web/`, and `npx @enmera/ai-design-check web/src`.
 - [ ] **Step 8: Run `go test ./...` and `npm run check`.** Expected: PASS.
 - [ ] **Step 9: Commit** with message `chore: project skeleton`.
@@ -613,7 +614,7 @@ func TestStreamIsPerUser(t *testing.T)              { /* user B's stream receive
 
 **Files:**
 - Create: `web/src/lib/tokens.css`, `web/src/lib/ui/Button.svelte`, `Field.svelte`, `Segmented.svelte`, `StatusBadge.svelte`, `StatTile.svelte`, `SectionTitle.svelte`, `PageHeader.svelte`, `Card.svelte`, `Icon.svelte`, `HoverCard.svelte`, `AlertList.svelte`, `web/src/routes/dev/components/+page.svelte`
-- Test: `web/src/lib/ui/ui.test.ts`
+- Test: `web/src/lib/ui/ui.test.ts`, `web/src/lib/tokens.test.ts`
 
 **Interfaces:**
 - Produces these props. The mockup canvas page "Screens and components" shows each one.
@@ -625,7 +626,7 @@ func TestStreamIsPerUser(t *testing.T)              { /* user B's stream receive
   - `SectionTitle`: `title`, `note?`. `PageHeader`: `title`, `note?`, slots `secondary` and `primary`.
   - `HoverCard`: `title`, `badge?`, `tone?`, `lines: {label, value}[]`, `note?`, slot `trigger`. Opens after 300 ms hover or on focus, closes on Escape, sets `aria-describedby`.
   - `AlertList`: `items: {id, level: 'urgent' | 'today', title, reason, action}[]`, `onact(id)`, `ondismiss(id)`
-- `tokens.css` defines every value in Global Constraints as a CSS variable, and the Tailwind theme reads them.
+- `tokens.css` defines every value in Global Constraints as a CSS custom property in two layers: raw palette and scale values, then meaning tokens such as `--color-action`, `--color-text-muted`, `--color-surface`, `--color-border`, `--color-status-success-bg`, `--space-4`, `--radius-control`, `--font-size-body`, `--control-height`, `--duration-screen`, `--ease-standard`, `--layer-popover`. Components use meaning tokens only. A hotel brand colour overrides `--color-action` and the tokens derived from it on the page root, and nothing else.
 
 - [ ] **Step 1: Write the failing tests** with `@testing-library/svelte`.
 
@@ -634,17 +635,26 @@ test('icon-only button has an accessible name', () => {
   render(Button, { icon: 'close', iconOnly: true, children: text('Close chat') });
   expect(screen.getByRole('button', { name: 'Close chat' })).toBeInTheDocument();
 });
-test('button is 44 px high and uses the token colours', () => { /* computed height 44px; primary background var(--accent) */ });
+test('button is 44 px high and uses the action token', () => { /* computed height 44px; primary background is var(--color-action) */ });
 test('segmented control marks the chosen option', async () => { /* click "Revenue": aria-pressed true on it, false on the others, bound value 'revenue' */ });
 test('field shows its error and links it to the input', () => { /* aria-invalid true, aria-describedby points at the message */ });
 test('hover card opens on focus and closes on Escape', async () => { /* role tooltip appears, then is gone */ });
 test('hover card does not open before 300 ms of hover', async () => { /* fake timers: absent at 299 ms, present at 300 ms */ });
 test('alert list calls onact with the id and removes the row', async () => { /* 2 rows → click action on 'a' → 1 row, onact('a') */ });
 test('empty alert list says nothing needs attention', () => { /* text "Nothing needs attention" */ });
+
+// tokens.test.ts
+test('no component file holds a literal design value', () => {
+  /* read every .svelte and .css under src except lib/tokens.css; fail on: a hex colour, rgb( or hsl(, a px value on padding, margin, gap, border-radius, font-size or line-height, a ms or s duration, a z-index number, a font-family name */
+});
+test('every var(--x) used in a component is defined in tokens.css', () => { /* collect var(--name) from component files; each name must be declared in tokens.css */ });
+test('no meaning token points at another meaning token more than 2 deep', () => { /* keeps the palette to meaning mapping readable */ });
+test('a brand override changes the action colour and no status colour', () => { /* set --color-action on the root: computed action changes; --color-status-success-bg, -warning-bg, -danger-bg, -info-bg are unchanged */ });
+test('every token the spec lists exists', () => { /* the values in Global Constraints: sizes 12,14,16,20,28; spacing 4,8,12,16,24,32; radius 4,8,12; control height 44; the 5 breakpoint-related sizes */ });
 ```
 
 - [ ] **Step 2: Run `npm test` in `web/`.** Expected: FAIL.
-- [ ] **Step 3: Implement the components.** Build `Segmented` and `HoverCard` on Bits UI primitives. Use CSS logical properties. Hover styles sit inside `@media (hover: hover)`.
+- [ ] **Step 3: Implement the components.** Build `Segmented` and `HoverCard` on Bits UI primitives. Write each component's CSS in its own `<style>` block using `var(--token)` only, with no literal colour, size, duration or layer. Use CSS logical properties. Hover styles sit inside `@media (hover: hover)`.
 - [ ] **Step 4: Build `/dev/components`**, a page that shows every component in every variant. It is the target for the design checker and for visual review.
 - [ ] **Step 5: Run `npm test` and `npx @enmera/ai-design-check web/src`.** Expected: tests PASS, 0 errors and 0 warnings.
 - [ ] **Step 6: Commit** with message `feat: design tokens and shared components`.
