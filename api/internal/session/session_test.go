@@ -408,3 +408,37 @@ func TestSetViewAsIsRememberedAndCanBeCleared(t *testing.T) {
 		t.Fatalf("unknown session: %v", err)
 	}
 }
+
+func TestEndInOrgEndsOnlyThatOrganizationsSessionsOfThatUser(t *testing.T) {
+	pool := testdb.New(t)
+	u, other := seedUser(t, pool, "mai@hotel.com"), seedUser(t, pool, "lan@hotel.com")
+	var a, b uuid.UUID
+	if err := tx(t, pool, func(c pgx.Tx) (e error) {
+		if a, e = tenant.CreateOrganization(ctx, c, "A"); e != nil {
+			return
+		}
+		b, e = tenant.CreateOrganization(ctx, c, "B")
+		return
+	}); err != nil {
+		t.Fatal(err)
+	}
+	mk := func(user uuid.UUID, org *uuid.UUID) string {
+		s := create(t, pool, user, session.StageFull, t0)
+		if org != nil {
+			tx(t, pool, func(c pgx.Tx) error { return session.SetOrganization(ctx, c, s.ID, *org) })
+		}
+		return s.ID
+	}
+	inA, inB, none, othersInA := mk(u, &a), mk(u, &b), mk(u, nil), mk(other, &a)
+	if err := tx(t, pool, func(c pgx.Tx) error { return session.EndInOrg(ctx, c, u, a) }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := lookup(pool, inA, t0); !errors.Is(err, session.ErrNotFound) {
+		t.Fatalf("the session in A survived: %v", err)
+	}
+	for name, id := range map[string]string{"in B": inB, "without an organization": none, "another user's in A": othersInA} {
+		if _, err := lookup(pool, id, t0); err != nil {
+			t.Errorf("the session %s was ended: %v", name, err)
+		}
+	}
+}

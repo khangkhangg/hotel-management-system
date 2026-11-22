@@ -123,3 +123,37 @@ func TestUserScopeDoesNotLeakToNextTransaction(t *testing.T) {
 		t.Fatalf("a later transaction saw %d memberships", n)
 	}
 }
+
+func TestAnInviteIsVisibleOnlyThroughItsOwnToken(t *testing.T) {
+	w := newWorld(t)
+	token := []byte("hash-of-token-1")
+	if err := db.WithOrg(ctx, w.pool, w.a, func(tx pgx.Tx) error {
+		_, e := tx.Exec(ctx, `insert into invite (id, organization_id, email, role, token_hash, created_at, expires_at)
+			values (gen_random_uuid(), $1, 'new@hotel.com', 'owner', $2, now(), now() + interval '7 days')`, w.a, token)
+		return e
+	}); err != nil {
+		t.Fatal(err)
+	}
+	seen := func(run func(func(pgx.Tx) error) error) (n int) {
+		if err := run(func(tx pgx.Tx) error { return tx.QueryRow(ctx, `select count(*) from invite`).Scan(&n) }); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	cases := map[string]struct {
+		run  func(func(pgx.Tx) error) error
+		want int
+	}{
+		"no scope":           {func(f func(pgx.Tx) error) error { return db.WithoutOrg(ctx, w.pool, f) }, 0},
+		"its organization":   {func(f func(pgx.Tx) error) error { return db.WithOrg(ctx, w.pool, w.a, f) }, 1},
+		"another one":        {func(f func(pgx.Tx) error) error { return db.WithOrg(ctx, w.pool, w.b, f) }, 0},
+		"the right token":    {func(f func(pgx.Tx) error) error { return db.WithInvite(ctx, w.pool, token, f) }, 1},
+		"a different token":  {func(f func(pgx.Tx) error) error { return db.WithInvite(ctx, w.pool, []byte("another"), f) }, 0},
+		"a signed-in person": {func(f func(pgx.Tx) error) error { return db.WithUser(ctx, w.pool, w.mai, f) }, 0},
+	}
+	for name, c := range cases {
+		if got := seen(c.run); got != c.want {
+			t.Errorf("%s sees %d invites, want %d", name, got, c.want)
+		}
+	}
+}

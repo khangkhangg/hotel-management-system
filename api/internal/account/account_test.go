@@ -124,11 +124,15 @@ func TestMembershipRoleMustBeOneOfTheFive(t *testing.T) {
 	if err := addMember(pool, org, user, &prop, "janitor"); err == nil {
 		t.Fatal("unknown role accepted")
 	}
-	for _, r := range []string{"owner", "manager", "front_desk", "revenue", "housekeeping"} {
+	for _, r := range []string{"manager", "front_desk", "revenue", "housekeeping"} {
 		u, _ := create(pool, r+"@hotel.com")
 		if err := addMember(pool, org, u, &prop, r); err != nil {
 			t.Errorf("%s rejected: %v", r, err)
 		}
+	}
+	owner, _ := create(pool, "owner@hotel.com")
+	if err := addMember(pool, org, owner, nil, "owner"); err != nil {
+		t.Errorf("owner rejected: %v", err)
 	}
 }
 
@@ -208,5 +212,17 @@ func TestByIDFindsTheRightUser(t *testing.T) {
 	err = db.WithoutOrg(ctx, pool, func(tx pgx.Tx) error { _, e := account.ByID(ctx, tx, uuid.New()); return e })
 	if !errors.Is(err, account.ErrNotFound) {
 		t.Fatalf("unknown id: %v", err)
+	}
+}
+
+func TestOwnerIsOrganizationWideAndNobodyElseIs(t *testing.T) {
+	pool, org, prop, user := seed(t)
+	if err := addMember(pool, org, user, &prop, "owner"); err == nil {
+		t.Fatal("an owner tied to one property was accepted")
+	}
+	for _, r := range []string{"manager", "front_desk", "revenue", "housekeeping"} {
+		if err := addMember(pool, org, user, nil, r); err == nil {
+			t.Errorf("organization-wide %s was accepted", r)
+		}
 	}
 }

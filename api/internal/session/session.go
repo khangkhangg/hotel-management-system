@@ -162,6 +162,12 @@ func End(ctx context.Context, tx pgx.Tx, id string) error {
 	return err
 }
 
+// EndInOrg ends one person's sessions in one organization, leaving their sessions anywhere else alone.
+func EndInOrg(ctx context.Context, tx pgx.Tx, userID, orgID uuid.UUID) error {
+	_, err := tx.Exec(ctx, `delete from session where user_id = $1 and org_id = $2`, userID, orgID)
+	return err
+}
+
 func EndAll(ctx context.Context, tx pgx.Tx, userID uuid.UUID) error {
 	_, err := tx.Exec(ctx, `delete from session where user_id = $1`, userID)
 	return err
