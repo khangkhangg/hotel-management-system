@@ -4,6 +4,8 @@ import { createRawSnippet } from 'svelte';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import AlertList from './AlertList.svelte';
 import Checkbox from './Checkbox.svelte';
+import Dialog from './Dialog.svelte';
+import Select from './Select.svelte';
 import Button from './Button.svelte';
 import Field from './Field.svelte';
 import HoverCard from './HoverCard.svelte';
@@ -209,5 +211,41 @@ describe('Checkbox', () => {
 		expect(box).not.toBeChecked();
 		await userEvent.click(box);
 		expect(box).toBeChecked();
+	});
+});
+
+describe('Select', () => {
+	const options = [
+		{ id: 'a', label: 'Alpha' },
+		{ id: 'b', label: 'Beta' }
+	];
+
+	test('is found by its label and reports a change', async () => {
+		const onchange = vi.fn();
+		render(Select, { label: 'Role', options, value: 'a', onchange });
+		const select = screen.getByLabelText('Role');
+		expect(select).toHaveValue('a');
+		await userEvent.selectOptions(select, 'Beta');
+		expect(onchange).toHaveBeenCalledWith('b');
+	});
+
+	test('can hide its label and still be named', () => {
+		render(Select, { label: 'Property', options, value: 'a', hideLabel: true });
+		expect(screen.getByRole('combobox', { name: 'Property' })).toBeInTheDocument();
+	});
+});
+
+describe('Dialog', () => {
+	test('shows its title and content when open, named by the title', () => {
+		render(Dialog, { title: 'Invite user', open: true, children: text('Body text') });
+		expect(screen.getByRole('dialog', { name: 'Invite user' })).toBeInTheDocument();
+		expect(screen.getByText('Body text')).toBeInTheDocument();
+	});
+
+	test('the close button asks to close', async () => {
+		const onclose = vi.fn();
+		render(Dialog, { title: 'Invite user', open: true, onclose, children: text('Body') });
+		await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+		expect(onclose).toHaveBeenCalled();
 	});
 });

@@ -1,3 +1,5 @@
+import { returnTo } from './draft.ts';
+
 // Small things the sign-in steps hand to each other. They live in sessionStorage, not the address bar,
 // so an email address never ends up in a URL or the browser history.
 export type OrganizationChoice = { id: string; name: string };
@@ -45,5 +47,5 @@ export function destination(step: NextStep): string {
 		organizationChoices.set(step.organizations ?? []);
 		return '/sign-in/organization';
 	}
-	return '/';
+	return returnTo.take() ?? '/';
 }

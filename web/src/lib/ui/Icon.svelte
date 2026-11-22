@@ -25,6 +25,9 @@
 		Tag,
 		TriangleAlert,
 		User,
+		Users,
+		Activity,
+		LogOut,
 		X
 	} from '@lucide/svelte';
 
@@ -38,6 +41,9 @@
 		tag: Tag,
 		link: Link,
 		list: List,
+	users: Users,
+	logout: LogOut,
+	activity: Activity,
 		chart: ChartColumn,
 		file: FileText,
 		shield: ShieldCheck,

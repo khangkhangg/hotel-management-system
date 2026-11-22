@@ -12,6 +12,12 @@ export class ApiError extends Error {
 
 let csrf: string | null = null;
 let property: string | null = null;
+let unauthorized: ((path: string) => void) | null = null;
+
+/** Called with the path of any request that finds the session gone (401), except sign-in itself. */
+export function onUnauthorized(handler: ((path: string) => void) | null) {
+	unauthorized = handler;
+}
 
 /** Forget the cached CSRF token and property. For tests and for signing out. */
 export function resetApi() {
@@ -53,6 +59,7 @@ async function request<T>(method: string, path: string, body?: unknown, retried 
 		csrf = null; // the cookie was renewed or lost; fetch a fresh token and try once more
 		return request<T>(method, path, body, true);
 	}
+	if (res.status === 401 && !path.startsWith('/api/sign-in')) unauthorized?.(path);
 	throw new ApiError(res.status, code, data?.error?.message ?? res.statusText);
 }
 

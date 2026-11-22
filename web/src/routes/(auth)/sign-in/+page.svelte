@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { api, errorText } from '#lib/api.ts';
 	import { t, has } from '#lib/i18n.ts';
-	import { destination, pendingEmail, type NextStep } from '#lib/session.ts';
+	import { destination, pendingEmail, type NextStep } from '#lib/signin-steps.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import Field from '#lib/ui/Field.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';

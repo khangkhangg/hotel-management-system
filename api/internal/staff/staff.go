@@ -34,6 +34,7 @@ func Mount(mux *http.ServeMux, d httpx.Deps) {
 	mux.HandleFunc("/api/staff/{id}/deactivate", m(http.MethodPost, users(h.setStatus("deactivated"))))
 	mux.HandleFunc("/api/staff/{id}/reactivate", m(http.MethodPost, users(h.setStatus("active"))))
 	mux.HandleFunc("/api/staff/{id}/reset-sign-in", m(http.MethodPost, users(h.resetSignIn)))
+	mux.HandleFunc("/api/properties", m(http.MethodGet, httpx.Wrap(d.RequireSession(http.HandlerFunc(h.properties)))))
 	mux.HandleFunc("/api/invites/{token}", m(http.MethodGet, h.previewInvite))
 	mux.HandleFunc("/api/invites/{token}/accept", m(http.MethodPost, h.acceptInvite))
 	mux.HandleFunc("/api/password-reset", m(http.MethodPost, h.requestReset))

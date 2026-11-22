@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { api, ApiError, resetApi, setProperty, errorText } from './api.ts';
+import { api, ApiError, resetApi, setProperty, errorText, onUnauthorized } from './api.ts';
 
 type Call = { url: string; init: RequestInit };
 let calls: Call[];
@@ -103,5 +103,25 @@ describe('api', () => {
 		expect(errorText(new ApiError(401, 'invalid_credentials', 'server words'))).toBe('The email or password is not right.');
 		expect(errorText(new ApiError(400, 'something_new', 'server words'))).toBe('server words');
 		expect(errorText(new Error('boom'))).toBe('Something failed on our side. Try again.');
+	});
+});
+
+describe('an expired session', () => {
+	test('a 401 calls the handler once, then still throws', async () => {
+		const seen: string[] = [];
+		onUnauthorized((path) => seen.push(path));
+		replies.push(json(401, { error: { code: 'unauthenticated', message: 'Sign in to continue.' } }));
+		await expect(api.get('/api/staff')).rejects.toMatchObject({ status: 401 });
+		expect(seen).toEqual(['/api/staff']);
+		onUnauthorized(null);
+	});
+
+	test('a failed sign-in is a 401 too but does not trigger the handler', async () => {
+		const seen: string[] = [];
+		onUnauthorized((path) => seen.push(path));
+		replies.push(json(200, { token: 't' }), json(401, { error: { code: 'invalid_credentials', message: 'x' } }));
+		await expect(api.post('/api/sign-in', {})).rejects.toMatchObject({ code: 'invalid_credentials' });
+		expect(seen).toEqual([]);
+		onUnauthorized(null);
 	});
 });

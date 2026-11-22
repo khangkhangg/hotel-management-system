@@ -19,7 +19,7 @@ test('sign in with password and code', async ({ page }) => {
 	await expect(page.getByText('mai@hotel.com')).toBeVisible();
 	await page.getByLabel('Code').fill(await lastCode(page, 'mai@hotel.com'));
 	await page.getByRole('button', { name: 'Continue' }).click();
-	await expect(page).toHaveURL('/');
+	await expect(page).toHaveURL('/calendar'); // front desk lands on the first item of its menu
 });
 
 test('wrong password shows the message and keeps the email', async ({ page }) => {

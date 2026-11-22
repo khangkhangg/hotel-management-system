@@ -25,6 +25,7 @@ import (
 	"hotelpms/api/internal/mail"
 	"hotelpms/api/internal/notify"
 	"hotelpms/api/internal/password"
+	"hotelpms/api/internal/session"
 	"hotelpms/api/internal/staff"
 	"hotelpms/api/internal/tenant"
 )
@@ -72,6 +73,50 @@ func main() {
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"path": "/invite/" + token, "propertyId": property})
 	})
+	// Test helpers: sign a person in without the code step, expire their sessions, send them a notification.
+	mux.HandleFunc("/api/test/login", func(w http.ResponseWriter, r *http.Request) {
+		err := db.WithoutOrg(r.Context(), pool, func(tx pgx.Tx) error {
+			u, err := account.ByEmail(r.Context(), tx, r.URL.Query().Get("email"))
+			if err != nil {
+				return err
+			}
+			s, err := session.Create(r.Context(), tx, u.ID, session.StageFull, "e2e", time.Now())
+			if err != nil {
+				return err
+			}
+			if err := session.SetOrganization(r.Context(), tx, s.ID, org); err != nil {
+				return err
+			}
+			session.SetCookie(w, s.ID, false)
+			return nil
+		})
+		reply(w, err)
+	})
+	mux.HandleFunc("/api/test/expire-session", func(w http.ResponseWriter, r *http.Request) {
+		err := db.WithoutOrg(r.Context(), pool, func(tx pgx.Tx) error {
+			u, err := account.ByEmail(r.Context(), tx, r.URL.Query().Get("email"))
+			if err != nil {
+				return err
+			}
+			return session.EndAll(r.Context(), tx, u.ID)
+		})
+		reply(w, err)
+	})
+	mux.HandleFunc("/api/test/notify", func(w http.ResponseWriter, r *http.Request) {
+		var id uuid.UUID
+		err := db.WithoutOrg(r.Context(), pool, func(tx pgx.Tx) error {
+			u, err := account.ByEmail(r.Context(), tx, r.URL.Query().Get("email"))
+			id = u.ID
+			return err
+		})
+		if err == nil {
+			err = db.WithOrg(r.Context(), pool, org, func(tx pgx.Tx) error {
+				return notify.Send(r.Context(), tx, notify.Input{OrgID: org, PropertyID: property, ToUser: &id, Level: notify.ActionNeeded,
+					Key: "e2e:" + uuid.NewString(), Title: "Refund needs approval", Body: "A refund of $40 is waiting.", Now: time.Now()})
+			})
+		}
+		reply(w, err)
+	})
 	srv := &http.Server{Addr: "127.0.0.1:8080", Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 	go func() { <-ctx.Done(); _ = srv.Close() }()
 	log.Printf("e2e API on %s", srv.Addr)
@@ -118,6 +163,7 @@ func seed(ctx context.Context, pool *pgxpool.Pool) (org, property uuid.UUID) {
 		{"mai@hotel.com", "Mai Pham", "front_desk"},
 		{"daniel@hotel.com", "Daniel Tran", "manager"},
 		{"lan@hotel.com", "Lan Vo", "front_desk"},
+		{"tuan@hotel.com", "Tuan Le", "housekeeping"},
 		{"owner@hotel.com", "Linh Nguyen", "owner"},
 	} {
 		var id uuid.UUID
@@ -133,5 +179,29 @@ func seed(ctx context.Context, pool *pgxpool.Pool) (org, property uuid.UUID) {
 		}
 		must(db.WithOrg(ctx, pool, org, func(tx pgx.Tx) error { return tenant.AddMembership(ctx, tx, org, id, prop, p.role) }))
 	}
+
+	// One person who works in two organizations, so sign-in has to ask which one.
+	var second, secondProperty, multi uuid.UUID
+	must(db.WithoutOrg(ctx, pool, func(tx pgx.Tx) (e error) { second, e = tenant.CreateOrganization(ctx, tx, "Second Hotel"); return }))
+	must(db.WithOrg(ctx, pool, second, func(tx pgx.Tx) (e error) {
+		secondProperty, e = tenant.CreateProperty(ctx, tx, second, tenant.PropertyInput{Name: "Harbour house", Slug: "harbour-house", TimeZone: "UTC", Currency: "USD", DefaultLocale: "en"})
+		return
+	}))
+	must(db.WithoutOrg(ctx, pool, func(tx pgx.Tx) (e error) {
+		if multi, e = account.Create(ctx, tx, "multi@hotel.com", "Minh Do"); e != nil {
+			return
+		}
+		return account.SetPassword(ctx, tx, multi, hash)
+	}))
+	must(db.WithOrg(ctx, pool, org, func(tx pgx.Tx) error { return tenant.AddMembership(ctx, tx, org, multi, &property, "front_desk") }))
+	must(db.WithOrg(ctx, pool, second, func(tx pgx.Tx) error { return tenant.AddMembership(ctx, tx, second, multi, &secondProperty, "manager") }))
 	return org, property
+}
+
+func reply(w http.ResponseWriter, err error) {
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

@@ -3,7 +3,7 @@
 	import { onMount } from 'svelte';
 	import { api, ApiError, errorText } from '#lib/api.ts';
 	import { t } from '#lib/i18n.ts';
-	import { destination, pendingEmail, type NextStep } from '#lib/session.ts';
+	import { destination, pendingEmail, type NextStep } from '#lib/signin-steps.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import Checkbox from '#lib/ui/Checkbox.svelte';
 	import Field from '#lib/ui/Field.svelte';

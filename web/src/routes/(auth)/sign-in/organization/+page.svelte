@@ -3,7 +3,7 @@
 	import { onMount } from 'svelte';
 	import { api, errorText } from '#lib/api.ts';
 	import { t } from '#lib/i18n.ts';
-	import { organizationChoices, type OrganizationChoice } from '#lib/session.ts';
+	import { organizationChoices, type OrganizationChoice } from '#lib/signin-steps.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 
