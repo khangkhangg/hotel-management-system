@@ -25,9 +25,22 @@ func TestUnknownRouteIsJSON404(t *testing.T) {
 }
 
 func TestHealthRefusesPost(t *testing.T) {
+	h := httpx.NewRouter(httpx.Deps{})
+	token, cookie := fetchToken(t, h) // the CSRF check runs first, so send a valid token to reach the method check
+	r := httptest.NewRequest("POST", "/api/health", nil)
+	r.Header.Set("X-CSRF-Token", token)
+	r.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, r)
+	if rec.Code != 405 || rec.Header().Get("Allow") != "GET" {
+		t.Fatalf("got %d allow=%q, want 405 and Allow: GET", rec.Code, rec.Header().Get("Allow"))
+	}
+}
+
+func TestHealthPostWithoutATokenIsRefusedByCSRFFirst(t *testing.T) {
 	rec := httptest.NewRecorder()
 	httpx.NewRouter(httpx.Deps{}).ServeHTTP(rec, httptest.NewRequest("POST", "/api/health", nil))
-	if rec.Code != 405 {
-		t.Fatalf("got %d, want 405", rec.Code)
+	if rec.Code != 403 {
+		t.Fatalf("got %d, want 403", rec.Code)
 	}
 }

@@ -18,6 +18,7 @@ import (
 	"hotelpms/api/internal/db"
 	"hotelpms/api/internal/db/testdb"
 	"hotelpms/api/internal/session"
+	"hotelpms/api/internal/tenant"
 )
 
 var (
@@ -300,5 +301,81 @@ func TestReadCookie(t *testing.T) {
 	r.AddCookie(&http.Cookie{Name: "sid", Value: "abc"})
 	if session.ReadCookie(r) != "abc" {
 		t.Fatal("cookie not read")
+	}
+}
+
+func TestSetOrganizationIsRememberedByLookup(t *testing.T) {
+	pool := testdb.New(t)
+	s := create(t, pool, seedUser(t, pool, "mai@hotel.com"), session.StageFull, t0)
+	if got, _ := lookup(pool, s.ID, t0); got.OrgID != nil {
+		t.Fatal("a new session already has an organization")
+	}
+	var org uuid.UUID
+	if err := tx(t, pool, func(c pgx.Tx) (e error) { org, e = tenant.CreateOrganization(ctx, c, "Sample Hotel"); return }); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx(t, pool, func(c pgx.Tx) error { return session.SetOrganization(ctx, c, s.ID, org) }); err != nil {
+		t.Fatal(err)
+	}
+	got, err := lookup(pool, s.ID, t0.Add(time.Minute))
+	if err != nil || got.OrgID == nil || *got.OrgID != org {
+		t.Fatalf("%+v %v", got, err)
+	}
+}
+
+func TestSetOrganizationOnAnUnknownSessionIsNotFound(t *testing.T) {
+	pool := testdb.New(t)
+	err := tx(t, pool, func(c pgx.Tx) error { return session.SetOrganization(ctx, c, "nope", uuid.New()) })
+	if !errors.Is(err, session.ErrNotFound) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestEndDeletesOnlyThatSession(t *testing.T) {
+	pool := testdb.New(t)
+	u := seedUser(t, pool, "mai@hotel.com")
+	a, b := create(t, pool, u, session.StageFull, t0), create(t, pool, u, session.StageFull, t0)
+	if err := tx(t, pool, func(c pgx.Tx) error { return session.End(ctx, c, a.ID) }); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := lookup(pool, a.ID, t0); !errors.Is(err, session.ErrNotFound) {
+		t.Fatalf("ended session still known: %v", err)
+	}
+	if _, err := lookup(pool, b.ID, t0); err != nil {
+		t.Fatalf("End removed another session: %v", err)
+	}
+	if err := tx(t, pool, func(c pgx.Tx) error { return session.End(ctx, c, "never-existed") }); err != nil {
+		t.Fatalf("ending an unknown session should be harmless: %v", err)
+	}
+}
+
+func TestClearCookieExpiresIt(t *testing.T) {
+	rec := httptest.NewRecorder()
+	session.ClearCookie(rec, true)
+	c := rec.Result().Cookies()[0]
+	if c.Name != "sid" || c.Value != "" || c.MaxAge >= 0 || !c.HttpOnly {
+		t.Fatalf("%+v", c)
+	}
+}
+
+func TestDeviceCookieLasts30DaysAndIsHttpOnly(t *testing.T) {
+	rec := httptest.NewRecorder()
+	session.SetDeviceCookie(rec, "tok", true)
+	c := rec.Result().Cookies()[0]
+	if c.Name != "td" || c.Value != "tok" || c.MaxAge != 30*24*3600 || !c.HttpOnly || !c.Secure || c.SameSite != http.SameSiteLaxMode {
+		t.Fatalf("%+v", c)
+	}
+	r := httptest.NewRequest("GET", "/", nil)
+	if session.ReadDeviceCookie(r) != "" {
+		t.Fatal("missing device cookie should read as empty")
+	}
+	r.AddCookie(&http.Cookie{Name: "td", Value: "tok"})
+	if session.ReadDeviceCookie(r) != "tok" {
+		t.Fatal("device cookie not read")
+	}
+	rec = httptest.NewRecorder()
+	session.ClearDeviceCookie(rec, true)
+	if rec.Result().Cookies()[0].MaxAge >= 0 {
+		t.Fatal("device cookie not cleared")
 	}
 }

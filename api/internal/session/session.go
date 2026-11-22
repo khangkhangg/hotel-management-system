@@ -131,6 +131,24 @@ func Purge(ctx context.Context, tx pgx.Tx, now time.Time) (int64, error) {
 	return tag.RowsAffected(), err
 }
 
+// SetOrganization records which organization a signed-in person is working in.
+func SetOrganization(ctx context.Context, tx pgx.Tx, id string, orgID uuid.UUID) error {
+	tag, err := tx.Exec(ctx, `update session set org_id = $2 where id_hash = $1`, hashOf(id), orgID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// End deletes one session. Ending a session that does not exist is not an error.
+func End(ctx context.Context, tx pgx.Tx, id string) error {
+	_, err := tx.Exec(ctx, `delete from session where id_hash = $1`, hashOf(id))
+	return err
+}
+
 func EndAll(ctx context.Context, tx pgx.Tx, userID uuid.UUID) error {
 	_, err := tx.Exec(ctx, `delete from session where user_id = $1`, userID)
 	return err
