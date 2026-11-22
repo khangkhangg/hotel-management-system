@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"hotelpms/api/internal/mail"
+	"hotelpms/api/internal/password"
 )
 
 // Deps is everything routes need. It grows as tasks add routes.
@@ -17,6 +18,8 @@ type Deps struct {
 	Mail         mail.Sender
 	Now          func() time.Time // injected so tests control time
 	CookieSecure bool
+	BaseURL      string                 // the address people use, for links in emails
+	Passwords    password.BreachChecker // checks new passwords against breach lists; nil skips the check
 }
 
 // Clock returns the current time from Now, or the real time when Now is not set.
