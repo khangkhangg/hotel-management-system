@@ -14,8 +14,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"hotelpms/api/internal/access"
 	"hotelpms/api/internal/activity"
+	"hotelpms/api/internal/app"
 	"hotelpms/api/internal/config"
 	"hotelpms/api/internal/db"
 	"hotelpms/api/internal/httpx"
@@ -23,22 +23,7 @@ import (
 	"hotelpms/api/internal/notify"
 	"hotelpms/api/internal/password"
 	"hotelpms/api/internal/session"
-	"hotelpms/api/internal/signin"
-	"hotelpms/api/internal/staff"
 )
-
-// newHandler mounts every area of the API. google is nil when Google sign-in is not configured.
-func newHandler(d httpx.Deps, hub *notify.Hub, google httpx.Mount) http.Handler {
-	mounts := []httpx.Mount{signin.Mount, access.Mount, staff.Mount, activity.Mount, notify.Mount(hub)}
-	if google != nil {
-		mounts = append(mounts, google)
-	}
-	return httpx.NewRouter(d, mounts...)
-}
-
-func googleFor(id, secret, baseURL string) httpx.Mount {
-	return signin.MountGoogle(signin.NewGoogle(signin.GoogleConfig{ClientID: id, ClientSecret: secret, RedirectURL: baseURL + "/api/sign-in/google/callback"}))
-}
 
 // logMailer prints emails instead of sending them, for a machine with no SMTP server set up.
 type logMailer struct{}
@@ -88,7 +73,7 @@ func main() {
 
 	var google httpx.Mount
 	if cfg.GoogleClientID != "" {
-		google = googleFor(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.BaseURL)
+		google = app.GoogleFor(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.BaseURL)
 	}
 	deps := httpx.Deps{Pool: pool, Mail: sender, Now: time.Now, CookieSecure: cfg.CookieSecure, BaseURL: cfg.BaseURL,
 		Passwords: password.NewRangeChecker(&http.Client{Timeout: 5 * time.Second})}
@@ -102,7 +87,7 @@ func main() {
 		addr = "127.0.0.1:8080"
 	}
 	// No WriteTimeout: the notification stream is a response that stays open.
-	srv := &http.Server{Addr: addr, Handler: newHandler(deps, hub, google), ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{Addr: addr, Handler: app.NewHandler(deps, hub, google), ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)

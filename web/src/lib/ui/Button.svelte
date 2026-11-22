@@ -4,6 +4,7 @@
 
 	type Props = {
 		variant?: 'primary' | 'secondary' | 'quiet';
+		type?: 'button' | 'submit';
 		icon?: IconName;
 		iconOnly?: boolean;
 		block?: boolean;
@@ -12,7 +13,7 @@
 		onclick?: (event: MouseEvent) => void;
 		children: Snippet;
 	};
-	let { variant = 'primary', icon, iconOnly = false, block = false, disabled = false, href, onclick, children }: Props = $props();
+	let { variant = 'primary', type = 'button', icon, iconOnly = false, block = false, disabled = false, href, onclick, children }: Props = $props();
 </script>
 
 {#snippet inner()}
@@ -23,7 +24,7 @@
 {#if href}
 	<a class="button {variant}" class:block class:icon-only={iconOnly} {href}>{@render inner()}</a>
 {:else}
-	<button type="button" class="button {variant}" class:block class:icon-only={iconOnly} {disabled} {onclick}>{@render inner()}</button>
+	<button {type} class="button {variant}" class:block class:icon-only={iconOnly} {disabled} {onclick}>{@render inner()}</button>
 {/if}
 
 <style>

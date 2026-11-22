@@ -1,4 +1,4 @@
-package main
+package app_test
 
 import (
 	"net/http"
@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"hotelpms/api/internal/app"
 	"hotelpms/api/internal/db/testdb"
 	"hotelpms/api/internal/httpx"
 	"hotelpms/api/internal/mail"
@@ -20,7 +21,7 @@ func TestEveryAreaIsMountedAndNeedsASession(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(hub.Close)
-	h := newHandler(httpx.Deps{Pool: pool, Mail: mail.NewFake(), Now: time.Now}, hub, nil)
+	h := app.NewHandler(httpx.Deps{Pool: pool, Mail: mail.NewFake(), Now: time.Now}, hub, nil)
 
 	get := func(method, path string) int {
 		req := httptest.NewRequest(method, path, strings.NewReader("{}"))
@@ -51,7 +52,7 @@ func TestGoogleSignInIsMountedWhenConfigured(t *testing.T) {
 	pool := testdb.New(t)
 	hub, _ := notify.NewHub(pool)
 	t.Cleanup(hub.Close)
-	h := newHandler(httpx.Deps{Pool: pool, Mail: mail.NewFake(), Now: time.Now}, hub, googleFor("id", "secret", "https://app.example.com"))
+	h := app.NewHandler(httpx.Deps{Pool: pool, Mail: mail.NewFake(), Now: time.Now}, hub, app.GoogleFor("id", "secret", "https://app.example.com"))
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest("GET", "/api/sign-in/google/start", nil))
 	if rec.Code != http.StatusFound || !strings.Contains(rec.Header().Get("Location"), "accounts.google.com") {

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { createRawSnippet } from 'svelte';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import AlertList from './AlertList.svelte';
+import Checkbox from './Checkbox.svelte';
 import Button from './Button.svelte';
 import Field from './Field.svelte';
 import HoverCard from './HoverCard.svelte';
@@ -186,5 +187,27 @@ describe('AlertList', () => {
 		expect(screen.getByText(/2 items/)).toBeInTheDocument();
 		await userEvent.click(screen.getAllByRole('button', { name: 'Dismiss' })[0]);
 		expect(screen.getByText(/1 item(?!s)/)).toBeInTheDocument();
+	});
+});
+
+describe('Button type', () => {
+	test('a submit button has type submit, so Enter in a form sends it', () => {
+		render(Button, { type: 'submit', children: text('Go') });
+		expect(screen.getByRole('button', { name: 'Go' })).toHaveAttribute('type', 'submit');
+	});
+
+	test('a button is not a submit button unless asked', () => {
+		render(Button, { children: text('Plain') });
+		expect(screen.getByRole('button', { name: 'Plain' })).toHaveAttribute('type', 'button');
+	});
+});
+
+describe('Checkbox', () => {
+	test('is found by its label and toggles', async () => {
+		render(Checkbox, { label: 'Trust this device for 30 days' });
+		const box = screen.getByLabelText('Trust this device for 30 days');
+		expect(box).not.toBeChecked();
+		await userEvent.click(box);
+		expect(box).toBeChecked();
 	});
 });
