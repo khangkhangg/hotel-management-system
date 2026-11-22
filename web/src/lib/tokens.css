@@ -1,0 +1,222 @@
+/*
+ * Design tokens: the single source of truth for how the app looks.
+ * Spec: docs/specs/08-branding-and-interface.md
+ *
+ * Layer 1, raw values: named by what they are (--palette-*, --font-size-*, --space-*).
+ * Layer 2, meaning tokens: named by what they do (--color-*, --font-*, --pad-*).
+ * Components use layer 2 only. Nothing outside this file holds a literal colour,
+ * length, duration, layer number or font name. tokens.test.ts enforces that.
+ *
+ * Branding: a hotel's colour replaces --brand on the page root and nothing else.
+ * Status colours do not depend on --brand, so "Paid" looks the same in every hotel.
+ */
+
+:root {
+	/* ---------- Layer 1: raw values ---------- */
+
+	/* Neutral palette */
+	--palette-page: #F4F5F3;
+	--palette-surface: #FFFFFF;
+	--palette-surface-muted: #ECEEEB;
+	--palette-surface-sunken: #E3E7E3;
+	--palette-border: #E2E5E1;
+	--palette-divider: #EDEFEC;
+	--palette-border-strong: #8B9590;
+	--palette-border-soft: #C9CFCA;
+	--palette-text: #17201D;
+	--palette-text-subtle: #3F4A45;
+	--palette-text-muted: #56615C;
+	--palette-text-inverse: #FFFFFF;
+	--palette-ink: #17201D;
+
+	/* Brand. Replace this one value to rebrand a hotel. The values derived from it are declared below. */
+	--brand: #1F5F4F;
+
+	/* Status palette. Never derived from the brand. */
+	--palette-success-bg: #E1F2EA;
+	--palette-success-fg: #14553F;
+	--palette-success-dot: #1E8A63;
+	--palette-warning-bg: #FBEFD2;
+	--palette-warning-fg: #7A4A00;
+	--palette-warning-dot: #B87A00;
+	--palette-danger-bg: #FBE5E1;
+	--palette-danger-fg: #8A2A1E;
+	--palette-danger-dot: #C9422F;
+	--palette-info-bg: #E2ECFB;
+	--palette-info-fg: #1D4C8F;
+	--palette-info-dot: #3B78D8;
+	--palette-neutral-dot: #7C8782;
+
+	/* Placeholder photo tints, used until a hotel uploads its own photos */
+	--palette-photo-1: #DDE4DC;
+	--palette-photo-2: #D5DEE2;
+	--palette-photo-3: #E6DFD3;
+	--palette-photo-4: #DAD9E3;
+
+	/* Type scale */
+	--font-family: 'IBM Plex Sans', system-ui, sans-serif;
+	--font-size-xs: 12px;
+	--font-size-sm: 14px;
+	--font-size-md: 16px;
+	--font-size-lg: 20px;
+	--font-size-xl: 28px;
+	--line-height-xs: 16px;
+	--line-height-sm: 20px;
+	--line-height-md: 24px;
+	--line-height-lg: 28px;
+	--line-height-xl: 36px;
+	--font-weight-regular: 400;
+	--font-weight-medium: 500;
+	--font-weight-semibold: 600;
+
+	/* Spacing, on a 4 px grid */
+	--space-0: 0;
+	--space-1: 4px;
+	--space-2: 8px;
+	--space-3: 12px;
+	--space-4: 16px;
+	--space-6: 24px;
+	--space-8: 32px;
+
+	/* Shape */
+	--radius-sm: 4px;
+	--radius-md: 8px;
+	--radius-lg: 12px;
+	--radius-full: 999px;
+	--border-width: 1px;
+	--border-width-strong: 2px;
+
+	/* Sizes */
+	--control-height: 44px;
+	--control-height-compact: 36px;
+	--icon-size: 20px;
+	--icon-stroke: 1.75;
+	--size-hidden: 1px;
+	--dot-size: 8px;
+	--bar-height: 4px;
+	--meter-height: 8px;
+	--sidebar-width: 240px;
+	--rail-width: 68px;
+	--topbar-height: 64px;
+	--hovercard-width: 280px;
+	--panel-width: 380px;
+	--content-max-width: 1280px;
+
+	/* Breakpoints. Media queries cannot read variables, so these are documented here
+	   for scripts and checked against the @media rules by tokens.test.ts. */
+	--breakpoint-tablet: 640px;
+	--breakpoint-desktop: 1024px;
+
+	/* Motion */
+	--duration-fast: 150ms;
+	--duration-screen: 200ms;
+	--duration-slide: 250ms;
+	--duration-fade: 300ms;
+	--duration-reduced: 1ms;
+	--ease-standard: cubic-bezier(0.2, 0, 0, 1);
+	--ease-out: ease-out;
+
+	/* Layers */
+	--layer-raised: 1;
+	--layer-sticky: 3;
+	--layer-header: 4;
+	--layer-popover: 5;
+	--layer-panel: 10;
+
+	/* Elevation. Cards use borders; shadows are for things that float. */
+	--shadow-float: 0 8px 24px rgb(23 32 29 / 0.14);
+	--shadow-bar: 0 -8px 24px rgb(23 32 29 / 0.08);
+	--shadow-thumb: 0 1px 2px rgb(23 32 29 / 0.16);
+
+	/* ---------- Layer 2: meaning tokens ---------- */
+
+	/* Surfaces and lines */
+	--color-page: var(--palette-page);
+	--color-surface: var(--palette-surface);
+	--color-surface-muted: var(--palette-surface-muted);
+	--color-surface-sunken: var(--palette-surface-sunken);
+	--color-border: var(--palette-border);
+	--color-divider: var(--palette-divider);
+	--color-border-input: var(--palette-border-strong);
+	--color-border-button: var(--palette-border-soft);
+	--color-border-button-hover: var(--palette-border-strong);
+
+	/* Text */
+	--color-text: var(--palette-text);
+	--color-text-subtle: var(--palette-text-subtle);
+	--color-text-muted: var(--palette-text-muted);
+	--color-text-inverse: var(--palette-text-inverse);
+	--color-ink: var(--palette-ink);
+
+	/* Action text and focus do not depend on the brand */
+	--color-action-text: var(--palette-text-inverse);
+	--color-focus: var(--palette-ink);
+
+	/* Buttons */
+	--color-button-secondary-bg: var(--palette-surface);
+	--color-button-secondary-bg-hover: var(--palette-page);
+	--color-button-quiet-bg-hover: var(--palette-surface-muted);
+	--color-disabled-bg: var(--palette-surface-muted);
+	--color-disabled-text: var(--palette-text-muted);
+
+	/* Status */
+	--color-status-success-bg: var(--palette-success-bg);
+	--color-status-success-fg: var(--palette-success-fg);
+	--color-status-success-dot: var(--palette-success-dot);
+	--color-status-warning-bg: var(--palette-warning-bg);
+	--color-status-warning-fg: var(--palette-warning-fg);
+	--color-status-warning-dot: var(--palette-warning-dot);
+	--color-status-danger-bg: var(--palette-danger-bg);
+	--color-status-danger-fg: var(--palette-danger-fg);
+	--color-status-danger-dot: var(--palette-danger-dot);
+	--color-status-info-bg: var(--palette-info-bg);
+	--color-status-info-fg: var(--palette-info-fg);
+	--color-status-info-dot: var(--palette-info-dot);
+	--color-status-neutral-bg: var(--palette-surface-muted);
+	--color-status-neutral-fg: var(--palette-text-subtle);
+	--color-status-neutral-dot: var(--palette-neutral-dot);
+
+	/* Trend colours for figures: up is good, down is bad */
+	--color-trend-up: var(--palette-success-fg);
+	--color-trend-down: var(--palette-danger-fg);
+
+	/* Type, as shorthand: font: var(--font-body) */
+	--font-caption: var(--font-weight-regular) var(--font-size-xs) / var(--line-height-xs) var(--font-family);
+	--font-label: var(--font-weight-medium) var(--font-size-xs) / var(--line-height-xs) var(--font-family);
+	--font-body: var(--font-weight-regular) var(--font-size-sm) / var(--line-height-sm) var(--font-family);
+	--font-body-strong: var(--font-weight-semibold) var(--font-size-sm) / var(--line-height-sm) var(--font-family);
+	--font-control: var(--font-weight-semibold) var(--font-size-sm) / var(--line-height-sm) var(--font-family);
+	--font-input: var(--font-weight-regular) var(--font-size-md) / var(--line-height-md) var(--font-family);
+	--font-title: var(--font-weight-semibold) var(--font-size-md) / var(--line-height-md) var(--font-family);
+	--font-heading: var(--font-weight-semibold) var(--font-size-lg) / var(--line-height-lg) var(--font-family);
+	--font-display: var(--font-weight-semibold) var(--font-size-xl) / var(--line-height-xl) var(--font-family);
+
+	/* Spacing by purpose */
+	--pad-control-x: var(--space-4);
+	--pad-card: var(--space-4);
+	--pad-page: var(--space-6);
+	--pad-page-compact: var(--space-4);
+	--gap-tight: var(--space-1);
+	--gap-related: var(--space-2);
+	--gap-group: var(--space-4);
+	--gap-section: var(--space-6);
+}
+
+/*
+ * Everything derived from --brand. CSS resolves var() where a property is declared, so these
+ * must be declared again on any element that sets its own --brand. Put data-brand-scope on that
+ * element, or set --brand on :root for a whole page. Status colours are not in this block.
+ */
+:root,
+[data-brand-scope] {
+	--brand-strong: color-mix(in oklch, var(--brand) 78%, black);
+	--brand-ink: color-mix(in oklch, var(--brand) 62%, black);
+	--brand-tint: color-mix(in oklch, var(--brand) 16%, white);
+	--brand-wash: color-mix(in oklch, var(--brand) 7%, white);
+
+	--color-action: var(--brand);
+	--color-action-hover: var(--brand-strong);
+	--color-action-tint: var(--brand-tint);
+	--color-action-ink: var(--brand-ink);
+	--color-action-wash: var(--brand-wash);
+}

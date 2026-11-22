@@ -1,0 +1,22 @@
+/* Base page styles. Values come from tokens only. */
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	background: var(--color-page);
+	color: var(--color-text);
+	font: var(--font-body);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: var(--duration-reduced) !important;
+		transition-duration: var(--duration-reduced) !important;
+	}
+}
