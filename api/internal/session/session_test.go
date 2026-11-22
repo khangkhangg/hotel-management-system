@@ -379,3 +379,32 @@ func TestDeviceCookieLasts30DaysAndIsHttpOnly(t *testing.T) {
 		t.Fatal("device cookie not cleared")
 	}
 }
+
+func TestSetViewAsIsRememberedAndCanBeCleared(t *testing.T) {
+	pool := testdb.New(t)
+	s := create(t, pool, seedUser(t, pool, "mai@hotel.com"), session.StageFull, t0)
+	set := func(role string) error {
+		return tx(t, pool, func(c pgx.Tx) error { return session.SetViewAs(ctx, c, s.ID, role) })
+	}
+	if err := set("front_desk"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := lookup(pool, s.ID, t0); got.ViewAs != "front_desk" {
+		t.Fatalf("view as %q", got.ViewAs)
+	}
+	if err := set(""); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := lookup(pool, s.ID, t0); got.ViewAs != "" {
+		t.Fatalf("view as %q after clearing", got.ViewAs)
+	}
+	if err := set("janitor"); err == nil {
+		t.Fatal("an unknown role was accepted")
+	}
+	if err := set("owner"); err == nil {
+		t.Fatal("viewing as owner was accepted; the switch only goes down to the other roles")
+	}
+	if err := tx(t, pool, func(c pgx.Tx) error { return session.SetViewAs(ctx, c, "nope", "manager") }); !errors.Is(err, session.ErrNotFound) {
+		t.Fatalf("unknown session: %v", err)
+	}
+}

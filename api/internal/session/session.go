@@ -143,6 +143,19 @@ func SetOrganization(ctx context.Context, tx pgx.Tx, id string, orgID uuid.UUID)
 	return nil
 }
 
+// SetViewAs records which role an owner is looking at the app as. "" clears it. The database only accepts
+// the four roles below owner, so an unknown role is an error and "owner" is refused.
+func SetViewAs(ctx context.Context, tx pgx.Tx, id, role string) error {
+	tag, err := tx.Exec(ctx, `update session set view_as = $2 where id_hash = $1`, hashOf(id), role)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // End deletes one session. Ending a session that does not exist is not an error.
 func End(ctx context.Context, tx pgx.Tx, id string) error {
 	_, err := tx.Exec(ctx, `delete from session where id_hash = $1`, hashOf(id))
