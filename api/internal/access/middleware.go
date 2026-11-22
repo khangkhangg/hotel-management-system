@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"hotelpms/api/internal/audit"
 	"hotelpms/api/internal/db"
 	"hotelpms/api/internal/httpx"
 	"hotelpms/api/internal/session"
@@ -94,7 +95,8 @@ func Require(d httpx.Deps, p Permission) func(http.Handler) http.Handler {
 				forbidden(w)
 				return
 			}
-			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), actorKey{}, a)))
+			ctx := context.WithValue(r.Context(), actorKey{}, a)
+			next.ServeHTTP(w, r.WithContext(audit.WithWho(ctx, a.who())))
 		}))
 	}
 }
@@ -120,7 +122,14 @@ func Mount(mux *http.ServeMux, d httpx.Deps) {
 				return
 			}
 			s := httpx.SessionFrom(r.Context())
-			err := db.WithoutOrg(r.Context(), d.Pool, func(tx pgx.Tx) error { return session.SetViewAs(r.Context(), tx, s.ID, in.Role) })
+			ctx := audit.WithWho(r.Context(), a.who())
+			err := db.WithOrg(ctx, d.Pool, a.OrgID, func(tx pgx.Tx) error {
+				if err := session.SetViewAs(ctx, tx, s.ID, in.Role); err != nil {
+					return err
+				}
+				return audit.Record(ctx, tx, audit.Entry{Action: "view_as.changed", TargetType: "user", TargetID: a.UserID,
+					Before: map[string]string{"viewAs": a.ViewAs}, After: map[string]string{"viewAs": in.Role}})
+			})
 			if err != nil {
 				httpx.InternalError(w, err)
 				return
@@ -128,4 +137,8 @@ func Mount(mux *http.ServeMux, d httpx.Deps) {
 			w.WriteHeader(http.StatusNoContent)
 		}))),
 	}))
+}
+
+func (a Actor) who() audit.Who {
+	return audit.Who{UserID: a.UserID, OrgID: a.OrgID, PropertyID: a.PropertyID, Role: string(a.Role), ViewAs: a.ViewAs}
 }

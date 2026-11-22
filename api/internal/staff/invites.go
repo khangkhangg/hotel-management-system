@@ -12,6 +12,7 @@ import (
 
 	"hotelpms/api/internal/access"
 	"hotelpms/api/internal/account"
+	"hotelpms/api/internal/audit"
 	"hotelpms/api/internal/db"
 	"hotelpms/api/internal/httpx"
 	"hotelpms/api/internal/ids"
@@ -90,6 +91,10 @@ func (h *handler) createInvite(w http.ResponseWriter, r *http.Request) {
 			`insert into invite (id, organization_id, property_id, email, role, token_hash, invited_by, created_at, expires_at)
 			 values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
 			inviteID, a.OrgID, property, email, in.Role, hash, a.UserID, now, now.Add(inviteLifetime)); err != nil {
+			return err
+		}
+		if err := audit.Record(ctx, tx, audit.Entry{Action: "user.invited", TargetType: "invite", TargetID: inviteID, TargetLabel: email,
+			After: map[string]any{"role": in.Role, "propertyId": property}}); err != nil {
 			return err
 		}
 		var orgName, propName string
@@ -243,8 +248,15 @@ func (h *handler) acceptInvite(w http.ResponseWriter, r *http.Request) {
 				return err
 			}
 		}
-		_, err = tx.Exec(ctx, `update invite set accepted_at = $2 where id = $1`, inv.ID, now)
-		return err
+		if _, err = tx.Exec(ctx, `update invite set accepted_at = $2 where id = $1`, inv.ID, now); err != nil {
+			return err
+		}
+		who := audit.Who{UserID: user.ID, OrgID: inv.Org, Role: inv.Role}
+		if inv.Property != nil {
+			who.PropertyID = *inv.Property
+		}
+		return audit.Record(audit.WithWho(ctx, who), tx, audit.Entry{Action: "user.joined", TargetType: "user", TargetID: user.ID, TargetLabel: user.Name,
+			After: map[string]any{"role": inv.Role}})
 	})
 	switch {
 	case errors.Is(err, errRefused):

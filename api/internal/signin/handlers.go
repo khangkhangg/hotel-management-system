@@ -2,6 +2,7 @@
 package signin
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"hotelpms/api/internal/account"
+	"hotelpms/api/internal/audit"
 	"hotelpms/api/internal/db"
 	"hotelpms/api/internal/httpx"
 	"hotelpms/api/internal/otp"
@@ -81,7 +83,15 @@ func (h *handler) signIn(w http.ResponseWriter, r *http.Request) {
 	}
 	matches := password.Verify(hash, in.Password)
 	if !matches || !found || user.Status != "active" || user.PasswordHash == "" {
-		if err := db.WithoutOrg(ctx, h.Pool, func(tx pgx.Tx) error { return recordFailure(ctx, tx, now, acctKey, ipKey) }); err != nil {
+		if err := db.WithoutOrg(ctx, h.Pool, func(tx pgx.Tx) error {
+			if err := recordFailure(ctx, tx, now, acctKey, ipKey); err != nil {
+				return err
+			}
+			if !found {
+				return nil
+			}
+			return audit.RecordForUser(ctx, tx, user.ID, audit.Entry{Action: "signin.failed", TargetType: "user", TargetID: user.ID})
+		}); err != nil {
 			httpx.InternalError(w, err)
 			return
 		}
@@ -226,7 +236,10 @@ func (h *handler) settle(r *http.Request, user account.User, s session.Session) 
 			return err
 		}
 		if len(orgs) == 1 {
-			return session.SetOrganization(ctx, tx, s.ID, orgs[0].ID)
+			if err := session.SetOrganization(ctx, tx, s.ID, orgs[0].ID); err != nil {
+				return err
+			}
+			return recordSignIn(ctx, tx, user.ID, orgs[0].ID)
 		}
 		return nil
 	})
@@ -286,7 +299,12 @@ func (h *handler) chooseOrganization(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, o := range orgs {
 		if o.ID == id {
-			if err := db.WithoutOrg(ctx, h.Pool, func(tx pgx.Tx) error { return session.SetOrganization(ctx, tx, s.ID, id) }); err != nil {
+			if err := db.WithoutOrg(ctx, h.Pool, func(tx pgx.Tx) error {
+				if err := session.SetOrganization(ctx, tx, s.ID, id); err != nil {
+					return err
+				}
+				return recordSignIn(ctx, tx, s.UserID, id)
+			}); err != nil {
 				httpx.InternalError(w, err)
 				return
 			}
@@ -367,7 +385,16 @@ func noAccess(w http.ResponseWriter) {
 func (h *handler) signOut(w http.ResponseWriter, r *http.Request) {
 	if id := session.ReadCookie(r); id != "" {
 		ctx := r.Context()
-		if err := db.WithoutOrg(ctx, h.Pool, func(tx pgx.Tx) error { return session.End(ctx, tx, id) }); err != nil {
+		if err := db.WithoutOrg(ctx, h.Pool, func(tx pgx.Tx) error {
+			s, lookupErr := session.Lookup(ctx, tx, id, h.Clock())
+			if err := session.End(ctx, tx, id); err != nil {
+				return err
+			}
+			if lookupErr != nil || s.OrgID == nil {
+				return nil
+			}
+			return audit.RecordAtOrg(ctx, tx, s.UserID, *s.OrgID, audit.Entry{Action: "signout", TargetType: "user", TargetID: s.UserID})
+		}); err != nil {
 			httpx.InternalError(w, err)
 			return
 		}
@@ -382,7 +409,13 @@ func (h *handler) signOutEverywhere(w http.ResponseWriter, r *http.Request) {
 		if err := session.EndAll(ctx, tx, s.UserID); err != nil {
 			return err
 		}
-		return session.ForgetDevices(ctx, tx, s.UserID)
+		if err := session.ForgetDevices(ctx, tx, s.UserID); err != nil {
+			return err
+		}
+		if s.OrgID == nil {
+			return nil
+		}
+		return audit.RecordAtOrg(ctx, tx, s.UserID, *s.OrgID, audit.Entry{Action: "signout", TargetType: "user", TargetID: s.UserID, After: map[string]bool{"everywhere": true}})
 	})
 	if err != nil {
 		httpx.InternalError(w, err)
@@ -391,4 +424,9 @@ func (h *handler) signOutEverywhere(w http.ResponseWriter, r *http.Request) {
 	session.ClearCookie(w, h.CookieSecure)
 	session.ClearDeviceCookie(w, h.CookieSecure)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// recordSignIn notes in the organization a person has entered that they signed in.
+func recordSignIn(ctx context.Context, tx pgx.Tx, userID, orgID uuid.UUID) error {
+	return audit.RecordAtOrg(ctx, tx, userID, orgID, audit.Entry{Action: "signin.succeeded", TargetType: "user", TargetID: userID})
 }

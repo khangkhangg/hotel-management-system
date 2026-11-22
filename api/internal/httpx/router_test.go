@@ -44,3 +44,13 @@ func TestHealthPostWithoutATokenIsRefusedByCSRFFirst(t *testing.T) {
 		t.Fatalf("got %d, want 403", rec.Code)
 	}
 }
+
+func TestEveryResponseCarriesATraceID(t *testing.T) {
+	for _, path := range []string{"/api/health", "/api/nope"} {
+		rec := httptest.NewRecorder()
+		httpx.NewRouter(httpx.Deps{}).ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
+		if rec.Header().Get("X-Trace-Id") == "" {
+			t.Fatalf("%s has no X-Trace-Id", path)
+		}
+	}
+}

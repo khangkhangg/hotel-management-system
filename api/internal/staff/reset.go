@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"hotelpms/api/internal/account"
+	"hotelpms/api/internal/audit"
 	"hotelpms/api/internal/db"
 	"hotelpms/api/internal/httpx"
 	"hotelpms/api/internal/ids"
@@ -104,7 +105,10 @@ func (h *handler) useReset(w http.ResponseWriter, r *http.Request) {
 		if err := session.EndAll(ctx, tx, userID); err != nil {
 			return err
 		}
-		return session.ForgetDevices(ctx, tx, userID)
+		if err := session.ForgetDevices(ctx, tx, userID); err != nil {
+			return err
+		}
+		return audit.RecordForUser(ctx, tx, userID, audit.Entry{Action: "password.changed", TargetType: "user", TargetID: userID})
 	})
 	switch {
 	case errors.Is(err, errLinkInvalid):

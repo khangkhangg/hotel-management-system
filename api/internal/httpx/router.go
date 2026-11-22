@@ -47,7 +47,7 @@ func NewRouter(d Deps, mounts ...Mount) http.Handler {
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusNotFound, "not_found", "There is nothing at this address.")
 	})
-	return d.csrf(mux)
+	return Trace(d.csrf(mux))
 }
 
 func JSON(w http.ResponseWriter, status int, body any) {

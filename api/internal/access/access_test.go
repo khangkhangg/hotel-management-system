@@ -404,3 +404,28 @@ func TestADeactivatedMembershipCannotAct(t *testing.T) {
 		t.Fatalf("a deactivated manager still acts: %d", r.status)
 	}
 }
+
+func TestViewAsChangeIsRecordedWithTheRealRole(t *testing.T) {
+	w := newWorld(t)
+	owner := w.signedIn(t, "linh@hotel.com", &w.orgA).member(t, w.orgA, nil, "owner")
+	mgr := w.signedIn(t, "daniel@hotel.com", &w.orgA).member(t, w.orgA, &w.propA1, "manager")
+	if r := mgr.do("POST", "/api/view-as", nil, `{"role":"front_desk"}`); r.status != 403 {
+		t.Fatalf("manager: %d", r.status)
+	}
+	for _, body := range []string{`{"role":"front_desk"}`, `{"role":""}`} {
+		if r := owner.do("POST", "/api/view-as", nil, body); r.status != 204 {
+			t.Fatalf("%s: %d", body, r.status)
+		}
+	}
+	var n int
+	var role, after string
+	must(t, db.WithOrg(ctx, w.pool, w.orgA, func(tx pgx.Tx) error {
+		if err := tx.QueryRow(ctx, `select count(*) from audit_log where action = 'view_as.changed'`).Scan(&n); err != nil {
+			return err
+		}
+		return tx.QueryRow(ctx, `select actor_role, after::text from audit_log where action = 'view_as.changed' order by seq limit 1`).Scan(&role, &after)
+	}))
+	if n != 2 || role != "owner" || !strings.Contains(after, "front_desk") {
+		t.Fatalf("rows %d, role %q, after %s", n, role, after)
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"hotelpms/api/internal/access"
+	"hotelpms/api/internal/audit"
 	"hotelpms/api/internal/db"
 	"hotelpms/api/internal/httpx"
 	"hotelpms/api/internal/session"
@@ -97,6 +98,7 @@ type target struct {
 	userID       uuid.UUID
 	role         string
 	status       string
+	name         string
 }
 
 var errNoTarget = errors.New("staff: no such person here")
@@ -115,9 +117,9 @@ func findTarget(r *http.Request, tx pgx.Tx, a access.Actor) (target, error) {
 		property = &a.PropertyID
 	}
 	err = tx.QueryRow(r.Context(),
-		`select id, user_id, role, status from membership
-		 where user_id = $1 and organization_id = $2 and property_id is not distinct from $3::uuid`, userID, a.OrgID, property).
-		Scan(&t.membershipID, &t.userID, &t.role, &t.status)
+		`select m.id, m.user_id, m.role, m.status, u.name from membership m join app_user u on u.id = m.user_id
+		 where m.user_id = $1 and m.organization_id = $2 and m.property_id is not distinct from $3::uuid`, userID, a.OrgID, property).
+		Scan(&t.membershipID, &t.userID, &t.role, &t.status, &t.name)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return t, errNoTarget
 	}
@@ -190,7 +192,20 @@ func (h *handler) patch(w http.ResponseWriter, r *http.Request) {
 				return err
 			}
 		}
-		return nil
+		action, afterRole := "user.moved", t.role
+		if in.Role != nil {
+			action, afterRole = "user.role_changed", *in.Role
+		}
+		var beforeProperty, afterProperty any
+		if a.PropertyID != uuid.Nil {
+			beforeProperty = a.PropertyID
+		}
+		afterProperty = beforeProperty
+		if newProperty != nil {
+			afterProperty = *newProperty
+		}
+		return audit.Record(ctx, tx, audit.Entry{Action: action, TargetType: "user", TargetID: t.userID, TargetLabel: t.name,
+			Before: map[string]any{"role": t.role, "propertyId": beforeProperty}, After: map[string]any{"role": afterRole, "propertyId": afterProperty}})
 	})
 	switch {
 	case errors.Is(err, errNoTarget):
@@ -233,10 +248,15 @@ func (h *handler) setStatus(status string) http.HandlerFunc {
 			if _, err := tx.Exec(ctx, `update membership set status = $2 where id = $1`, t.membershipID, status); err != nil {
 				return err
 			}
+			action := "user.reactivated"
 			if status == "deactivated" {
-				return session.EndInOrg(ctx, tx, t.userID, a.OrgID)
+				if err := session.EndInOrg(ctx, tx, t.userID, a.OrgID); err != nil {
+					return err
+				}
+				action = "user.deactivated"
 			}
-			return nil
+			return audit.Record(ctx, tx, audit.Entry{Action: action, TargetType: "user", TargetID: t.userID, TargetLabel: t.name,
+				Before: map[string]string{"status": t.status}, After: map[string]string{"status": status}})
 		})
 		switch {
 		case errors.Is(err, errNoTarget):
@@ -263,7 +283,10 @@ func (h *handler) resetSignIn(w http.ResponseWriter, r *http.Request) {
 		if err := session.EndAll(ctx, tx, t.userID); err != nil {
 			return err
 		}
-		return session.ForgetDevices(ctx, tx, t.userID)
+		if err := session.ForgetDevices(ctx, tx, t.userID); err != nil {
+			return err
+		}
+		return audit.Record(ctx, tx, audit.Entry{Action: "user.signin_reset", TargetType: "user", TargetID: t.userID, TargetLabel: t.name})
 	})
 	switch {
 	case errors.Is(err, errNoTarget):
