@@ -581,3 +581,38 @@ func TestDescribeBrowser(t *testing.T) {
 		}
 	}
 }
+
+func TestDeactivatedMembershipGivesNoAccessAndHidesTheOrganization(t *testing.T) {
+	a := newApp(t)
+	first, second := a.newSite("First Hotel"), a.newSite("Second Hotel")
+	id := a.seedUser("mai@hotel.com", goodPassword, first, "owner")
+	a.addMembership(id, second, "owner")
+	a.deactivateMemberships(first.org)
+	c := a.client()
+	// Only the second organization is left, so it is chosen automatically and the first never appears.
+	r := c.fullSignIn("mai@hotel.com", goodPassword, false).want(200, `"next":"done"`)
+	if strings.Contains(r.body, "First Hotel") {
+		t.Fatalf("a deactivated organization is offered: %s", r.body)
+	}
+	c.get("/api/me").want(200, "Second Hotel")
+
+	a.deactivateMemberships(second.org)
+	c2 := a.client()
+	c2.fullSignIn("mai@hotel.com", goodPassword, false).want(200, `"next":"done"`)
+	c2.get("/api/me").want(403, "no_access")
+}
+
+// deactivateMemberships deactivates every membership inside each organization. Row-level security means
+// the update only reaches rows when it runs with that organization's context.
+func (a *app) deactivateMemberships(orgs ...uuid.UUID) {
+	a.t.Helper()
+	for _, org := range orgs {
+		must(a.t, db.WithOrg(ctx, a.pool, org, func(tx pgx.Tx) error {
+			tag, err := tx.Exec(ctx, `update membership set status = 'deactivated'`)
+			if err == nil && tag.RowsAffected() == 0 {
+				err = fmt.Errorf("no membership was deactivated in %s", org)
+			}
+			return err
+		}))
+	}
+}

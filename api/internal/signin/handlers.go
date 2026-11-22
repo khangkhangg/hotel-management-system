@@ -330,7 +330,7 @@ func (h *handler) me(w http.ResponseWriter, r *http.Request) {
 		rows, e := tx.Query(ctx,
 			`select coalesce(m.property_id::text, ''), coalesce(p.name, ''), m.role
 			 from membership m left join property p on p.id = m.property_id
-			 where m.user_id = $1 and m.organization_id = $2 order by p.name nulls first`, s.UserID, org.ID)
+			 where m.user_id = $1 and m.organization_id = $2 and m.status = 'active' order by p.name nulls first`, s.UserID, org.ID)
 		if e != nil {
 			return e
 		}

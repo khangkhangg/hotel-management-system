@@ -62,7 +62,7 @@ func load(d httpx.Deps, w http.ResponseWriter, r *http.Request) (Actor, bool) {
 		// An organization-wide membership (an owner) covers every property; otherwise the property's own one counts.
 		return tx.QueryRow(ctx,
 			`select role from membership
-			 where user_id = $1 and organization_id = $2 and (property_id is null or property_id = $3::uuid)
+			 where user_id = $1 and organization_id = $2 and status = 'active' and (property_id is null or property_id = $3::uuid)
 			 order by property_id nulls first limit 1`, a.UserID, a.OrgID, property).Scan(&role)
 	})
 	if err != nil && err != pgx.ErrNoRows {

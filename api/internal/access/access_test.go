@@ -389,3 +389,18 @@ func TestViewAsRefusesTheWrongMethod(t *testing.T) {
 		t.Fatalf("%d", r.status)
 	}
 }
+
+func TestADeactivatedMembershipCannotAct(t *testing.T) {
+	w := newWorld(t)
+	p := w.signedIn(t, "mai@hotel.com", &w.orgA).member(t, w.orgA, &w.propA1, "manager")
+	if r := p.can("users.manage", ptr(w.propA1)); r.status != 200 {
+		t.Fatalf("before: %d", r.status)
+	}
+	must(t, db.WithOrg(ctx, w.pool, w.orgA, func(tx pgx.Tx) error {
+		_, e := tx.Exec(ctx, `update membership set status = 'deactivated' where user_id = $1`, p.id)
+		return e
+	}))
+	if r := p.can("users.manage", ptr(w.propA1)); r.status != 403 {
+		t.Fatalf("a deactivated manager still acts: %d", r.status)
+	}
+}
