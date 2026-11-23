@@ -49,6 +49,8 @@
 			res = await api.get<Reservation>(`/api/reservations/${reservation}`);
 			folio = await api.get<Folio>(`/api/reservations/${reservation}/folio`);
 			rooms = await api.get<Room[]>('/api/rooms');
+			extras = await api.get<Extra[]>('/api/extras').catch(() => []);
+			extraId = extras[0]?.id ?? '';
 			version++;
 		} catch (e) {
 			message = errorText(e);
@@ -60,6 +62,25 @@
 		try {
 			await api.post(`/api/reservations/${id}/${path}`, body);
 			ok = done;
+			await load(id!);
+			onchange?.();
+		} catch (e) {
+			message = errorText(e);
+		}
+	}
+
+	type Extra = { id: string; name: string; unit: string; price: number };
+	let extras = $state<Extra[]>([]);
+	let extraId = $state('');
+	let extraQty = $state('1');
+
+	async function sellExtra(event: SubmitEvent) {
+		event.preventDefault();
+		message = ok = '';
+		try {
+			await api.post(`/api/reservations/${id}/extras`, { extraId, quantity: Number(extraQty) });
+			ok = t('panel.extraAdded');
+			extraQty = '1';
 			await load(id!);
 			onchange?.();
 		} catch (e) {
@@ -165,6 +186,13 @@
 					</div>
 				{/each}
 
+				{#if extras.length}
+					<form class="take" onsubmit={sellExtra}>
+						<Select label={t('panel.extra')} options={extras.map((x) => ({ id: x.id, label: `${x.name} · ${money(x.price)}` }))} bind:value={extraId} />
+						<Field label={t('panel.extraQty')} inputmode="numeric" bind:value={extraQty} />
+						<Button type="submit" variant="secondary" disabled={!Number(extraQty)}>{t('panel.addExtra')}</Button>
+					</form>
+				{/if}
 				<form class="take" onsubmit={takePayment}>
 					<Select label={t('panel.method')} options={methods} bind:value={method} />
 					<Field label={t('panel.amount')} inputmode="decimal" bind:value={amount} />
