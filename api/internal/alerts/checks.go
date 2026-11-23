@@ -27,6 +27,7 @@ var registry = []check{
 	{kind: "refund_waiting", role: access.Manager, find: refundWaiting},
 	{kind: "paid_late", role: access.Manager, find: paidLate},
 	{kind: "booking_review", role: access.Manager, find: bookingReview},
+	{kind: "reconfirm_missing", role: access.FrontDesk, find: reconfirmMissing},
 	{kind: "price_parity", role: access.Manager, find: priceParity},
 	{kind: "channel_trouble", role: access.Manager, defaults: map[string]float64{"staleHours": 3}, find: channelTrouble},
 	{kind: "tag_not_answered", role: access.FrontDesk, defaults: map[string]float64{"hours": 4}, find: tagNotAnswered},
@@ -532,4 +533,26 @@ func priceParity(ctx context.Context, tx pgx.Tx, sc scope) ([]Finding, error) {
 		Text:   fmt.Sprintf("The booking sites are sent a lower price than your booking page on %d nights in the next 14 days.", lower),
 		Facts:  map[string]any{"nights": lower},
 		Action: openAction("Open the yield rules", "/yield")}}, nil
+}
+
+// reconfirmMissing finds guests who were asked to reconfirm more than a day ago and have not answered.
+func reconfirmMissing(ctx context.Context, tx pgx.Tx, sc scope) ([]Finding, error) {
+	rows, err := tx.Query(ctx, `select r.id, r.code, g.name from reconfirm c join reservation r on r.id = c.reservation_id join guest g on g.id = r.guest_id
+		where c.property_id = $1 and c.confirmed_at is null and c.sent_at < $2::timestamptz - interval '24 hours' and r.status in ('pending', 'confirmed') order by c.sent_at`, sc.propertyID, sc.now)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Finding
+	for rows.Next() {
+		var id uuid.UUID
+		var code, name string
+		if err := rows.Scan(&id, &code, &name); err != nil {
+			return nil, err
+		}
+		out = append(out, Finding{SubjectType: "reservation", Subject: id, Severity: "warning",
+			Text:   fmt.Sprintf("%s has not reconfirmed booking %s. Call them, and release the room only if there is no answer.", name, code),
+			Action: openAction("Open the booking", "/calendar")})
+	}
+	return out, rows.Err()
 }
