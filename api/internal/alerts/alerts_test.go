@@ -386,25 +386,31 @@ func TestARefundWaitingGoesToTheManagerAndClosesWhenDecided(t *testing.T) {
 	}
 }
 
-func TestADismissedAlertStaysAwayForADay(t *testing.T) {
-	h := newHotel(t, 2)
-	h.book("2026-11-23", "2026-11-25")
+func TestADismissedAlertStaysAwayForADayWhileTheCauseLasts(t *testing.T) {
+	h := newHotel(t, 1)
+	res := h.book("2026-12-10", "2026-12-12")
+	var v struct{ FolioID string }
+	must(t, json.Unmarshal([]byte(h.desk.Do("GET", "/api/reservations/"+res+"/folio", &h.prop, "").Want(t, 200).Body), &v))
+	p := idOf(t, h.desk.Do("POST", "/api/folios/"+v.FolioID+"/payments", &h.prop, `{"method":"cash","amount":20000}`).Want(t, 201))
+	h.desk.Do("POST", "/api/payments/"+p+"/refunds", &h.prop, `{"amount":9000,"reason":"unhappy"}`).Want(t, 201, "pending") // waits for a manager until someone decides
 	h.run()
-	a := h.of(h.desk, "unassigned_arrival")[0]
-	h.desk.Do("POST", "/api/alerts/"+a.ID+"/dismiss", &h.prop, "").Want(t, 204)
+	a := h.of(h.mgr, "refund_waiting")[0]
+	h.mgr.Do("POST", "/api/alerts/"+a.ID+"/dismiss", &h.prop, "").Want(t, 204)
 	h.run()
-	if len(h.of(h.desk, "unassigned_arrival")) != 0 {
+	if len(h.of(h.mgr, "refund_waiting")) != 0 {
 		t.Fatal("it came straight back")
 	}
 	h.w.Advance(23 * time.Hour)
 	h.run()
-	if len(h.of(h.desk, "unassigned_arrival")) != 0 {
+	if len(h.of(h.mgr, "refund_waiting")) != 0 {
 		t.Fatal("it came back before 24 hours")
 	}
-	// 25 hours after the dismissal, on the next hotel day, a new arrival would raise its own alert; the same cause may return.
 	h.w.Advance(2 * time.Hour)
 	h.run()
-	h.desk.Do("POST", "/api/alerts/"+a.ID+"/dismiss", &h.prop, "").Want(t, 409, "already_closed")
+	if got := h.of(h.mgr, "refund_waiting"); len(got) != 1 || got[0].ID == a.ID {
+		t.Fatalf("after a day the unresolved cause should raise a fresh alert: %+v", got)
+	}
+	h.mgr.Do("POST", "/api/alerts/"+a.ID+"/dismiss", &h.prop, "").Want(t, 409, "already_closed")
 }
 
 func TestASnoozedAlertComesBackWhenTheTimeIsUp(t *testing.T) {
