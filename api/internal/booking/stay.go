@@ -14,6 +14,7 @@ import (
 	"hotelpms/api/internal/access"
 	"hotelpms/api/internal/audit"
 	"hotelpms/api/internal/db"
+	"hotelpms/api/internal/housekeeping"
 	"hotelpms/api/internal/httpx"
 	"hotelpms/api/internal/rooms"
 )
@@ -166,8 +167,30 @@ func CheckOut(ctx context.Context, tx pgx.Tx, orgID, propertyID, id uuid.UUID, n
 			return err
 		}
 	}
-	if _, err := tx.Exec(ctx, `update room set status = 'dirty' where id in (select room_id from reservation_room where reservation_id = $1 and room_id is not null)`, id); err != nil {
+	rooms, err := tx.Query(ctx, `select distinct room_id from reservation_room where reservation_id = $1 and room_id is not null`, id)
+	if err != nil {
 		return err
+	}
+	var roomIDs []uuid.UUID
+	for rooms.Next() {
+		var rid uuid.UUID
+		if err := rooms.Scan(&rid); err != nil {
+			rooms.Close()
+			return err
+		}
+		roomIDs = append(roomIDs, rid)
+	}
+	rooms.Close()
+	if err := rooms.Err(); err != nil {
+		return err
+	}
+	for _, rid := range roomIDs {
+		if _, err := tx.Exec(ctx, `update room set status = 'dirty' where id = $1`, rid); err != nil {
+			return err
+		}
+		if err := housekeeping.EnsureCheckoutTask(ctx, tx, orgID, propertyID, rid, today, now); err != nil {
+			return err
+		}
 	}
 	return setStatus(ctx, tx, id, code, "reservation.checked_out", status, "checked_out")
 }
