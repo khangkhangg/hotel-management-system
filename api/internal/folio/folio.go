@@ -130,7 +130,7 @@ func sync(ctx context.Context, tx pgx.Tx, orgID, propertyID, folioID, reservatio
 			ids.New(), orgID, folioID, fmt.Sprintf("%s, night of %s", n.name, n.date.Format("2006-01-02")), n.price, included, n.date, now); err != nil {
 			return err
 		}
-		roomTotal += n.price
+		roomTotal += n.price - included
 	}
 	for _, r := range rules {
 		if r.inclusive || roomTotal == 0 {
@@ -154,7 +154,7 @@ func trimPercent(p100 int64) string {
 // AddLine adds an extra charge or an adjustment (which may be a discount) to a folio.
 func AddLine(ctx context.Context, tx pgx.Tx, orgID, propertyID, folioID, by uuid.UUID, kind, description string, quantity int, unitPrice int64, now time.Time) (uuid.UUID, error) {
 	description = strings.TrimSpace(description)
-	if (kind != "extra" && kind != "adjustment") || description == "" || len(description) > 200 || quantity < 1 || unitPrice == 0 || (kind == "extra" && unitPrice < 0) {
+	if (kind != "extra" && kind != "adjustment") || description == "" || len(description) > 200 || quantity < 1 || quantity > 1000 || unitPrice == 0 || unitPrice > 1e11 || unitPrice < -1e11 || (kind == "extra" && unitPrice < 0) {
 		return uuid.Nil, ErrBad
 	}
 	var one int

@@ -180,6 +180,22 @@ func TestMovingToAnotherRoomTypeMovesTheInventory(t *testing.T) {
 	}
 }
 
+func TestCheckingOutOnTheArrivalDayStillKeepsTheFirstNight(t *testing.T) {
+	h := newHotel(t, 1)
+	b := newID(t, h.book(h.desk, "2026-11-23", "2026-11-25", "").Want(t, 201))
+	h.desk.Do("POST", "/api/reservations/"+b.ID+"/assign", &h.property, fmt.Sprintf(`{"roomId":%q}`, h.roomID("101"))).Want(t, 204)
+	h.desk.Do("POST", "/api/reservations/"+b.ID+"/check-in", &h.property, "").Want(t, 204)
+	h.desk.Do("POST", "/api/reservations/"+b.ID+"/check-out", &h.property, "").Want(t, 204)
+	if s := status(t, h, b.ID); s != "checked_out" {
+		t.Fatalf("status %s", s)
+	}
+	for date, want := range map[string]int{"2026-11-23": 1, "2026-11-24": 0} {
+		if s, _ := h.sold(date); s != want {
+			t.Fatalf("%s: sold %d, want %d", date, s, want)
+		}
+	}
+}
+
 func TestStayActionsNeedThePermissions(t *testing.T) {
 	h := newHotel(t, 1)
 	b := newID(t, h.book(h.desk, "2026-11-23", "2026-11-24", "").Want(t, 201))
@@ -190,4 +206,16 @@ func TestStayActionsNeedThePermissions(t *testing.T) {
 		rev.Do("POST", "/api/reservations/"+b.ID+"/"+p, &h.property, "{}").Want(t, 403)
 	}
 	h.w.Anon("POST", "/api/reservations/"+b.ID+"/check-in", "").Want(t, 401)
+}
+
+func TestMovingToAnotherRatePlanOfTheSameTypeWorksWhenTheTypeIsFull(t *testing.T) {
+	h := newHotel(t, 1)
+	b := newID(t, h.book(h.desk, "2026-12-10", "2026-12-12", "").Want(t, 201))
+	plan := newID(t, h.mgr.Do("POST", "/api/rate-plans", &h.property, fmt.Sprintf(`{"roomTypeId":%q,"name":"Weekend"}`, h.roomType)).Want(t, 201)).ID
+	h.mgr.Do("PUT", "/api/rates", &h.property, fmt.Sprintf(`{"ratePlanId":%q,"from":"2026-11-23","to":"2027-01-01","price":15000}`, plan)).Want(t, 200)
+	h.desk.Do("POST", "/api/reservations/"+b.ID+"/move", &h.property, fmt.Sprintf(`{"roomTypeId":%q,"ratePlanId":%q}`, h.roomType, plan)).Want(t, 204)
+	if s, total := h.sold("2026-12-10"); s != 1 || total != 1 {
+		t.Fatalf("sold %d of %d after a same-type move", s, total)
+	}
+	h.desk.Do("GET", "/api/reservations/"+b.ID, &h.property, "").Want(t, 200, `"total":30000`)
 }

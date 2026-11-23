@@ -131,10 +131,16 @@ func CheckIn(ctx context.Context, tx pgx.Tx, orgID, propertyID, id uuid.UUID, no
 
 // release gives the nights of the reservation's active rooms from date on back to inventory.
 func release(ctx context.Context, tx pgx.Tx, id uuid.UUID, from *time.Time) error {
+	// Lock the nights in the same order as a booking does (room type, then date), so two cancellations cannot deadlock.
+	if _, err := tx.Exec(ctx,
+		`select 1 from inventory i where exists (select 1 from reservation_room a where a.reservation_id = $1 and a.active and a.room_type_id = i.room_type_id
+		   and i.date >= case when $2::date is null then lower(a.stay) else greatest($2::date, lower(a.stay) + 1) end and i.date < upper(a.stay)) order by i.room_type_id, i.date for update`, id, from); err != nil {
+		return err
+	}
 	_, err := tx.Exec(ctx,
 		`with active as (select room_type_id, stay from reservation_room where reservation_id = $1 and active)
 		 update inventory i set sold = sold - 1 from active a
-		 where i.room_type_id = a.room_type_id and i.date >= greatest(lower(a.stay), coalesce($2::date, lower(a.stay))) and i.date < upper(a.stay)`, id, from)
+		 where i.room_type_id = a.room_type_id and i.date >= case when $2::date is null then lower(a.stay) else greatest($2::date, lower(a.stay) + 1) end and i.date < upper(a.stay)`, id, from)
 	return err
 }
 
@@ -152,24 +158,19 @@ func CheckOut(ctx context.Context, tx pgx.Tx, orgID, propertyID, id uuid.UUID, n
 	if err != nil {
 		return err
 	}
+	// The guest keeps at least the first night, so a check-out on the arrival day still pays for it and the stay is never empty.
 	var early int
-	if err := tx.QueryRow(ctx, `select count(*) from reservation_room where reservation_id = $1 and active and upper(stay) > $2`, id, today).Scan(&early); err != nil {
+	if err := tx.QueryRow(ctx, `select count(*) from reservation_room where reservation_id = $1 and active and upper(stay) > greatest($2::date, lower(stay) + 1)`, id, today).Scan(&early); err != nil {
 		return err
 	}
 	if early > 0 {
 		if err := release(ctx, tx, id, &today); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx,
-			`delete from reservation_night n using reservation_room rr
-			 where n.reservation_room_id = rr.id and rr.reservation_id = $1 and rr.active and n.date >= $2`, id, today); err != nil {
+		if _, err := tx.Exec(ctx, `delete from reservation_night n using reservation_room rr where n.reservation_room_id = rr.id and rr.reservation_id = $1 and rr.active and n.date >= greatest($2::date, lower(rr.stay) + 1)`, id, today); err != nil {
 			return err
 		}
-		// A stay that ends today keeps its used nights; one that would be empty is closed.
-		if _, err := tx.Exec(ctx, `update reservation_room set stay = daterange(lower(stay), $2, '[)') where reservation_id = $1 and active and upper(stay) > $2 and lower(stay) < $2`, id, today); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, `update reservation_room set active = false where reservation_id = $1 and active and upper(stay) > $2`, id, today); err != nil {
+		if _, err := tx.Exec(ctx, `update reservation_room set stay = daterange(lower(stay), greatest($2::date, lower(stay) + 1), '[)') where reservation_id = $1 and active and upper(stay) > greatest($2::date, lower(stay) + 1)`, id, today); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `update reservation r set total = coalesce((select sum(n.price) from reservation_night n join reservation_room rr on rr.id = n.reservation_room_id where rr.reservation_id = r.id), 0) where r.id = $1`, id); err != nil {
@@ -262,17 +263,22 @@ func Move(ctx context.Context, tx pgx.Tx, orgID, propertyID, id, roomTypeID, rat
 	if err := checkRules(ctx, tx, ratePlanID, from, to); err != nil {
 		return err
 	}
-	tag, err := tx.Exec(ctx,
-		`with locked as (select date from inventory where room_type_id = $1 and date >= $2 and date < $3 order by date for update)
-		 update inventory i set sold = sold + 1 from locked l where i.room_type_id = $1 and i.date = l.date and i.sold + i.blocked < i.total`, roomTypeID, from, to)
-	if err != nil {
-		return err
-	}
-	if int(tag.RowsAffected()) != len(nights) {
-		return ErrSoldOut
-	}
-	if _, err := tx.Exec(ctx, `update inventory set sold = sold - 1 where room_type_id = $1 and date >= $2 and date < $3`, oldType, from, to); err != nil {
-		return err
+	// A move to another rate plan of the same room type takes nothing from inventory and gives nothing back.
+	if roomTypeID != oldType {
+		// Lock both room types' nights in one fixed order, so two opposite moves cannot wait on each other.
+		if _, err := tx.Exec(ctx, `select 1 from inventory where room_type_id in ($1, $2) and date >= $3 and date < $4 order by room_type_id, date for update`, roomTypeID, oldType, from, to); err != nil {
+			return err
+		}
+		tag, err := tx.Exec(ctx, `update inventory set sold = sold + 1 where room_type_id = $1 and date >= $2 and date < $3 and sold + blocked < total`, roomTypeID, from, to)
+		if err != nil {
+			return err
+		}
+		if int(tag.RowsAffected()) != len(nights) {
+			return ErrSoldOut
+		}
+		if _, err := tx.Exec(ctx, `update inventory set sold = sold - 1 where room_type_id = $1 and date >= $2 and date < $3`, oldType, from, to); err != nil {
+			return err
+		}
 	}
 	var oldTotal int64
 	if err := tx.QueryRow(ctx, `select coalesce(sum(price), 0) from reservation_night where reservation_room_id = $1`, rrID).Scan(&oldTotal); err != nil {

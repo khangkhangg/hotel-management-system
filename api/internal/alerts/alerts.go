@@ -180,6 +180,7 @@ func RunProperty(ctx context.Context, tx pgx.Tx, orgID, propertyID uuid.UUID, no
 	if _, err := tx.Exec(ctx, `update alert set status = 'open', snoozed_until = null where property_id = $1 and status = 'snoozed' and snoozed_until <= $2`, propertyID, now); err != nil {
 		return err
 	}
+	var failed []error
 	for _, c := range registry {
 		enabled, th, err := settings(ctx, tx, propertyID, c)
 		if err != nil {
@@ -190,16 +191,29 @@ func RunProperty(ctx context.Context, tx pgx.Tx, orgID, propertyID uuid.UUID, no
 		}
 		sc := base
 		sc.th = th
-		found, err := c.find(ctx, tx, sc)
-		if err != nil {
-			return fmt.Errorf("%s: %w", c.kind, err)
+		// One broken check must not undo the others, so each runs behind its own savepoint.
+		if _, err := tx.Exec(ctx, `savepoint chk`); err != nil {
+			return err
 		}
-		if err := reconcile(ctx, tx, sc, c, found); err != nil {
-			return fmt.Errorf("%s: %w", c.kind, err)
+		found, err := c.find(ctx, tx, sc)
+		if err == nil {
+			err = reconcile(ctx, tx, sc, c, found)
+		}
+		if err != nil {
+			failed = append(failed, fmt.Errorf("%s: %w", c.kind, err))
+			if _, rerr := tx.Exec(ctx, `rollback to savepoint chk`); rerr != nil {
+				return rerr
+			}
+		}
+		if _, err := tx.Exec(ctx, `release savepoint chk`); err != nil {
+			return err
 		}
 	}
 	_, err = tx.Exec(ctx, `insert into alert_run (property_id, organization_id, ran_at) values ($1, $2, $3) on conflict (property_id) do update set ran_at = excluded.ran_at`, propertyID, orgID, now)
-	return err
+	if err != nil {
+		return err
+	}
+	return errors.Join(failed...)
 }
 
 // reconcile makes the open alerts of one check match what it found now.

@@ -141,6 +141,17 @@ func TestTaxIsAddedOnTopOrIncludedInThePrice(t *testing.T) {
 	}
 }
 
+func TestAnExclusiveTaxIsNotChargedOnTaxAlreadyInThePrice(t *testing.T) {
+	h := newHotel(t)
+	h.owner.Do("POST", "/api/tax-rules", &h.prop, `{"name":"VAT","percent":10,"inclusive":true}`).Want(t, 201)
+	h.owner.Do("POST", "/api/tax-rules", &h.prop, `{"name":"City","percent":5,"inclusive":false}`).Want(t, 201)
+	v := h.folio(h.desk, h.reservation())
+	// 20000 with 10% inside it leaves 18182 of room; 5% of that is 909, not 5% of 20000.
+	if v.Total != 20909 {
+		t.Fatalf("total %d, want 20909", v.Total)
+	}
+}
+
 func TestInvalidTaxRulesAreRefused(t *testing.T) {
 	h := newHotel(t)
 	for _, bad := range []string{`{"name":"","percent":10}`, `{"name":"x","percent":-1}`, `{"name":"x","percent":101}`, `{bad`} {
@@ -193,6 +204,7 @@ func TestManualLinesSurviveAndAdjustTheTotal(t *testing.T) {
 	h.desk.Do("POST", "/api/folios/"+f+"/lines", &h.prop, `{"kind":"room","description":"x","quantity":1,"unitPrice":1}`).Want(t, 400)
 	h.desk.Do("POST", "/api/folios/"+f+"/lines", &h.prop, `{"kind":"extra","description":"","quantity":1,"unitPrice":1}`).Want(t, 400)
 	h.desk.Do("POST", "/api/folios/"+f+"/lines", &h.prop, `{"kind":"extra","description":"x","quantity":0,"unitPrice":1}`).Want(t, 400)
+	h.desk.Do("POST", "/api/folios/"+f+"/lines", &h.prop, `{"kind":"extra","description":"x","quantity":1000000,"unitPrice":9000000000000}`).Want(t, 400)
 }
 
 func pay(t *testing.T, h *hotel, folioID string, amount int) string {

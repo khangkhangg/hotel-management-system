@@ -264,10 +264,7 @@ func Cancel(ctx context.Context, tx pgx.Tx, orgID, propertyID, id uuid.UUID, now
 	case "checked_in", "checked_out", "no_show":
 		return ErrCannotCancel
 	}
-	if _, err := tx.Exec(ctx,
-		`with active as (select room_type_id, stay from reservation_room where reservation_id = $1 and active)
-		 update inventory i set sold = sold - 1 from active a
-		 where i.room_type_id = a.room_type_id and i.date >= lower(a.stay) and i.date < upper(a.stay)`, id); err != nil {
+	if err := release(ctx, tx, id, nil); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(ctx, `update reservation_room set active = false where reservation_id = $1`, id); err != nil {

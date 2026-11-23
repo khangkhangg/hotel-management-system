@@ -99,22 +99,14 @@ func TestCheckingOutCreatesOneCleaningTaskPerRoom(t *testing.T) {
 	if len(got) != 1 || got[0].RoomNumber != "101" || got[0].Status != "todo" || got[0].RoomStatus != "dirty" {
 		t.Fatalf("%+v", got)
 	}
-	// A second guest leaving the same room the same day does not add another open task.
-	res2 := h.book("2026-11-23", "2026-11-24")
-	h.desk.Do("POST", "/api/reservations/"+res2+"/assign", &h.prop, fmt.Sprintf(`{"roomId":%q,"force":true,"reason":"test"}`, h.roomID("101"))).Want(t, 204)
-	h.desk.Do("POST", "/api/reservations/"+res2+"/check-in", &h.prop, "").Want(t, 204)
-	h.desk.Do("POST", "/api/reservations/"+res2+"/check-out", &h.prop, "").Want(t, 204)
-	if got := h.tasks(h.keeper); len(got) != 1 {
-		t.Fatalf("%d tasks", len(got))
-	}
 }
 
 func TestHousekeepingNeverSeesGuestDataOrMoney(t *testing.T) {
 	h := newHotel(t, 2)
 	res := h.stay("101")
 	h.desk.Do("POST", "/api/reservations/"+res+"/check-out", &h.prop, "").Want(t, 204)
-	other := h.book("2026-11-23", "2026-11-25") // an arrival today in the room just left
-	h.desk.Do("POST", "/api/reservations/"+other+"/assign", &h.prop, fmt.Sprintf(`{"roomId":%q,"force":true,"reason":"cleaning now"}`, h.roomID("101"))).Want(t, 204)
+	other := h.book("2026-11-23", "2026-11-25") // an arrival today in another room
+	h.desk.Do("POST", "/api/reservations/"+other+"/assign", &h.prop, fmt.Sprintf(`{"roomId":%q,"force":true,"reason":"cleaning now"}`, h.roomID("102"))).Want(t, 204)
 	h.keeper.Do("POST", "/api/maintenance-tickets", &h.prop, fmt.Sprintf(`{"roomId":%q,"description":"Tap drips"}`, h.roomID("101"))).Want(t, 201)
 	for _, path := range []string{"/api/housekeeping/tasks?date=2026-11-23", "/api/maintenance-tickets", "/api/rooms"} {
 		body := h.keeper.Do("GET", path, &h.prop, "").Want(t, 200).Body

@@ -60,7 +60,7 @@ type arrival struct {
 // arrivals returns the bookings arriving today with the given status, one row per reservation.
 func arrivals(ctx context.Context, tx pgx.Tx, sc scope, status string) ([]arrival, error) {
 	rows, err := tx.Query(ctx,
-		`select r.id, r.code, g.name, r.status, (array_agg(rr.room_type_id order by rr.id))[1], (array_agg(rr.room_id order by rr.id))[1],
+		`select r.id, r.code, g.name, r.status, (array_agg(rr.room_type_id order by rr.room_id is not null, rr.id))[1], (array_agg(rr.room_id order by rr.id))[1],
 		        (array_agg(rm.number order by rr.id))[1], (array_agg(rm.status order by rr.id))[1],
 		        bool_or(rr.room_id is null)
 		 from reservation r join guest g on g.id = r.guest_id

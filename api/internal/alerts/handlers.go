@@ -123,6 +123,7 @@ var (
 	errNotFound = errors.New("alerts: not found")
 	errClosed   = errors.New("alerts: already closed")
 	errNoAction = errors.New("alerts: this alert has no action to apply")
+	errChanged  = errors.New("alerts: the suggested action changed since it was shown")
 )
 
 func (h *handler) answer(w http.ResponseWriter, err error) {
@@ -135,7 +136,9 @@ func (h *handler) answer(w http.ResponseWriter, err error) {
 		httpx.Error(w, http.StatusConflict, "already_closed", "That alert is already closed.")
 	case errors.Is(err, errNoAction):
 		bad(w, "That alert has no button to press; open the screen it points to.")
-	case errors.Is(err, booking.ErrRoomTaken), errors.Is(err, booking.ErrRoomNotReady), errors.Is(err, booking.ErrBadStatus), errors.Is(err, booking.ErrTooEarly), errors.Is(err, booking.ErrNotConfirmed):
+	case errors.Is(err, errChanged):
+		httpx.Error(w, http.StatusConflict, "action_changed", "The suggested fix changed since you opened it. Look at the alert again.")
+	case errors.Is(err, booking.ErrWrongType), errors.Is(err, booking.ErrReason), errors.Is(err, booking.ErrRoomTaken), errors.Is(err, booking.ErrRoomNotReady), errors.Is(err, booking.ErrBadStatus), errors.Is(err, booking.ErrTooEarly), errors.Is(err, booking.ErrNotConfirmed):
 		httpx.Error(w, http.StatusConflict, "action_not_possible", "The situation changed, so that fix no longer works. Check the booking.")
 	default:
 		httpx.InternalError(w, err)
@@ -152,6 +155,8 @@ func (h *handler) apply(w http.ResponseWriter, r *http.Request) {
 		notFound(w)
 		return
 	}
+	var in struct{ Kind string } // the kind of action the person was shown; a different one now means the situation changed
+	_ = json.NewDecoder(r.Body).Decode(&in)
 	ctx := r.Context()
 	err = db.WithOrg(ctx, h.Pool, a.OrgID, func(tx pgx.Tx) error {
 		status, action, kind, err := load(r, tx, a, id)
@@ -163,6 +168,9 @@ func (h *handler) apply(w http.ResponseWriter, r *http.Request) {
 		}
 		if action == nil || action.Kind == "open" {
 			return errNoAction
+		}
+		if in.Kind != "" && in.Kind != action.Kind {
+			return errChanged
 		}
 		reservation, _ := uuid.Parse(str(action.Params["reservationId"]))
 		switch action.Kind {

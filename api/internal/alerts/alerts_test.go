@@ -541,3 +541,13 @@ func TestTheNightlyRunKeepsInventoryRowsAheadOfTheCalendar(t *testing.T) {
 		t.Fatal("the run did not add inventory rows for the coming year")
 	}
 }
+
+func TestApplyingAnActionThatChangedSinceItWasShownIsRefused(t *testing.T) {
+	h := newHotel(t, 2)
+	res := h.book("2026-11-23", "2026-11-25")
+	h.run()
+	a := h.of(h.desk, "unassigned_arrival")[0]
+	h.desk.Do("POST", "/api/alerts/"+a.ID+"/apply", &h.prop, `{"kind":"no_show"}`).Want(t, 409, "action_changed")
+	h.desk.Do("POST", "/api/alerts/"+a.ID+"/apply", &h.prop, `{"kind":"assign_room"}`).Want(t, 204)
+	h.desk.Do("GET", "/api/reservations/"+res, &h.prop, "").Want(t, 200, `"roomNumber":"101"`)
+}

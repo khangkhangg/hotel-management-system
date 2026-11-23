@@ -11,7 +11,9 @@ export function listen(url: string, headers: Record<string, string>, onEvent: (n
 		while (!stopped) {
 			try {
 				const res = await fetch(url, { headers: { Accept: 'text/event-stream', ...headers }, credentials: 'same-origin', signal: controller.signal });
-				if (!res.ok || !res.body) throw new Error(String(res.status));
+				// A gone session will not come back by asking again; the app's own requests send the person to sign in.
+			if (res.status === 401 || res.status === 403) return;
+			if (!res.ok || !res.body) throw new Error(String(res.status));
 				const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
 				let buffer = '';
 				for (;;) {
