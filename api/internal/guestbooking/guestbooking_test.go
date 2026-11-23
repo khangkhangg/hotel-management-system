@@ -381,3 +381,22 @@ func TestCardIsOnlyOfferedToTheOrganizationThatOwnsTheProviderAccount(t *testing
 	}
 	h.w.Anon("POST", "/api/public/a1/bookings", h.booking("card", "2026-12-10", "2026-12-12")).Want(t, 409, "payment_type_off")
 }
+
+func TestTheSameBookingKeySentTwiceMakesOneBooking(t *testing.T) {
+	h := newHotel(t, 2)
+	body := strings.Replace(h.booking("card", "2026-12-10", "2026-12-12"), `{"guest"`, `{"key":"k-1","guest"`, 1)
+	var first, again made
+	testkit.Must(t, json.Unmarshal([]byte(h.w.Anon("POST", "/api/public/a1/bookings", body).Want(t, 201).Body), &first))
+	testkit.Must(t, json.Unmarshal([]byte(h.w.Anon("POST", "/api/public/a1/bookings", body).Want(t, 201).Body), &again))
+	if again.Code != first.Code || again.CheckoutURL == "" || again.Total != first.Total {
+		t.Fatalf("%+v %+v", first, again)
+	}
+	if got := h.row(t, `select count(*)::text from reservation`); got != "1" {
+		t.Fatalf("%s reservations", got)
+	}
+	other := strings.Replace(body, "k-1", "k-2", 1)
+	h.w.Anon("POST", "/api/public/a1/bookings", other).Want(t, 201)
+	if got := h.row(t, `select count(*)::text from reservation`); got != "2" {
+		t.Fatalf("%s reservations", got)
+	}
+}

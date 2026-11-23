@@ -328,6 +328,7 @@ type bookIn struct {
 	Guest       booking.GuestInput    `json:"guest"`
 	Rooms       []booking.RoomRequest `json:"rooms"`
 	PaymentKind string                `json:"paymentKind"`
+	Key         string                `json:"key"`
 }
 
 type lineOut struct {
@@ -448,6 +449,7 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 	now := h.Clock()
 	var out madeOut
 	var resID uuid.UUID
+	var replay bool
 	err := db.WithOrg(r.Context(), h.Pool, org, func(tx pgx.Tx) error {
 		ctx := r.Context()
 		on, err := h.offered(ctx, tx, org, prop)
@@ -457,12 +459,38 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 		if !slices.Contains(on, in.PaymentKind) {
 			return errTypeOff
 		}
+		if in.Key != "" {
+			// The lock makes a double click wait for the first request, so it finds that booking below.
+			if _, err := tx.Exec(ctx, `select pg_advisory_xact_lock(hashtext($1))`, org.String()+in.Key); err != nil {
+				return err
+			}
+			var code, status, cur string
+			var total int64
+			var hu *time.Time
+			err := tx.QueryRow(ctx, `select id, code, status, currency, total, hold_until from reservation where channel_booking_ref = $1 and source_channel = 'website'`, in.Key).Scan(&resID, &code, &status, &cur, &total, &hu)
+			if err == nil { // shortcut: the replay leaves out bank details, the guest has them by email
+				out = madeOut{Code: code, Total: total, Currency: cur, Status: status}
+				if hu != nil {
+					out.HoldUntil = *hu
+				}
+				replay = true
+				return nil
+			}
+			if !errors.Is(err, pgx.ErrNoRows) {
+				return err
+			}
+		}
 		res, _, due, _, err := price(ctx, tx, org, prop, in, now)
 		if err != nil {
 			return err
 		}
 		out = madeOut{Code: res.Code, Total: due, Currency: res.Currency, Status: "confirmed"}
 		resID = res.ID
+		if in.Key != "" {
+			if _, err := tx.Exec(ctx, `update reservation set channel_booking_ref = $2 where id = $1`, resID, in.Key); err != nil {
+				return err
+			}
+		}
 		var hold *time.Time
 		switch in.PaymentKind {
 		case "card":
@@ -489,7 +517,7 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 		httpx.InternalError(w, err)
 		return
 	}
-	if in.PaymentKind == "card" {
+	if in.PaymentKind == "card" && out.Status == "pending" {
 		c, err := h.card.CreateCheckout(r.Context(), payments.CheckoutRequest{
 			Reference: org.String() + ":" + out.Code, Amount: out.Total, Currency: out.Currency, Description: "Booking " + out.Code,
 			SuccessURL: h.BaseURL + "/book/" + r.PathValue("slug") + "?done=" + out.Code, CancelURL: h.BaseURL + "/book/" + r.PathValue("slug"),
@@ -502,7 +530,7 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		out.CheckoutURL = c.URL
-	} else {
+	} else if !replay {
 		h.mailGuest(in.Guest.Email, out, out.BankDetails)
 	}
 	httpx.JSON(w, http.StatusCreated, out)
