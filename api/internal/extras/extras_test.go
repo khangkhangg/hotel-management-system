@@ -92,3 +92,12 @@ func TestSellingAnExtraPostsOneFolioLineScaledByItsUnit(t *testing.T) {
 	h.owner.Do("PATCH", "/api/extras/"+each, &h.prop, `{"active":false}`).Want(t, 200)
 	h.desk.Do("POST", "/api/reservations/"+res+"/extras", &h.prop, fmt.Sprintf(`{"extraId":%q,"quantity":1}`, each)).Want(t, 404)
 }
+
+func TestAnExtraCannotBeSoldOnAClosedStayOrInAnAbsurdAmount(t *testing.T) {
+	h := newHotel(t)
+	res := h.book(t)
+	x := id(t, h.owner.Do("POST", "/api/extras", &h.prop, `{"name":"Breakfast","kind":"service","unit":"per_person_night","price":800}`).Want(t, 201))
+	h.desk.Do("POST", "/api/reservations/"+res+"/extras", &h.prop, fmt.Sprintf(`{"extraId":%q,"quantity":101}`, x)).Want(t, 400)
+	h.desk.Do("POST", "/api/reservations/"+res+"/cancel", &h.prop, "").Want(t, 204)
+	h.desk.Do("POST", "/api/reservations/"+res+"/extras", &h.prop, fmt.Sprintf(`{"extraId":%q,"quantity":1}`, x)).Want(t, 400)
+}

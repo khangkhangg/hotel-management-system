@@ -411,7 +411,7 @@ func bookingError(w http.ResponseWriter, err error) bool {
 		httpx.Error(w, http.StatusConflict, "sold_out", "The last room was just taken. Choose other dates or another room.")
 	case errors.Is(err, booking.ErrStayRule):
 		httpx.Error(w, http.StatusConflict, "stay_rule", "The hotel does not take that stay. Try other dates.")
-	case errors.Is(err, booking.ErrPast), errors.Is(err, booking.ErrBad):
+	case errors.Is(err, booking.ErrPast), errors.Is(err, booking.ErrBad), errors.Is(err, folio.ErrBad):
 		httpx.Error(w, http.StatusBadRequest, "bad_request", "Check the dates and guests.")
 	case errors.Is(err, booking.ErrNotFound), errors.Is(err, pgx.ErrNoRows):
 		httpx.Error(w, http.StatusNotFound, "not_found", "That room or rate is not available here.")
@@ -432,6 +432,10 @@ func (h *handler) quote(w http.ResponseWriter, r *http.Request) {
 	}
 	var in bookIn
 	if !readJSON(w, r, &in) {
+		return
+	}
+	if !extrasOK(in) {
+		httpx.Error(w, http.StatusBadRequest, "bad_request", "Check the extras and try again.")
 		return
 	}
 	in.Guest = booking.GuestInput{Name: "Quote"}
@@ -504,7 +508,7 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 			var code, status, cur string
 			var total int64
 			var hu *time.Time
-			err := tx.QueryRow(ctx, `select id, code, status, currency, total, hold_until from reservation where channel_booking_ref = $1 and source_channel = 'website'`, in.Key).Scan(&resID, &code, &status, &cur, &total, &hu)
+			err := tx.QueryRow(ctx, `select id, code, status, currency, total, hold_until from reservation where property_id = $2 and channel_booking_ref = $1 and source_channel = 'website'`, in.Key, prop).Scan(&resID, &code, &status, &cur, &total, &hu)
 			if err == nil { // shortcut: the replay leaves out bank details, the guest has them by email
 				out = madeOut{Code: code, Total: total, Currency: cur, Status: status}
 				if hu != nil {
@@ -579,13 +583,8 @@ func sane(in bookIn) bool {
 	if err != nil || a.Address != in.Guest.Email || len(in.Guest.Email) > 200 || len(in.Guest.Phone) > 50 || len(in.Guest.Name) > 200 || len(in.Guest.Country) > 100 {
 		return false
 	}
-	if len(in.Extras) > 10 {
+	if len(in.Key) > 64 || !extrasOK(in) {
 		return false
-	}
-	for _, x := range in.Extras {
-		if x.Quantity < 1 || x.Quantity > 10 {
-			return false
-		}
 	}
 	if len(in.Rooms) < 1 || len(in.Rooms) > 4 {
 		return false
@@ -855,4 +854,17 @@ func RunSweeper(ctx context.Context, pool *pgxpool.Pool, every time.Duration) {
 			_, _ = ExpireHolds(ctx, pool, time.Now())
 		}
 	}
+}
+
+// extrasOK limits what a guest can ask for: at most 10 extras, 1 to 10 of each.
+func extrasOK(in bookIn) bool {
+	if len(in.Extras) > 10 {
+		return false
+	}
+	for _, x := range in.Extras {
+		if x.Quantity < 1 || x.Quantity > 10 {
+			return false
+		}
+	}
+	return true
 }

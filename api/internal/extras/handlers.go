@@ -206,6 +206,8 @@ func (h *handler) sell(w http.ResponseWriter, r *http.Request) {
 		return e
 	})
 	switch {
+	case errors.Is(err, folio.ErrBad):
+		httpx.Error(w, http.StatusBadRequest, "bad_request", "That extra cannot be added to this stay in that amount.")
 	case errors.Is(err, pgx.ErrNoRows), errors.Is(err, folio.ErrNotFound):
 		notFound(w)
 	case err != nil:
@@ -223,6 +225,13 @@ func Add(ctx context.Context, tx pgx.Tx, org, prop, reservation, extra uuid.UUID
 	if err := tx.QueryRow(ctx, `select name, unit, price from extra where id = $1 and property_id = $2 and active`, extra, prop).Scan(&name, &unit, &price); err != nil {
 		return uuid.Nil, err
 	}
+	var status string
+	if err := tx.QueryRow(ctx, `select status from reservation where id = $1 and property_id = $2`, reservation, prop).Scan(&status); err != nil {
+		return uuid.Nil, err
+	}
+	if status != "pending" && status != "confirmed" && status != "checked_in" { // a closed stay takes no new charges
+		return uuid.Nil, folio.ErrBad
+	}
 	var nights, guests, guestNights int
 	if err := tx.QueryRow(ctx, `select coalesce(max(upper(stay) - lower(stay)), 0), coalesce(sum(adults + children), 0), coalesce(sum((adults + children) * (upper(stay) - lower(stay))), 0)
 		from reservation_room x join reservation r on r.id = x.reservation_id where r.id = $1 and r.property_id = $2`, reservation, prop).Scan(&nights, &guests, &guestNights); err != nil || nights == 0 {
@@ -235,6 +244,9 @@ func Add(ctx context.Context, tx pgx.Tx, org, prop, reservation, extra uuid.UUID
 		quantity *= guests
 	case "per_person_night":
 		quantity *= guestNights
+	}
+	if quantity > 1000 {
+		return uuid.Nil, folio.ErrBad
 	}
 	folioID, _, err := folio.Ensure(ctx, tx, org, prop, reservation, now)
 	if err != nil {

@@ -39,10 +39,14 @@ func safe(s string) string {
 var zeroDecimal = map[string]bool{"VND": true, "JPY": true, "KRW": true, "CLP": true, "IDR": true}
 
 func amount(minor int64, currency string) string {
-	if zeroDecimal[currency] {
-		return fmt.Sprintf("%d", minor)
+	sign, n := "", minor
+	if n < 0 {
+		sign, n = "-", -n
 	}
-	return fmt.Sprintf("%d.%02d", minor/100, minor%100)
+	if zeroDecimal[currency] {
+		return fmt.Sprintf("%s%d", sign, n)
+	}
+	return fmt.Sprintf("%s%d.%02d", sign, n/100, n%100)
 }
 
 func period(r *http.Request) (from, to time.Time, ok bool) {

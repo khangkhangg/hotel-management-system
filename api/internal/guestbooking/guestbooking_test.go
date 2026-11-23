@@ -431,3 +431,12 @@ func TestAGuestAddsExtrasAndTheyAreInTheTotal(t *testing.T) {
 		t.Fatalf("%s reservations: a refused extra left a booking behind", got)
 	}
 }
+
+func TestQuotesAndKeysAreBounded(t *testing.T) {
+	h := newHotel(t, 2)
+	x := idOf(t, h.owner.Do("POST", "/api/extras", h.prop, `{"name":"Pickup","kind":"service","unit":"each","price":2500}`).Want(t, 201))
+	bad := strings.Replace(h.booking("hotel", "2026-12-10", "2026-12-12"), `{"guest"`, fmt.Sprintf(`{"extras":[{"id":%q,"quantity":0}],"guest"`, x), 1)
+	h.w.Anon("POST", "/api/public/a1/quote", bad).Want(t, 400)
+	long := strings.Replace(h.booking("hotel", "2026-12-10", "2026-12-12"), `{"guest"`, `{"key":"`+strings.Repeat("k", 65)+`","guest"`, 1)
+	h.w.Anon("POST", "/api/public/a1/bookings", long).Want(t, 400)
+}
