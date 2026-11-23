@@ -252,3 +252,28 @@ func TestAModifiedBookingMovesTheStay(t *testing.T) {
 	}
 	h.manager.Do("POST", "/api/channel/sync", &h.w.A1, "").Want(t, 200, `"pulled":0`) // the same change again changes nothing
 }
+
+func TestTheNightlyCheckMovesAStayAndImportsABookingThatNoMessageBrought(t *testing.T) {
+	h := newHotel(t, 2)
+	h.connect(t, "channel_manager", "fake", true)
+	b := channels.Booking{ExternalID: "N1", Status: "new", GuestName: "Kim", Arrival: "2026-12-10", Departure: "2026-12-12", ExternalRoomID: "R1", ExternalRateID: "P1", Adults: 2}
+	h.fake.Inbox = []channels.Booking{b}
+	h.manager.Do("POST", "/api/channel/sync", &h.w.A1, "").Want(t, 200, `"pulled":1`)
+	// the other side moved the stay and took a new booking, and neither message reached us
+	b.Arrival, b.Departure = "2026-12-14", "2026-12-16"
+	m := channels.Booking{ExternalID: "N2", Status: "new", GuestName: "Lee", Arrival: "2026-12-20", Departure: "2026-12-21", ExternalRoomID: "R1", ExternalRateID: "P1", Adults: 1}
+	h.fake.Inbox = []channels.Booking{b, m}
+	n, err := channels.RunNightly(testkit.Ctx, h.w.Pool, channels.Fixed(h.fake), h.w.Now)
+	testkit.Must(t, err)
+	if n != 1 {
+		t.Fatalf("%d connections checked", n)
+	}
+	for date, want := range map[string]string{"2026-12-10": "0", "2026-12-14": "1", "2026-12-20": "1"} {
+		if got := h.row(t, `select sold::text from inventory where date = $1`, date); got != want {
+			t.Errorf("%s sold %s, want %s", date, got, want)
+		}
+	}
+	if got := h.row(t, `select count(*)::text from reservation where source_channel = 'fake' and status <> 'cancelled'`); got != "2" {
+		t.Fatalf("%s reservations", got)
+	}
+}

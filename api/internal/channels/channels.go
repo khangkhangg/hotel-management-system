@@ -27,6 +27,8 @@ const (
 	Horizon = 60
 	// pullOverlap makes each pull start a little before the last one, so a booking made while it ran is not missed.
 	pullOverlap = 10 * time.Minute
+	// reconcileWindow is how far back the nightly check reads.
+	reconcileWindow = 14 * 24 * time.Hour
 )
 
 // modes says which providers each way of connecting may use.
@@ -325,10 +327,23 @@ func (l *loaded) mapFor(b Booking) (mapping, bool) {
 // Sync pushes the property's nights and pulls its bookings. The calls to the other side run outside any
 // transaction, and each pulled booking is saved in its own, so one that cannot be kept does not stop the rest.
 func Sync(ctx context.Context, pool *pgxpool.Pool, factory Factory, org, prop uuid.UUID, now time.Time) (Result, error) {
+	return syncWith(ctx, pool, factory, org, prop, now, false)
+}
+
+// Reconcile is the nightly check. It reads the last two weeks again and fixes what the live messages missed:
+// a moved stay, a cancellation, or a booking that never arrived.
+func Reconcile(ctx context.Context, pool *pgxpool.Pool, factory Factory, org, prop uuid.UUID, now time.Time) (Result, error) {
+	return syncWith(ctx, pool, factory, org, prop, now, true)
+}
+
+func syncWith(ctx context.Context, pool *pgxpool.Pool, factory Factory, org, prop uuid.UUID, now time.Time, full bool) (Result, error) {
 	var l loaded
 	err := db.WithOrg(ctx, pool, org, func(tx pgx.Tx) error { return load(ctx, tx, org, prop, now, &l) })
 	if err != nil {
 		return Result{}, err
+	}
+	if full {
+		l.since = now.Add(-reconcileWindow)
 	}
 	ad, err := factory(l.conn)
 	if err != nil {
@@ -351,6 +366,9 @@ func Sync(ctx context.Context, pool *pgxpool.Pool, factory Factory, org, prop uu
 	}
 	var kept []string
 	for _, b := range bookings {
+		if full && b.Status == "new" {
+			b.Status = "modified" // apply then compares the stay with ours instead of skipping a booking it knows
+		}
 		made, err := apply(ctx, pool, org, prop, &l, b, now)
 		switch {
 		case err != nil:
@@ -538,6 +556,15 @@ var errProblem = errors.New("channels: the booking needs staff")
 // RunAll syncs every enabled connection of every organization and says how many it reached. A connection that fails
 // is written to its own log and does not stop the others.
 func RunAll(ctx context.Context, pool *pgxpool.Pool, factory Factory, now time.Time) (int, error) {
+	return runEach(ctx, pool, factory, now, Sync)
+}
+
+// RunNightly runs the nightly check on every enabled connection.
+func RunNightly(ctx context.Context, pool *pgxpool.Pool, factory Factory, now time.Time) (int, error) {
+	return runEach(ctx, pool, factory, now, Reconcile)
+}
+
+func runEach(ctx context.Context, pool *pgxpool.Pool, factory Factory, now time.Time, run func(context.Context, *pgxpool.Pool, Factory, uuid.UUID, uuid.UUID, time.Time) (Result, error)) (int, error) {
 	type pair struct{ org, prop uuid.UUID }
 	var todo []pair
 	err := db.WithoutOrg(ctx, pool, func(tx pgx.Tx) error {
@@ -560,23 +587,27 @@ func RunAll(ctx context.Context, pool *pgxpool.Pool, factory Factory, now time.T
 	}
 	done := 0
 	for _, p := range todo {
-		if _, err := Sync(ctx, pool, factory, p.org, p.prop, now); err == nil {
+		if _, err := run(ctx, pool, factory, p.org, p.prop, now); err == nil {
 			done++
 		}
 	}
 	return done, nil
 }
 
-// RunSweeper runs RunAll on a timer until the context ends.
+// RunSweeper runs RunAll on a timer and RunNightly once a day, until the context ends.
 func RunSweeper(ctx context.Context, pool *pgxpool.Pool, factory Factory, every time.Duration) {
 	t := time.NewTicker(every)
 	defer t.Stop()
+	night := time.NewTicker(24 * time.Hour)
+	defer night.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
 			_, _ = RunAll(ctx, pool, factory, time.Now())
+		case <-night.C:
+			_, _ = RunNightly(ctx, pool, factory, time.Now())
 		}
 	}
 }
