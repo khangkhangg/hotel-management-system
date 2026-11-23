@@ -35,6 +35,8 @@ const all = {
 	extras: item('extras', 'Extras', 'box', '/extras'),
 	group: item('group', 'All properties', 'grid', '/group'),
 	chainPlans: item('chain-plans', 'Chain plans', 'list', '/chain-plans'),
+	branding: item('branding', 'Branding', 'tag', '/branding'),
+	siteContent: item('site-content', 'Site content', 'file', '/site-content'),
 	lost: item('lost-and-found', 'Lost and found', 'box', '/lost-and-found')
 };
 
@@ -48,7 +50,7 @@ const menus: Record<Role, NavItem[]> = {
 
 // Screens a role may open that do not fit the five-item menu. The overview links to them.
 const more: Record<Role, NavItem[]> = {
-	owner: [all.group, all.reports, all.chainPlans, all.channels, all.bookingSite, all.arrivals, all.guests, all.rooms, all.issues, all.rates, all.ratePlans, all.extras],
+	owner: [all.group, all.reports, all.chainPlans, all.channels, all.bookingSite, all.siteContent, all.branding, all.arrivals, all.guests, all.rooms, all.issues, all.rates, all.ratePlans, all.extras],
 	manager: [all.arrivals, all.guests, all.payments, all.issues, all.rates, all.ratePlans, all.extras, all.reports, all.chainPlans, all.channels],
 	front_desk: [],
 	revenue: [all.chainPlans],
@@ -68,7 +70,7 @@ const matches = (href: string, path: string) => (href === '/' ? path === '/' : p
 export const allowed = (role: Role, path: string): boolean => [...menus[role], ...more[role]].some((i) => matches(i.href, path));
 
 /** Screens that exist in this milestone. The rest open a placeholder. */
-const built = ['/', '/staff', '/activity', '/calendar', '/arrivals', '/guests', '/payments', '/rates', '/rate-plans', '/rooms', '/booking-site', '/issues', '/extras', '/group', '/reports', '/chain-plans', '/channels', '/sync-log'];
+const built = ['/', '/staff', '/activity', '/calendar', '/arrivals', '/guests', '/payments', '/rates', '/rate-plans', '/rooms', '/booking-site', '/issues', '/extras', '/group', '/reports', '/chain-plans', '/channels', '/sync-log', '/branding', '/site-content'];
 export const isBuilt = (path: string): boolean => built.some((href) => matches(href, path));
 
 const milestones: [string[], string][] = [

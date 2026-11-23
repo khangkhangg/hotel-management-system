@@ -54,7 +54,7 @@ describe('allowed', () => {
 describe('more screens', () => {
 	test('owners and managers reach the rest of the hotel screens from the overview, outside the five-item menu', () => {
 		expect(moreFor('manager').map((i) => i.label)).toEqual(['Arrivals', 'Guests', 'Payments', 'Issues', 'Rates', 'Rate plans', 'Extras', 'Reports', 'Chain plans', 'Channels']);
-		expect(moreFor('owner').map((i) => i.label)).toEqual(['All properties', 'Reports', 'Chain plans', 'Channels', 'Booking site', 'Arrivals', 'Guests', 'Rooms', 'Issues', 'Rates', 'Rate plans', 'Extras']);
+		expect(moreFor('owner').map((i) => i.label)).toEqual(['All properties', 'Reports', 'Chain plans', 'Channels', 'Booking site', 'Site content', 'Branding', 'Arrivals', 'Guests', 'Rooms', 'Issues', 'Rates', 'Rate plans', 'Extras']);
 		expect(allowed('manager', '/rates')).toBe(true);
 		expect(allowed('owner', '/arrivals')).toBe(true);
 		expect(moreFor('front_desk')).toEqual([]);

@@ -15,6 +15,7 @@
 		roomTypes: { id: string; name: string; baseGuests: number; maxGuests: number }[];
 		ratePlans: { id: string; roomTypeId: string; name: string }[];
 		extras: { id: string; name: string; unit: string; price: number }[];
+		site: { color: string; logo: string; texts: Record<string, Record<string, string>>; amenities: string[]; photos: { id: string; caption: string }[] };
 	};
 	type Quote = { total: number; currency: string; soldOut: boolean; lines: { description: string; amount: number }[] };
 	type Made = { code: string; total?: number; currency: string; status: string; checkoutUrl?: string; bankDetails?: string; holdUntil?: string };
@@ -84,6 +85,27 @@
 		look();
 		return () => clearTimeout(timer);
 	});
+	// The hotel's text comes in the guest's language when the hotel wrote it, then in the hotel's own language, then in English.
+	const siteText = (field: string): string => {
+		const x = info?.site.texts;
+		if (!x) return '';
+		return x[locale]?.[field] || x[info!.defaultLocale]?.[field] || x.en?.[field] || Object.values(x).map((l) => l[field]).find(Boolean) || '';
+	};
+	const hasAbout = $derived(!!info && (!!siteText('tagline') || !!siteText('description') || !!siteText('policies') || info.site.amenities.length > 0 || info.site.photos.length > 0));
+
+	// The hotel's colour replaces --brand for the whole page, and only on this page.
+	$effect(() => {
+		const color = info?.site.color;
+		if (!color) return;
+		const root = document.documentElement;
+		root.setAttribute('data-brand-scope', '');
+		root.style.setProperty('--brand', color);
+		return () => {
+			root.removeAttribute('data-brand-scope');
+			root.style.removeProperty('--brand');
+		};
+	});
+
 	$effect(() => {
 		document.documentElement.lang = locale;
 		document.documentElement.dir = dir;
@@ -174,7 +196,7 @@
 	<main class="page"><p>{translate('en', 'guest.empty')}</p></main>
 {:else if info}
 	<header class="top">
-		<h1>{info.name}</h1>
+		<h1>{#if info.site.logo}<img class="logo" src={`/api/public/${slug}/photos/${info.site.logo}`} alt="" />{/if}{info.name}</h1>
 		<Button variant="quiet" href={`/book/${slug}/manage`}>{t('guest.manage')}</Button>
 		{#if offered().length > 1}
 			<label class="lang">
@@ -194,6 +216,32 @@
 
 	<main class="page">
 		{#if step === 'room'}
+			{#if hasAbout}
+				<section class="about stack" aria-label={t('guest.about')}>
+					{#if siteText('tagline')}<p class="lead">{siteText('tagline')}</p>{/if}
+					{#if siteText('description')}
+						<h2>{t('guest.about')}</h2>
+						<p class="text">{siteText('description')}</p>
+					{/if}
+					{#if info.site.photos.length}
+						<ul class="gallery" aria-label={t('guest.photos')}>
+							{#each info.site.photos as ph (ph.id)}
+								<li><figure><img src={`/api/public/${slug}/photos/${ph.id}`} alt="" loading="lazy" />{#if ph.caption}<figcaption class="muted">{ph.caption}</figcaption>{/if}</figure></li>
+							{/each}
+						</ul>
+					{/if}
+					{#if info.site.amenities.length}
+						<h3>{t('guest.amenities')}</h3>
+						<ul class="amenities">
+							{#each info.site.amenities as a (a)}<li>{t(`amenity.${a}`)}</li>{/each}
+						</ul>
+					{/if}
+					{#if siteText('policies')}
+						<h3>{t('guest.policies')}</h3>
+						<p class="text">{siteText('policies')}</p>
+					{/if}
+				</section>
+			{/if}
 			<form class="stack search" onsubmit={search}>
 				<Field label={t('guest.arrival')} type="date" bind:value={from} />
 				<Field label={t('guest.departure')} type="date" bind:value={to} />
@@ -283,6 +331,63 @@
 {/if}
 
 <style>
+	.logo {
+		block-size: var(--space-8);
+		inline-size: auto;
+		vertical-align: middle;
+		margin-inline-end: var(--space-2);
+	}
+	.about {
+		margin-block-end: var(--space-6);
+	}
+	.about h2,
+	.about h3 {
+		margin: 0;
+		font: var(--font-heading);
+	}
+	.lead {
+		margin: 0;
+		font: var(--font-heading);
+		color: var(--color-text-muted);
+	}
+	.text {
+		margin: 0;
+		white-space: pre-line;
+	}
+	.gallery {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(var(--card-min), 1fr));
+		gap: var(--gap-related);
+	}
+	.gallery figure {
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-1);
+	}
+	.gallery img {
+		display: block;
+		inline-size: 100%;
+		aspect-ratio: 3 / 2;
+		object-fit: cover;
+		border-radius: var(--radius-md);
+	}
+	.amenities {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-2);
+	}
+	.amenities li {
+		padding: var(--space-1) var(--space-3);
+		border: var(--border-width) solid var(--color-border);
+		border-radius: var(--radius-full);
+	}
 	.top {
 		display: flex;
 		justify-content: space-between;
