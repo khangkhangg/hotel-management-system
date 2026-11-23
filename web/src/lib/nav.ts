@@ -24,6 +24,7 @@ const all = {
 	messages: item('messages', 'Messages', 'chat', '/messages'),
 	arrivals: item('arrivals', 'Arrivals', 'arrivals', '/arrivals'),
 	guests: item('guests', 'Guests', 'guests', '/guests'),
+	bookingSite: item('booking-site', 'Booking site', 'link', '/booking-site'),
 	payments: item('payments', 'Payments', 'card', '/payments'),
 	rates: item('rates', 'Rates', 'tag', '/rates'),
 	ratePlans: item('rate-plans', 'Rate plans', 'list', '/rate-plans'),
@@ -44,7 +45,7 @@ const menus: Record<Role, NavItem[]> = {
 
 // Screens a role may open that do not fit the five-item menu. The overview links to them.
 const more: Record<Role, NavItem[]> = {
-	owner: [all.arrivals, all.guests, all.rooms, all.issues, all.rates, all.ratePlans],
+	owner: [all.bookingSite, all.arrivals, all.guests, all.rooms, all.issues, all.rates, all.ratePlans],
 	manager: [all.arrivals, all.guests, all.payments, all.issues, all.rates, all.ratePlans],
 	front_desk: [],
 	revenue: [],
@@ -64,7 +65,7 @@ const matches = (href: string, path: string) => (href === '/' ? path === '/' : p
 export const allowed = (role: Role, path: string): boolean => [...menus[role], ...more[role]].some((i) => matches(i.href, path));
 
 /** Screens that exist in this milestone. The rest open a placeholder. */
-const built = ['/', '/staff', '/activity', '/calendar', '/arrivals', '/guests', '/payments', '/rates', '/rate-plans', '/rooms', '/issues'];
+const built = ['/', '/staff', '/activity', '/calendar', '/arrivals', '/guests', '/payments', '/rates', '/rate-plans', '/rooms', '/booking-site', '/issues'];
 export const isBuilt = (path: string): boolean => built.some((href) => matches(href, path));
 
 const milestones: [string[], string][] = [

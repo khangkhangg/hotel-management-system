@@ -305,5 +305,18 @@
 	"overview.tonight": "tonight",
 	"overview.ofRooms": "of {n} rooms",
 	"overview.more": "More screens",
-	"panel.badAmount": "Enter the amount as a plain number, such as 120 or 12.50."
+	"panel.badAmount": "Enter the amount as a plain number, such as 120 or 12.50.",
+	"common.save": "Save",
+	"site.title": "Booking site",
+	"site.note": "Choose how guests can pay when they book on your website.",
+	"site.offer": "Offer this to guests",
+	"site.holdHours": "Hours to hold the room",
+	"site.bankDetails": "Bank details shown to the guest",
+	"site.saved": "Saved",
+	"site.kind.hotel": "Pay at the hotel",
+	"site.kind.hotelNote": "Nothing is charged online. The front desk records the payment.",
+	"site.kind.bank_transfer": "Bank transfer",
+	"site.kind.bank_transferNote": "The guest sees your bank details. The booking is cancelled if no transfer arrives in time.",
+	"site.kind.card": "Card online",
+	"site.kind.cardNote": "The guest pays on the payment provider's page. Needs the provider keys in the server settings."
 }

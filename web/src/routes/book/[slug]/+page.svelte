@@ -1,0 +1,344 @@
+<script lang="ts">
+	import { page } from '$app/state';
+	import { api, ApiError } from '#lib/api.ts';
+	import { formatMoney } from '#lib/booking/money.ts';
+	import { direction, offered, pickLocale, translate } from '#lib/guest/locale.ts';
+	import Button from '#lib/ui/Button.svelte';
+	import Field from '#lib/ui/Field.svelte';
+
+	type Info = {
+		name: string;
+		currency: string;
+		defaultLocale: string;
+		address: string;
+		payments: string[];
+		roomTypes: { id: string; name: string; baseGuests: number; maxGuests: number }[];
+		ratePlans: { id: string; roomTypeId: string; name: string }[];
+	};
+	type Quote = { total: number; currency: string; soldOut: boolean; lines: { description: string; amount: number }[] };
+	type Made = { code: string; total: number; currency: string; status: string; checkoutUrl?: string; bankDetails?: string; holdUntil?: string };
+
+	const slug = page.params.slug;
+	const saved = (() => {
+		try {
+			return localStorage.getItem('guest-locale') ?? undefined;
+		} catch {
+			return undefined;
+		}
+	})();
+
+	let info = $state<Info | null>(null);
+	let missing = $state(false);
+	let locale = $state('en');
+	let step = $state<'room' | 'details' | 'done'>('room');
+	let from = $state('');
+	let to = $state('');
+	let adults = $state('2');
+	let children = $state('0');
+	let quotes = $state<Record<string, Quote>>({});
+	let chosen = $state<{ typeId: string; planId: string } | null>(null);
+	let name = $state('');
+	let email = $state('');
+	let phone = $state('');
+	let kind = $state('');
+	let error = $state('');
+	let busy = $state(false);
+	let made = $state<Made | null>(null);
+
+	const t = (key: string, params: Record<string, string | number> = {}) => translate(locale, key, params);
+	const nights = $derived(from && to ? Math.round((Date.parse(to) - Date.parse(from)) / 86400000) : 0);
+	const dir = $derived(direction(locale));
+	const money = (n: number) => formatMoney(n, info?.currency ?? 'USD');
+	const current = $derived(chosen ? quotes[chosen.planId] : undefined);
+	const typeName = $derived(info?.roomTypes.find((x) => x.id === chosen?.typeId)?.name ?? '');
+	const steps = $derived(['room', 'details', 'done'] as const);
+
+	$effect(() => {
+		api
+			.get<Info>(`/api/public/${slug}`)
+			.then((i) => {
+				info = i;
+				locale = pickLocale({ url: page.url.searchParams.get('lang') ?? undefined, saved, browser: navigator.languages, fallback: i.defaultLocale });
+				kind = i.payments[0] ?? '';
+			})
+			.catch(() => (missing = true));
+	});
+	$effect(() => {
+		document.documentElement.lang = locale;
+		document.documentElement.dir = dir;
+	});
+
+	const body = (planId: string, typeId: string) => ({ rooms: [{ roomTypeId: typeId, ratePlanId: planId, from, to, adults: +adults || 1, children: +children || 0 }] });
+
+	async function search(event: SubmitEvent) {
+		event.preventDefault();
+		error = '';
+		quotes = {};
+		chosen = null;
+		if (!info || nights < 1) return;
+		busy = true;
+		try {
+			const entries = await Promise.all(
+				info.ratePlans.map(async (p) => [p.id, await api.post<Quote>(`/api/public/${slug}/quote`, { ...body(p.id, p.roomTypeId), paymentKind: 'hotel' })] as const)
+			);
+			quotes = Object.fromEntries(entries);
+		} catch (e) {
+			error = e instanceof ApiError ? t(`guest.error.${e.code}`) : t('guest.error.generic');
+		}
+		busy = false;
+	}
+
+	async function book(event: SubmitEvent) {
+		event.preventDefault();
+		if (!chosen) return;
+		error = '';
+		busy = true;
+		try {
+			made = await api.post<Made>(`/api/public/${slug}/bookings`, {
+				guest: { name, email, phone, locale },
+				paymentKind: kind,
+				...body(chosen.planId, chosen.typeId)
+			});
+			if (made.checkoutUrl) {
+				window.location.href = made.checkoutUrl;
+				return;
+			}
+			step = 'done';
+		} catch (e) {
+			const code = e instanceof ApiError ? e.code : 'generic';
+			error = t(`guest.error.${code}`) === `guest.error.${code}` ? t('guest.error.generic') : t(`guest.error.${code}`);
+			if (code === 'sold_out') step = 'room';
+		}
+		busy = false;
+	}
+
+	function pick(l: string) {
+		locale = l;
+		try {
+			localStorage.setItem('guest-locale', l);
+		} catch {
+			/* the choice lasts until the page closes */
+		}
+	}
+</script>
+
+<svelte:head><title>{info?.name ?? 'Book'}</title></svelte:head>
+
+{#if missing}
+	<main class="page"><p>{translate('en', 'guest.empty')}</p></main>
+{:else if info}
+	<header class="top">
+		<h1>{info.name}</h1>
+		{#if offered().length > 1}
+			<label class="lang">
+				<span class="visually-hidden">{t('guest.language')}</span>
+				<select value={locale} onchange={(e) => pick(e.currentTarget.value)}>
+					{#each offered() as l (l.code)}<option value={l.code} lang={l.code}>{l.name}</option>{/each}
+				</select>
+			</label>
+		{/if}
+	</header>
+
+	<nav class="progress" aria-label={t('guest.stepOf', { n: steps.indexOf(step) + 1, total: steps.length })}>
+		{#each steps as s, i (s)}
+			<span class:active={s === step} class:past={i < steps.indexOf(step)} aria-current={s === step ? 'step' : undefined}>{i + 1}. {t(`guest.step.${s}`)}</span>
+		{/each}
+	</nav>
+
+	<main class="page">
+		{#if step === 'room'}
+			<form class="stack search" onsubmit={search}>
+				<Field label={t('guest.arrival')} type="date" bind:value={from} />
+				<Field label={t('guest.departure')} type="date" bind:value={to} />
+				<Field label={t('guest.adults')} inputmode="numeric" bind:value={adults} />
+				<Field label={t('guest.children')} inputmode="numeric" bind:value={children} />
+				<Button type="submit" disabled={busy || nights < 1}>{t('guest.search')}</Button>
+			</form>
+			{#if error}<p class="error" role="alert">{error}</p>{/if}
+			{#if info.roomTypes.length === 0}<p class="muted">{t('guest.empty')}</p>{/if}
+			<ul class="rooms">
+				{#each info.ratePlans as p (p.id)}
+					{@const rt = info.roomTypes.find((x) => x.id === p.roomTypeId)}
+					{@const q = quotes[p.id]}
+					{#if rt && q}
+						<li class="card">
+							<div>
+								<h2>{rt.name} <span class="muted">{p.name}</span></h2>
+								<p class="muted">{t('guest.upTo', { count: rt.maxGuests })} · {t('guest.nights', { count: nights })}</p>
+							</div>
+							<div class="buy">
+								<p><strong>{money(q.total)}</strong> <span class="muted">{t('guest.withTaxes')}</span></p>
+								{#if q.soldOut}
+									<p class="muted">{t('guest.soldOut')}</p>
+								{:else}
+									<Button
+										onclick={() => {
+											chosen = { typeId: rt.id, planId: p.id };
+											step = 'details';
+										}}>{t('guest.select')}</Button
+									>
+								{/if}
+							</div>
+						</li>
+					{/if}
+				{/each}
+			</ul>
+		{:else if step === 'details' && current}
+			<div class="split">
+				<form id="guest-form" class="stack" onsubmit={book}>
+					<Field label={t('guest.name')} autocomplete="name" bind:value={name} />
+					<Field label={t('guest.email')} type="email" autocomplete="email" bind:value={email} />
+					<Field label={t('guest.phone')} type="tel" autocomplete="tel" bind:value={phone} />
+					<fieldset class="pay">
+						<legend>{t('guest.payHow')}</legend>
+						{#each info.payments as k (k)}
+							<label class="choice">
+								<input type="radio" name="kind" value={k} bind:group={kind} />
+								<span><strong>{t(`guest.pay.${k}`)}</strong><br /><span class="muted">{t(`guest.pay.${k}Note`)}</span></span>
+							</label>
+						{/each}
+					</fieldset>
+					{#if error}<p class="error" role="alert">{error}</p>{/if}
+					<Button type="submit" disabled={busy || !name.trim() || !email.trim() || !kind}>{kind === 'card' ? t('guest.payNow') : t('guest.confirm')}</Button>
+				</form>
+				<aside class="card summary" aria-label={t('guest.yourStay')}>
+					<h2>{t('guest.yourStay')}</h2>
+					<p>{typeName} · {from} → {to} · {t('guest.nights', { count: nights })}</p>
+					<ul class="plain">
+						{#each current.lines as l (l.description)}<li><span>{l.description}</span><span>{money(l.amount)}</span></li>{/each}
+					</ul>
+					<p class="total"><span>{t('guest.total')}</span><strong>{money(current.total)}</strong></p>
+				</aside>
+			</div>
+		{:else if step === 'done' && made}
+			<section class="card stack">
+				<h2>{t('guest.done.title', { state: t(`guest.done.${made.status}`) })}</h2>
+				<p>{t('guest.done.code')}: <strong>{made.code}</strong></p>
+				<p><strong>{money(made.total)}</strong></p>
+				{#if made.holdUntil}<p class="muted">{t('guest.done.holdUntil', { time: new Date(made.holdUntil).toLocaleString(locale) })}</p>{/if}
+				{#if made.bankDetails}<p>{t('guest.done.bank')}</p><pre>{made.bankDetails}</pre>{/if}
+			</section>
+		{/if}
+	</main>
+{/if}
+
+<style>
+	.top {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: var(--gap-related);
+		padding: var(--space-4);
+		border-block-end: var(--border-width) solid var(--color-border);
+		background: var(--color-surface);
+	}
+	h1,
+	h2 {
+		margin: 0;
+		font: var(--font-heading);
+	}
+	.progress {
+		display: flex;
+		gap: var(--space-4);
+		padding: var(--space-3) var(--space-4);
+		font: var(--font-body);
+		color: var(--color-text-muted);
+	}
+	.progress .active {
+		color: var(--color-text);
+		font-weight: var(--font-weight-semibold);
+	}
+	.page {
+		max-inline-size: var(--page-width);
+		margin-inline: auto;
+		padding: var(--space-4);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-4);
+		font: var(--font-body);
+	}
+	.search {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(var(--field-min), 1fr));
+		align-items: end;
+		gap: var(--gap-related);
+	}
+	.rooms,
+	.plain {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--gap-related);
+	}
+	.card {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: space-between;
+		gap: var(--space-4);
+		padding: var(--space-4);
+		border: var(--border-width) solid var(--color-border);
+		border-radius: var(--radius-md);
+		background: var(--color-surface);
+	}
+	.buy {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: var(--gap-related);
+	}
+	.split {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(var(--card-min), 1fr));
+		gap: var(--space-6);
+		align-items: start;
+	}
+	.stack {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-4);
+	}
+	.summary {
+		flex-direction: column;
+	}
+	.plain li,
+	.total {
+		display: flex;
+		justify-content: space-between;
+		gap: var(--space-4);
+		margin: 0;
+	}
+	.pay {
+		border: 0;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--gap-related);
+	}
+	.choice {
+		display: flex;
+		gap: var(--gap-related);
+		align-items: flex-start;
+		padding: var(--space-3);
+		border: var(--border-width) solid var(--color-border);
+		border-radius: var(--radius-md);
+	}
+	.muted {
+		color: var(--color-text-muted);
+	}
+	.error {
+		margin: 0;
+		color: var(--palette-danger-fg);
+	}
+	pre {
+		margin: 0;
+		white-space: pre-wrap;
+		font: var(--font-body);
+	}
+	select {
+		min-block-size: var(--control-height);
+		font: var(--font-body);
+	}
+</style>

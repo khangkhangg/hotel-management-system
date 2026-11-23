@@ -63,6 +63,9 @@ func seedHotel(ctx context.Context, pool *pgxpool.Pool, org, property uuid.UUID)
 			if err := rooms.EnsureInventory(ctx, tx, org, typeID, today); err != nil {
 				return err
 			}
+			if _, err := tx.Exec(ctx, `insert into payment_type (property_id, kind, organization_id, enabled, bank_details) select $1, k, $2, true, 'IBAN VN00 0000' from unnest(array['hotel', 'bank_transfer', 'card']) k on conflict do nothing`, property, org); err != nil {
+				return err
+			}
 			if _, err := tx.Exec(ctx, `insert into rate_plan (id, organization_id, property_id, room_type_id, name, free_cancel_until_days, late_cancel_penalty, created_at) values ($1, $2, $3, $4, 'Flexible', 2, 'first_night', $5)`, planID, org, property, typeID, now); err != nil {
 				return err
 			}
