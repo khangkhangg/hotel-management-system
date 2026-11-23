@@ -25,15 +25,15 @@ test('front desk does not see Staff, and /staff is refused', async ({ page }) =>
 test('owner switches view and the banner returns', async ({ page }) => {
 	await loginAs(page, 'owner@hotel.com');
 	await page.goto('/');
-	await expect(mainNav(page).getByRole('link', { name: 'Payouts' })).toBeVisible();
+	await expect(mainNav(page).getByRole('link', { name: 'Staff' })).toBeVisible();
 	const view = page.getByRole('group', { name: 'Viewing as' });
 	await view.getByRole('button', { name: 'Front desk' }).click();
 	await expect(page.getByText('Viewing as Front desk')).toBeVisible();
 	await expect(mainNav(page).getByRole('link', { name: 'Calendar' })).toBeVisible();
-	await expect(mainNav(page).getByRole('link', { name: 'Payouts' })).toHaveCount(0);
+	await expect(mainNav(page).getByRole('link', { name: 'Staff' })).toHaveCount(0);
 	await page.getByRole('button', { name: 'Back to owner view' }).click();
 	await expect(page.getByText('Viewing as Front desk')).toHaveCount(0);
-	await expect(mainNav(page).getByRole('link', { name: 'Payouts' })).toBeVisible();
+	await expect(mainNav(page).getByRole('link', { name: 'Staff' })).toBeVisible();
 });
 
 test('manager has no Viewing as control', async ({ page }) => {
@@ -89,13 +89,16 @@ test('sidebar collapse is remembered after reload', async ({ page }) => {
 test('bell count rises without reload', async ({ page }) => {
 	await loginAs(page, 'daniel@hotel.com');
 	await page.goto('/');
-	await expect(page.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible();
+	const bell = page.getByRole('button', { name: /^Notifications/ });
+	await expect(bell).toBeVisible();
+	const count = async () => Number(/(\d+) unread/.exec((await bell.getAttribute('aria-label')) ?? '')?.[1] ?? 0);
+	const before = await count();
 	await page.request.get('/api/test/notify?email=daniel@hotel.com');
-	await expect(page.getByRole('button', { name: 'Notifications, 1 unread' })).toBeVisible({ timeout: 3000 });
-	await page.getByRole('button', { name: 'Notifications, 1 unread' }).click();
+	await expect.poll(count, { timeout: 4000 }).toBe(before + 1);
+	await bell.click();
 	await expect(page.getByText('Refund needs approval')).toBeVisible();
 	await page.getByRole('button', { name: 'Mark all read' }).click();
-	await expect(page.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible();
+	await expect.poll(count).toBe(0);
 });
 
 test('owner invites a user and sees them as invited', async ({ page }) => {

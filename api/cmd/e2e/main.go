@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"hotelpms/api/internal/account"
+	"hotelpms/api/internal/alerts"
 	"hotelpms/api/internal/app"
 	"hotelpms/api/internal/db"
 	"hotelpms/api/internal/db/testdb"
@@ -50,6 +51,9 @@ func main() {
 	defer cleanup()
 	org, property := seed(ctx, pool)
 	seedHotel(ctx, pool, org, property)
+	if err := alerts.Run(ctx, pool, time.Now()); err != nil {
+		log.Fatal(err)
+	}
 	sender := mail.NewFake()
 	hub, err := notify.NewHub(pool)
 	if err != nil {
@@ -58,6 +62,7 @@ func main() {
 	defer hub.Close()
 	deps := httpx.Deps{Pool: pool, Mail: sender, Now: time.Now, BaseURL: baseURL}
 
+	go alerts.RunSweeper(ctx, pool, 2*time.Second) // the browser tests do not wait a minute for an alert
 	mux := http.NewServeMux()
 	mux.Handle("/", app.NewHandler(deps, hub, nil))
 	mux.HandleFunc("/api/test/last-code", lastMatch(sender, codeRE, 0))
@@ -165,6 +170,7 @@ func seed(ctx context.Context, pool *pgxpool.Pool) (org, property uuid.UUID) {
 		{"daniel@hotel.com", "Daniel Tran", "manager"},
 		{"lan@hotel.com", "Lan Vo", "front_desk"},
 		{"tuan@hotel.com", "Tuan Le", "housekeeping"},
+		{"rita@hotel.com", "Rita Ho", "revenue"},
 		{"owner@hotel.com", "Linh Nguyen", "owner"},
 	} {
 		var id uuid.UUID

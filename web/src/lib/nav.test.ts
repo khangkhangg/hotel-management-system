@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { allowed, homeFor, isBuilt, itemsFor, milestoneFor, type Role } from './nav.ts';
+import { allowed, homeFor, isBuilt, itemsFor, milestoneFor, moreFor, type Role } from './nav.ts';
 
 const labels = (role: Role) => itemsFor(role).map((i) => i.label);
 
@@ -48,6 +48,29 @@ describe('allowed', () => {
 		expect(allowed('owner', '/')).toBe(true);
 		expect(allowed('manager', '/')).toBe(true);
 		expect(allowed('front_desk', '/')).toBe(false);
+	});
+});
+
+describe('more screens', () => {
+	test('owners and managers reach the rest of the hotel screens from the overview, outside the five-item menu', () => {
+		expect(moreFor('manager').map((i) => i.label)).toEqual(['Arrivals', 'Guests', 'Payments', 'Issues', 'Rates', 'Rate plans']);
+		expect(moreFor('owner').map((i) => i.label)).toEqual(['Arrivals', 'Guests', 'Rooms', 'Issues', 'Rates', 'Rate plans']);
+		expect(allowed('manager', '/rates')).toBe(true);
+		expect(allowed('owner', '/arrivals')).toBe(true);
+		expect(moreFor('front_desk')).toEqual([]);
+	});
+
+	test('a role with no extra screens is still refused the others', () => {
+		expect(allowed('front_desk', '/rates')).toBe(false);
+		expect(allowed('housekeeping', '/guests')).toBe(false);
+		expect(allowed('revenue', '/payments')).toBe(false);
+	});
+
+	test('a screen is never in a role menu and in its more list at once', () => {
+		for (const role of ['owner', 'manager'] as Role[]) {
+			const menu = new Set(itemsFor(role).map((i) => i.id));
+			for (const i of moreFor(role)) expect(menu.has(i.id), i.id).toBe(false);
+		}
 	});
 });
 

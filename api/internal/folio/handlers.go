@@ -36,6 +36,7 @@ func Mount(mux *http.ServeMux, d httpx.Deps) {
 	mux.HandleFunc("/api/payments/{id}/refunds", one(http.MethodPost, h.refund, access.RefundsRequest))
 	mux.HandleFunc("/api/refunds/{id}/approve", one(http.MethodPost, h.decide(true), access.RefundsApprove))
 	mux.HandleFunc("/api/refunds/{id}/reject", one(http.MethodPost, h.decide(false), access.RefundsApprove))
+	mux.HandleFunc("/api/payments", one(http.MethodGet, h.listPayments, access.PaymentsTake))
 	mux.HandleFunc("/api/tax-rules", route(
 		map[string]http.HandlerFunc{http.MethodGet: h.listTax, http.MethodPost: h.createTax},
 		map[string][]access.Permission{http.MethodGet: {access.ReservationsView, access.PaymentsConfigure}, http.MethodPost: {access.PaymentsConfigure}}))
@@ -414,5 +415,86 @@ func (h *handler) putLimits(w http.ResponseWriter, r *http.Request) {
 	})
 	if !fail(w, err) {
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// listPayments shows what was taken between two dates (the hotel day starts at midnight UTC here), with who paid,
+// and the refunds still waiting for approval. The front desk uses it to see the day's takings.
+func (h *handler) listPayments(w http.ResponseWriter, r *http.Request) {
+	a, ok := scope(w, r)
+	if !ok {
+		return
+	}
+	from, e1 := time.Parse("2006-01-02", r.URL.Query().Get("from"))
+	to, e2 := time.Parse("2006-01-02", r.URL.Query().Get("to"))
+	if e1 != nil || e2 != nil || !to.After(from) || to.Sub(from) > 93*24*time.Hour {
+		bad(w, "Give a first date and a later last date within 93 days.")
+		return
+	}
+	type pay struct {
+		ID            uuid.UUID `json:"id"`
+		ReservationID uuid.UUID `json:"reservationId"`
+		Code          string    `json:"code"`
+		GuestName     string    `json:"guestName"`
+		Method        string    `json:"method"`
+		Amount        int64     `json:"amount"`
+		Status        string    `json:"status"`
+		Currency      string    `json:"currency"`
+		CreatedAt     time.Time `json:"createdAt"`
+	}
+	type waiting struct {
+		ID            uuid.UUID `json:"id"`
+		ReservationID uuid.UUID `json:"reservationId"`
+		Code          string    `json:"code"`
+		GuestName     string    `json:"guestName"`
+		Amount        int64     `json:"amount"`
+		Reason        string    `json:"reason"`
+		Currency      string    `json:"currency"`
+	}
+	out := struct {
+		Payments       []pay            `json:"payments"`
+		PendingRefunds []waiting        `json:"pendingRefunds"`
+		Totals         map[string]int64 `json:"totals"`
+	}{Payments: []pay{}, PendingRefunds: []waiting{}, Totals: map[string]int64{}}
+	err := db.WithOrg(r.Context(), h.Pool, a.OrgID, func(tx pgx.Tx) error {
+		rows, err := tx.Query(r.Context(),
+			`select p.id, r.id, r.code, g.name, p.method, p.amount, p.status, f.currency, p.created_at
+			 from payment p join folio f on f.id = p.folio_id join reservation r on r.id = f.reservation_id join guest g on g.id = r.guest_id
+			 where f.property_id = $1 and p.created_at >= $2 and p.created_at < $3 order by p.created_at`, a.PropertyID, from, to)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var x pay
+			if err := rows.Scan(&x.ID, &x.ReservationID, &x.Code, &x.GuestName, &x.Method, &x.Amount, &x.Status, &x.Currency, &x.CreatedAt); err != nil {
+				rows.Close()
+				return err
+			}
+			out.Totals[x.Method] += x.Amount
+			out.Payments = append(out.Payments, x)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		rs, err := tx.Query(r.Context(),
+			`select rf.id, r.id, r.code, g.name, rf.amount, rf.reason, f.currency
+			 from refund rf join payment p on p.id = rf.payment_id join folio f on f.id = p.folio_id join reservation r on r.id = f.reservation_id join guest g on g.id = r.guest_id
+			 where f.property_id = $1 and rf.status = 'pending' order by rf.created_at`, a.PropertyID)
+		if err != nil {
+			return err
+		}
+		defer rs.Close()
+		for rs.Next() {
+			var x waiting
+			if err := rs.Scan(&x.ID, &x.ReservationID, &x.Code, &x.GuestName, &x.Amount, &x.Reason, &x.Currency); err != nil {
+				return err
+			}
+			out.PendingRefunds = append(out.PendingRefunds, x)
+		}
+		return rs.Err()
+	})
+	if !fail(w, err) {
+		httpx.JSON(w, http.StatusOK, out)
 	}
 }

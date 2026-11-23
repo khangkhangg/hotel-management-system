@@ -1,0 +1,157 @@
+<script lang="ts">
+	import { api, errorText } from '#lib/api.ts';
+	import { addDays, formatDay, rangeDays, weekday } from '#lib/booking/dates.ts';
+	import { formatMoney } from '#lib/booking/money.ts';
+	import type { RatePlan, RoomType } from '#lib/booking/types.ts';
+	import { t } from '#lib/i18n.ts';
+	import Button from '#lib/ui/Button.svelte';
+	import Checkbox from '#lib/ui/Checkbox.svelte';
+	import Dialog from '#lib/ui/Dialog.svelte';
+	import Field from '#lib/ui/Field.svelte';
+	import PageHeader from '#lib/ui/PageHeader.svelte';
+	import Select from '#lib/ui/Select.svelte';
+
+	type Rate = { date: string; price: number; minNights: number; closed: boolean; closedToArrival: boolean; closedToDeparture: boolean; suspicious: boolean };
+
+	const today = new Date().toISOString().slice(0, 10);
+	const DAYS = 30;
+	let types = $state<RoomType[]>([]);
+	let plans = $state<RatePlan[]>([]);
+	let plan = $state('');
+	let rates = $state<Rate[]>([]);
+	let message = $state('');
+	let ok = $state('');
+	let open = $state(false);
+	let from = $state(today);
+	let to = $state(addDays(today, 7));
+	let price = $state('');
+	let minNights = $state('1');
+	let closed = $state(false);
+	let closedToArrival = $state(false);
+	let closedToDeparture = $state(false);
+	let currency = $state('USD');
+
+	const days = rangeDays(today, DAYS);
+	const byDate = $derived(Object.fromEntries(rates.map((r) => [r.date, r])));
+
+	$effect(() => {
+		Promise.all([api.get<RoomType[]>('/api/room-types'), api.get<RatePlan[]>('/api/rate-plans')])
+			.then(([a, b]) => {
+				types = a;
+				plans = b;
+				plan = plan || b[0]?.id || '';
+			})
+			.catch((e) => (message = errorText(e)));
+	});
+	$effect(() => {
+		if (plan) load();
+	});
+
+	async function load() {
+		try {
+			rates = await api.get<Rate[]>(`/api/rates?ratePlanId=${plan}&from=${today}&to=${addDays(today, DAYS)}`);
+		} catch (e) {
+			message = errorText(e);
+		}
+	}
+
+	async function save(event: SubmitEvent) {
+		event.preventDefault();
+		message = ok = '';
+		try {
+			const r = await api.put<{ suspicious: string[] }>('/api/rates', {
+				ratePlanId: plan,
+				from,
+				to,
+				price: Math.round(parseFloat(price.replace(',', '.')) * 100),
+				minNights: +minNights || 1,
+				closed,
+				closedToArrival,
+				closedToDeparture
+			});
+			open = false;
+			ok = r.suspicious.length ? t('rates.suspicious', { dates: r.suspicious.map(formatDay).join(', ') }) : t('rates.saved');
+			await load();
+		} catch (e) {
+			message = errorText(e);
+		}
+	}
+	const planLabel = (p: RatePlan) => `${types.find((x) => x.id === p.roomTypeId)?.name ?? ''}, ${p.name}`;
+</script>
+
+<svelte:head><title>{t('rates.title')} · {t('app.name')}</title></svelte:head>
+
+<PageHeader title={t('rates.title')} note={t('rates.note')}>
+	{#snippet primary()}<Button icon="tag" disabled={!plan} onclick={() => (open = true)}>{t('rates.set')}</Button>{/snippet}
+</PageHeader>
+
+{#if message}<p class="notice danger" role="alert">{message}</p>{/if}
+{#if ok}<p class="notice success" role="status">{ok}</p>{/if}
+
+{#if plans.length === 0}
+	<p class="muted">{t('rates.noPlans')} <a href="/rate-plans">{t('rate-plans.title')}</a></p>
+{:else}
+	<div class="pick"><Select label={t('booking.ratePlan')} options={plans.map((p) => ({ id: p.id, label: planLabel(p) }))} bind:value={plan} /></div>
+	<!-- svelte-ignore a11y_no_noninteractive_tabindex -- a scrolling table must be reachable by keyboard -->
+	<div class="table-scroll" role="region" aria-label={t('rates.title')} tabindex="0">
+		<table class="data-table">
+			<thead>
+				<tr>
+					<th scope="col">{t('rates.date')}</th>
+					<th scope="col" class="num">{t('rates.price')}</th>
+					<th scope="col">{t('rates.rules')}</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each days as d (d)}
+					{@const r = byDate[d]}
+					<tr>
+						<th scope="row">{weekday(d)} {formatDay(d)}</th>
+						<td class="num">{r ? formatMoney(r.price, currency) : '–'}</td>
+						<td>
+							{#if !r}<span class="muted">{t('rates.none')}</span>
+							{:else}
+								<span class="muted">
+									{r.minNights > 1 ? t('rates.minNights', { n: r.minNights }) : ''}
+									{r.closed ? t('rates.closed') : ''}
+									{r.closedToArrival ? t('rates.cta') : ''}
+									{r.closedToDeparture ? t('rates.ctd') : ''}
+									{r.suspicious ? t('rates.check') : ''}
+								</span>
+							{/if}
+						</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
+{/if}
+
+<Dialog title={t('rates.set')} bind:open>
+	<form id="rate-form" class="stack" onsubmit={save}>
+		<div class="pair">
+			<Field label={t('rates.from')} type="date" bind:value={from} />
+			<Field label={t('rates.to')} type="date" bind:value={to} />
+		</div>
+		<Field label={t('rates.pricePerNight')} inputmode="decimal" bind:value={price} />
+		<Field label={t('rates.minimum')} inputmode="numeric" bind:value={minNights} />
+		<Checkbox label={t('rates.closedLabel')} bind:checked={closed} />
+		<Checkbox label={t('rates.ctaLabel')} bind:checked={closedToArrival} />
+		<Checkbox label={t('rates.ctdLabel')} bind:checked={closedToDeparture} />
+	</form>
+	{#snippet actions()}
+		<Button variant="quiet" onclick={() => (open = false)}>{t('common.cancel')}</Button>
+		<Button type="submit" form="rate-form" disabled={price.trim() === ''}>{t('rates.save')}</Button>
+	{/snippet}
+</Dialog>
+
+<style>
+	.pick {
+		max-inline-size: var(--form-width);
+	}
+	.pair {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: var(--gap-related);
+	}
+</style>

@@ -42,6 +42,16 @@ const menus: Record<Role, NavItem[]> = {
 	housekeeping: [all.rooms, all.issues, all.lost]
 };
 
+// Screens a role may open that do not fit the five-item menu. The overview links to them.
+const more: Record<Role, NavItem[]> = {
+	owner: [all.arrivals, all.guests, all.rooms, all.issues, all.rates, all.ratePlans],
+	manager: [all.arrivals, all.guests, all.payments, all.issues, all.rates, all.ratePlans],
+	front_desk: [],
+	revenue: [],
+	housekeeping: []
+};
+export const moreFor = (role: Role): NavItem[] => more[role];
+
 /** The menu for a role, in order. At most 5 items, so it fits the phone's bottom bar. */
 export const itemsFor = (role: Role): NavItem[] => menus[role];
 
@@ -51,7 +61,7 @@ export const homeFor = (role: Role): string => menus[role][0].href;
 const matches = (href: string, path: string) => (href === '/' ? path === '/' : path === href || path.startsWith(href + '/'));
 
 /** Whether a role's menu leads to the path (or to a page under it). */
-export const allowed = (role: Role, path: string): boolean => menus[role].some((i) => matches(i.href, path));
+export const allowed = (role: Role, path: string): boolean => [...menus[role], ...more[role]].some((i) => matches(i.href, path));
 
 /** Screens that exist in this milestone. The rest open a placeholder. */
 const built = ['/', '/staff', '/activity', '/calendar', '/arrivals', '/guests', '/payments', '/rates', '/rate-plans', '/rooms', '/issues'];

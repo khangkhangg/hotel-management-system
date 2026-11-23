@@ -486,3 +486,24 @@ func TestAnotherPropertyOrOrganizationSeesNothing(t *testing.T) {
 }
 
 var _ = time.Now
+
+func TestTheStatusSaysWhenTheChecksLastRan(t *testing.T) {
+	h := newHotel(t, 1)
+	var s struct{ LastRun *time.Time }
+	must(t, json.Unmarshal([]byte(h.desk.Do("GET", "/api/alerts/status", &h.prop, "").Want(t, 200).Body), &s))
+	if s.LastRun != nil {
+		t.Fatalf("the checks never ran, yet %v", s.LastRun)
+	}
+	h.run()
+	must(t, json.Unmarshal([]byte(h.desk.Do("GET", "/api/alerts/status", &h.prop, "").Want(t, 200).Body), &s))
+	if s.LastRun == nil || !s.LastRun.Equal(h.w.Now) {
+		t.Fatalf("%v, want %v", s.LastRun, h.w.Now)
+	}
+	h.w.Advance(time.Minute)
+	h.run()
+	must(t, json.Unmarshal([]byte(h.desk.Do("GET", "/api/alerts/status", &h.prop, "").Want(t, 200).Body), &s))
+	if !s.LastRun.Equal(h.w.Now) {
+		t.Fatalf("the time did not move: %v", s.LastRun)
+	}
+	h.w.Anon("GET", "/api/alerts/status", "").Want(t, 401)
+}

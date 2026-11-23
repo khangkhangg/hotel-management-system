@@ -101,13 +101,13 @@ test('the calendar and the booking panel pass axe and fit at every width', async
 		await page.setViewportSize({ width, height: 900 });
 		await page.goto('/calendar');
 		await expect(page.getByRole('group', { name: 'Room 101' })).toBeVisible();
-		await page.waitForTimeout(300);
+		await page.waitForTimeout(700);
 		expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), `scrolls sideways at ${width}`).toBe(true);
 		let result = await new AxeBuilder({ page }).analyze();
 		expect(result.violations.map((v) => `${v.id}: ${v.nodes[0]?.html}`), `calendar at ${width}`).toEqual([]);
 		await page.getByRole('region', { name: 'Bookings without a room' }).getByRole('button', { name: /Ana Reyes/ }).click();
 		await expect(panel(page).getByRole('heading', { name: /Ana Reyes/ })).toBeVisible();
-		await page.waitForTimeout(300);
+		await page.waitForTimeout(700);
 		result = await new AxeBuilder({ page }).analyze();
 		expect(result.violations.map((v) => `${v.id}: ${v.nodes[0]?.html}`), `panel at ${width}`).toEqual([]);
 	}

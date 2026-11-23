@@ -587,4 +587,3 @@ func (h *handler) stream(w http.ResponseWriter, r *http.Request) {
 		flusher.Flush()
 	}
 }
-

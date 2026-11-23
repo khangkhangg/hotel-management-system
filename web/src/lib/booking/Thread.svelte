@@ -55,7 +55,7 @@
 			picks = [];
 			return;
 		}
-		const q = m[1].toLowerCase();
+		const q = m[1].toLocaleLowerCase('en');
 		const roles = roleHandles.filter((r) => r.label.startsWith(q));
 		const people = await api.get<Colleague[]>(`/api/colleagues?q=${encodeURIComponent(q)}`).catch(() => []);
 		picks = [...people.map((p) => ({ label: p.name, hint: roleLabels[p.role as Role] ?? p.role, userId: p.id })), ...roles].slice(0, 6);

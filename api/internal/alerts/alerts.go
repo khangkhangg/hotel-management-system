@@ -173,7 +173,8 @@ func RunProperty(ctx context.Context, tx pgx.Tx, orgID, propertyID uuid.UUID, no
 			return fmt.Errorf("%s: %w", c.kind, err)
 		}
 	}
-	return nil
+	_, err = tx.Exec(ctx, `insert into alert_run (property_id, organization_id, ran_at) values ($1, $2, $3) on conflict (property_id) do update set ran_at = excluded.ran_at`, propertyID, orgID, now)
+	return err
 }
 
 // reconcile makes the open alerts of one check match what it found now.

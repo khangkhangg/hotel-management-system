@@ -81,6 +81,8 @@
 	}
 </script>
 
+<svelte:head>{#if denied}<title>{t('access.denied.title')} · {t('app.name')}</title>{/if}</svelte:head>
+
 {#if loadError}
 	<main class="failed">
 		<PageHeader title={loadError} />

@@ -51,3 +51,56 @@ body {
 	background: var(--color-status-success-bg);
 	color: var(--color-status-success-fg);
 }
+
+/* A table that scrolls inside its own box on narrow screens. */
+.table-scroll {
+	position: relative;
+	overflow-x: auto;
+	border: var(--border-width) solid var(--color-border);
+	border-radius: var(--radius-lg);
+	background: var(--color-surface);
+}
+.data-table {
+	inline-size: 100%;
+	border-collapse: collapse;
+	font: var(--font-body);
+}
+.data-table th,
+.data-table td {
+	padding: var(--space-3) var(--space-4);
+	text-align: start;
+	vertical-align: middle;
+	border-block-end: var(--border-width) solid var(--color-divider);
+	white-space: nowrap;
+}
+.data-table thead th {
+	font: var(--font-label);
+	color: var(--color-text-subtle);
+	background: var(--color-surface-muted);
+}
+.data-table tbody tr:last-child > * {
+	border-block-end: 0;
+}
+.data-table tbody th {
+	font-weight: var(--font-weight-regular);
+}
+.data-table .num {
+	text-align: end;
+	font-variant-numeric: tabular-nums;
+}
+.data-table .actions {
+	text-align: end;
+}
+.row-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--gap-related);
+}
+.visually-hidden {
+	position: absolute;
+	inline-size: var(--size-hidden);
+	block-size: var(--size-hidden);
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}

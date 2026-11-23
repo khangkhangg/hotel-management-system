@@ -10,6 +10,7 @@
 	import { addDays, formatDay, rangeDays } from '#lib/booking/dates.ts';
 	import type { CalendarData, Stay } from '#lib/booking/types.ts';
 	import Button from '#lib/ui/Button.svelte';
+	import AttentionPanel from '#lib/alerts/AttentionPanel.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 
 	const DAYS = 14;
@@ -64,6 +65,8 @@
 </PageHeader>
 
 {#if message}<p class="notice danger" role="alert">{message}</p>{/if}
+
+<AttentionPanel onchange={load} />
 
 {#if unassigned.length}
 	<section class="tray" aria-label={t('calendar.unassigned')}>

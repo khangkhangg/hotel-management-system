@@ -26,6 +26,7 @@ func Mount(mux *http.ServeMux, d httpx.Deps) {
 		return httpx.Wrap(access.RequireAny(d, access.ReservationsView, access.HousekeepingView, access.RatesEdit)(f))
 	}
 	mux.HandleFunc("/api/alerts", httpx.Methods(map[string]http.HandlerFunc{http.MethodGet: anyRole(h.list)}))
+	mux.HandleFunc("/api/alerts/status", httpx.Methods(map[string]http.HandlerFunc{http.MethodGet: anyRole(h.status)}))
 	mux.HandleFunc("/api/alerts/{id}/apply", httpx.Methods(map[string]http.HandlerFunc{http.MethodPost: anyRole(h.apply)}))
 	mux.HandleFunc("/api/alerts/{id}/dismiss", httpx.Methods(map[string]http.HandlerFunc{http.MethodPost: anyRole(h.dismiss)}))
 	mux.HandleFunc("/api/alerts/{id}/snooze", httpx.Methods(map[string]http.HandlerFunc{http.MethodPost: anyRole(h.snooze)}))
@@ -365,4 +366,25 @@ func (h *handler) putSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// status says when the checks last ran for the property, so an empty panel can show it.
+func (h *handler) status(w http.ResponseWriter, r *http.Request) {
+	a, ok := scopeOf(w, r)
+	if !ok {
+		return
+	}
+	var last *time.Time
+	err := db.WithOrg(r.Context(), h.Pool, a.OrgID, func(tx pgx.Tx) error {
+		err := tx.QueryRow(r.Context(), `select ran_at from alert_run where property_id = $1`, a.PropertyID).Scan(&last)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return err
+	})
+	if err != nil {
+		httpx.InternalError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"lastRun": last})
 }

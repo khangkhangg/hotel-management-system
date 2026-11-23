@@ -280,3 +280,31 @@ func dbCount(h *hotel, n *int) error {
 		return tx.QueryRow(testkit.Ctx, `select count(*) from audit_log where action like 'folio.%' or action like 'payment.%' or action like 'refund.%' or action like 'tax_rule.%'`).Scan(n)
 	})
 }
+
+func TestThePaymentsListShowsTodaysTakingsAndWaitingRefunds(t *testing.T) {
+	h := newHotel(t)
+	res := h.reservation()
+	f := h.folio(h.desk, res).FolioID
+	p := pay(t, h, f, 8000)
+	h.desk.Do("POST", "/api/payments/"+p+"/refunds", &h.prop, `{"amount":6500,"reason":"too much"}`).Want(t, 201, "pending")
+	var out struct {
+		Payments []struct {
+			ID, Method, Code, GuestName string
+			Amount                      int64
+		}
+		PendingRefunds []struct {
+			ID, Code string
+			Amount   int64
+		}
+		Totals map[string]int64
+	}
+	body := h.desk.Do("GET", "/api/payments?from=2026-11-23&to=2026-11-24", &h.prop, "").Want(t, 200).Body
+	must(t, json.Unmarshal([]byte(body), &out))
+	if len(out.Payments) != 1 || out.Payments[0].Amount != 8000 || out.Payments[0].GuestName != "Mai Pham" || len(out.PendingRefunds) != 1 || out.PendingRefunds[0].Amount != 6500 || out.Totals["cash"] != 8000 {
+		t.Fatalf("%s", body)
+	}
+	h.desk.Do("GET", "/api/payments?from=2026-11-24&to=2026-11-25", &h.prop, "").Want(t, 200, `"payments":[]`)
+	h.desk.Do("GET", "/api/payments?from=2026-11-25&to=2026-11-24", &h.prop, "").Want(t, 400)
+	rev := h.w.Member(h.w.OrgA, &h.prop, "revenue")
+	rev.Do("GET", "/api/payments?from=2026-11-23&to=2026-11-24", &h.prop, "").Want(t, 403)
+}
