@@ -136,3 +136,36 @@ func TestAnotherPropertyCannotReadTheRisk(t *testing.T) {
 	owner.Do("GET", "/api/reservations/"+res+"/cancel-risk", &other, "").Want(t, 404)
 	h.w.Member(h.w.OrgA, &h.w.A1, "housekeeping").Do("GET", "/api/cancel-risk", &h.prop, "").Want(t, 403)
 }
+
+func TestOverbookingHintsCountExpectedCancellationsOnFullNightsOnly(t *testing.T) {
+	h := newHotel(t)
+	hints := func(days int) (out []struct {
+		Date, RoomType                string
+		Rooms, Booked, SuggestedExtra int
+		Expected                      float64
+	}) {
+		testkit.Must(t, json.Unmarshal([]byte(h.mgr.Do("GET", fmt.Sprintf("/api/overbooking-hints?days=%d", days), &h.prop, "").Want(t, 200).Body), &out))
+		return out
+	}
+	h.desk.Do("GET", "/api/overbooking-hints", &h.prop, "").Want(t, 403)
+	for i := 0; i < 3; i++ { // three of four rooms is not full enough
+		id := h.book(t, fmt.Sprintf("far%d@hotel.com", i), "2027-02-10", "2027-02-11")
+		h.sql(t, `update reservation set source_channel = 'expedia' where id = $1`, uuid.MustParse(id))
+	}
+	if got := hints(100); len(got) != 0 {
+		t.Fatalf("%+v", got)
+	}
+	id := h.book(t, "far3@hotel.com", "2027-02-10", "2027-02-11")
+	h.sql(t, `update reservation set source_channel = 'expedia' where id = $1`, uuid.MustParse(id))
+	got := hints(100)
+	if len(got) != 1 || got[0].Date != "2027-02-10" || got[0].RoomType != "Deluxe" || got[0].Rooms != 4 || got[0].Booked != 4 || got[0].SuggestedExtra != 1 || got[0].Expected < 1.19 || got[0].Expected > 1.21 {
+		t.Fatalf("%+v", got)
+	}
+	// Four near bookings with little risk expect almost no cancellations.
+	for i := 0; i < 4; i++ {
+		h.book(t, fmt.Sprintf("near%d@hotel.com", i), "2026-11-25", "2026-11-26")
+	}
+	for _, g := range hints(10) {
+		t.Errorf("a low risk night has a hint: %+v", g)
+	}
+}

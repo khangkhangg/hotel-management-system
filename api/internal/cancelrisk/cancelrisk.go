@@ -151,6 +151,7 @@ func Mount(mux *http.ServeMux, d httpx.Deps) {
 	}
 	mux.HandleFunc("/api/reservations/{id}/cancel-risk", wrap(h.one))
 	mux.HandleFunc("/api/cancel-risk", wrap(h.upcoming))
+	mux.HandleFunc("/api/overbooking-hints", httpx.Methods(map[string]http.HandlerFunc{http.MethodGet: httpx.Wrap(access.Require(d, access.RatesEdit)(http.HandlerFunc(h.hints)))}))
 }
 
 func (h *handler) one(w http.ResponseWriter, r *http.Request) {
