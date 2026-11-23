@@ -47,8 +47,8 @@ const menus: Record<Role, NavItem[]> = {
 
 // Screens a role may open that do not fit the five-item menu. The overview links to them.
 const more: Record<Role, NavItem[]> = {
-	owner: [all.group, all.bookingSite, all.arrivals, all.guests, all.rooms, all.issues, all.rates, all.ratePlans, all.extras],
-	manager: [all.arrivals, all.guests, all.payments, all.issues, all.rates, all.ratePlans, all.extras],
+	owner: [all.group, all.reports, all.bookingSite, all.arrivals, all.guests, all.rooms, all.issues, all.rates, all.ratePlans, all.extras],
+	manager: [all.arrivals, all.guests, all.payments, all.issues, all.rates, all.ratePlans, all.extras, all.reports],
 	front_desk: [],
 	revenue: [],
 	housekeeping: []
@@ -67,14 +67,14 @@ const matches = (href: string, path: string) => (href === '/' ? path === '/' : p
 export const allowed = (role: Role, path: string): boolean => [...menus[role], ...more[role]].some((i) => matches(i.href, path));
 
 /** Screens that exist in this milestone. The rest open a placeholder. */
-const built = ['/', '/staff', '/activity', '/calendar', '/arrivals', '/guests', '/payments', '/rates', '/rate-plans', '/rooms', '/booking-site', '/issues', '/extras', '/group'];
+const built = ['/', '/staff', '/activity', '/calendar', '/arrivals', '/guests', '/payments', '/rates', '/rate-plans', '/rooms', '/booking-site', '/issues', '/extras', '/group', '/reports'];
 export const isBuilt = (path: string): boolean => built.some((href) => matches(href, path));
 
 const milestones: [string[], string][] = [
 	[['/messages'], 'Milestone 3: Guest booking'],
 	[['/channels', '/sync-log'], 'Milestone 4: Channel sync'],
 	[['/lost-and-found'], 'Milestone 5: Extras'],
-	[['/reports', '/payouts'], 'Milestone 6: Reports and chains']
+	[['/payouts'], 'Milestone 6: Reports and chains']
 ];
 
 /** The milestone that builds a screen, for its placeholder. */

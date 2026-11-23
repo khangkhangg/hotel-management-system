@@ -34,6 +34,12 @@ describe('api', () => {
 		expect(header(calls[0], 'X-CSRF-Token')).toBeNull();
 	});
 
+	test('a CSV reply comes back as text, not parsed as JSON', async () => {
+		const csv = 'code,total\nAB12,200.00\n';
+		replies.push(new Response(csv, { status: 200, headers: { 'Content-Type': 'text/csv; charset=utf-8' } }));
+		expect(await api.get<string>('/api/reports/reservations.csv')).toBe(csv);
+	});
+
 	test('a POST fetches the CSRF token once and sends it every time', async () => {
 		replies.push(json(200, { token: 'abc' }), json(204, null), json(204, null));
 		await api.post('/api/sign-out');

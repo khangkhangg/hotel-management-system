@@ -51,7 +51,10 @@ async function request<T>(method: string, path: string, body?: unknown, retried 
 		credentials: 'same-origin',
 		body: body === undefined ? undefined : JSON.stringify(body)
 	});
-	if (res.ok) return (res.status === 204 ? undefined : await res.json()) as T;
+	if (res.ok) {
+		if (res.headers.get('Content-Type')?.startsWith('text/csv')) return (await res.text()) as T; // an export is a file, not JSON
+		return (res.status === 204 ? undefined : await res.json()) as T;
+	}
 
 	const data = (await res.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null;
 	const code = data?.error?.code ?? 'error';

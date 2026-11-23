@@ -357,5 +357,13 @@
 	"group.today": "today",
 	"group.tonight": "tonight",
 	"group.paid": "Paid in",
-	"group.last30": "last 30 days, after refunds"
+	"group.last30": "last 30 days, after refunds",
+	"reports.title": "Reports",
+	"reports.note": "Download your records to open in a spreadsheet.",
+	"reports.reservations": "Reservations",
+	"reports.reservationsNote": "Every stay that touches the period, with what was charged and what was paid.",
+	"reports.from": "From",
+	"reports.to": "To",
+	"reports.download": "Download CSV",
+	"reports.downloaded": "The file is downloaded."
 }
