@@ -9,6 +9,8 @@ test('a manager adds a yield rule, switches it off and removes it', async ({ pag
 	await page.goto('/yield');
 	await expect(page.getByText('No rules yet')).toBeVisible();
 	await page.getByLabel('Most rooms to show').fill('2');
+	await page.getByRole('button', { name: 'See the effect' }).click();
+	await expect(page.getByText('This rule would change nothing right now.')).toBeVisible(); // no booking site is connected here
 	await page.getByRole('button', { name: 'Add rule' }).click();
 	await expect(page.getByRole('status')).toHaveText('The rule is added.');
 	await expect(page.getByText('Show at most 2 rooms')).toBeVisible();

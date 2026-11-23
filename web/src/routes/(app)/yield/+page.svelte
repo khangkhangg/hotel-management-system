@@ -16,6 +16,8 @@
 
 	let rules = $state<Rule[]>([]);
 	let parity = $state<Parity[]>([]);
+	type Preview = { date: string; roomType: string; availableBefore: number; availableAfter: number; priceBefore: number; priceAfter: number };
+	let preview = $state<Preview[] | null>(null);
 	let roomTypes = $state<RoomType[]>([]);
 	let kind = $state('availability_cap');
 	let roomTypeId = $state('');
@@ -53,22 +55,25 @@
 		}
 	}
 
+	const draft = () => ({ kind, roomTypeId: roomTypeId || null, from, to, value: Number(value), percent: kind === 'rate_adjust' ? Number(percent) : 0, active: true });
+
 	const add = (event: SubmitEvent) => {
 		event.preventDefault();
-		return run(
-			() =>
-				api.post('/api/yield-rules', {
-					kind,
-					roomTypeId: roomTypeId || null,
-					from,
-					to,
-					value: Number(value),
-					percent: kind === 'rate_adjust' ? Number(percent) : 0,
-					active: true
-				}),
-			t('yield.added')
-		);
+		preview = null;
+		return run(() => api.post('/api/yield-rules', draft()), t('yield.added'));
 	};
+
+	async function showPreview() {
+		message = ok = '';
+		busy = true;
+		try {
+			preview = await api.post<Preview[]>('/api/channel/yield-preview', draft());
+		} catch (e) {
+			message = errorText(e);
+		} finally {
+			busy = false;
+		}
+	}
 
 	const toggle = (r: Rule) => run(() => api.put(`/api/yield-rules/${r.id}`, { ...r, active: !r.active }), t('yield.changed'));
 	const remove = (r: Rule) => run(() => api.delete(`/api/yield-rules/${r.id}`), t('yield.removed'));
@@ -92,7 +97,22 @@
 	{#if kind === 'rate_adjust'}<Field label={t('yield.percent')} inputmode="numeric" bind:value={percent} />{/if}
 	<Field label={t('yield.from')} type="date" bind:value={from} />
 	<Field label={t('yield.to')} type="date" bind:value={to} />
-	<div class="row"><Button type="submit" disabled={busy}>{t('yield.add')}</Button></div>
+	<div class="row">
+		<Button type="submit" disabled={busy}>{t('yield.add')}</Button>
+		<Button variant="secondary" disabled={busy} onclick={showPreview}>{t('yield.preview')}</Button>
+	</div>
+	{#if preview}
+		{#if preview.length === 0}
+			<p class="muted" role="status">{t('yield.previewNone')}</p>
+		{:else}
+			<p role="status">{t('yield.previewCount', { count: preview.length })}</p>
+			<ul class="plain">
+				{#each preview.slice(0, 8) as p (p.date + p.roomType)}
+					<li>{t('yield.previewRow', { date: p.date, roomType: p.roomType, before: p.availableBefore, after: p.availableAfter, priceBefore: formatMoney(p.priceBefore, session.currency), priceAfter: formatMoney(p.priceAfter, session.currency) })}</li>
+				{/each}
+			</ul>
+		{/if}
+	{/if}
 </form>
 
 <section class="card">
@@ -177,6 +197,14 @@
 	.rules li > div:first-child {
 		display: flex;
 		flex-direction: column;
+	}
+	.plain {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-1);
 	}
 	.off strong {
 		color: var(--color-text-muted);

@@ -650,5 +650,9 @@
 	"payouts.gross": "Taken",
 	"payouts.refunds": "Refunded",
 	"payouts.net": "Net",
-	"payouts.total": "Net for these dates: {amount}"
+	"payouts.total": "Net for these dates: {amount}",
+	"yield.preview": "See the effect",
+	"yield.previewNone": "This rule would change nothing right now.",
+	"yield.previewCount": "This rule would change {count} nights. The first ones:",
+	"yield.previewRow": "{date}, {roomType}: {before} rooms at {priceBefore} now, {after} rooms at {priceAfter} with the rule."
 }

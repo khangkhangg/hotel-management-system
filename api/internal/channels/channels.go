@@ -53,6 +53,7 @@ func Mount(factory Factory) httpx.Mount {
 		mux.HandleFunc("/api/channel", httpx.Methods(map[string]http.HandlerFunc{http.MethodGet: wrap(h.get), http.MethodPut: wrap(h.put)}))
 		mux.HandleFunc("/api/channel/map", httpx.Methods(map[string]http.HandlerFunc{http.MethodPut: wrap(h.putMap)}))
 		mux.HandleFunc("/api/channel/sync", httpx.Methods(map[string]http.HandlerFunc{http.MethodPost: wrap(h.syncNow)}))
+		mux.HandleFunc("/api/channel/yield-preview", httpx.Methods(map[string]http.HandlerFunc{http.MethodPost: wrap(h.preview)}))
 		mux.HandleFunc("/api/channel/parity", httpx.Methods(map[string]http.HandlerFunc{http.MethodGet: wrap(h.parity)}))
 		mux.HandleFunc("/api/channel/providers", httpx.Methods(map[string]http.HandlerFunc{http.MethodGet: wrap(h.providers)}))
 		mux.HandleFunc("/api/channel/test", httpx.Methods(map[string]http.HandlerFunc{http.MethodPost: wrap(h.test)}))
@@ -313,7 +314,8 @@ type loaded struct {
 	conn  Connection
 	maps  []mapping
 	slots []Slot
-	meta  []slotMeta // one for each slot
+	meta  []slotMeta        // one for each slot
+	extra []yieldrules.Rule // a rule being tried out, which is not saved
 	since time.Time
 	today time.Time
 }
@@ -466,6 +468,7 @@ func load(ctx context.Context, tx pgx.Tx, org, prop uuid.UUID, now time.Time, l 
 	if err != nil {
 		return err
 	}
+	rules = append(rules, l.extra...)
 	for _, m := range l.maps {
 		s, err := tx.Query(ctx, `select to_char(i.date, 'YYYY-MM-DD'), case when r.closed then 0 else greatest(i.total - i.sold - i.blocked, 0) end, r.price, i.total, i.sold + i.blocked
 			from inventory i join rate r on r.rate_plan_id = $1 and r.date = i.date
@@ -480,11 +483,11 @@ func load(ctx context.Context, tx pgx.Tx, org, prop uuid.UUID, now time.Time, l 
 				s.Close()
 				return err
 			}
-			direct := sl.Price
+			direct, avail := sl.Price, sl.Available
 			night := yieldrules.Apply(yieldrules.Night{Date: sl.Date, RoomTypeID: m.roomType, Total: total, Taken: taken, Available: sl.Available, Price: sl.Price}, rules)
 			sl.Available, sl.Price = night.Available, night.Price
 			l.slots = append(l.slots, sl)
-			l.meta = append(l.meta, slotMeta{roomType: m.roomType, direct: direct})
+			l.meta = append(l.meta, slotMeta{roomType: m.roomType, direct: direct, avail: avail})
 		}
 		s.Close()
 		if err := s.Err(); err != nil {

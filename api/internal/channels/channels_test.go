@@ -405,3 +405,20 @@ func TestAnAlertWarnsWhenABookingSiteUndercutsTheBookingPage(t *testing.T) {
 		t.Fatalf("a second run made %s alerts", n)
 	}
 }
+
+func TestPreviewShowsWhatANewYieldRuleWouldChangeBeforeItIsSaved(t *testing.T) {
+	h := newHotel(t, 2)
+	h.manager.Do("POST", "/api/channel/yield-preview", &h.w.A1, `{"kind":"availability_cap","value":1,"active":true}`).Want(t, 200, "[]") // no connection yet
+	h.connect(t, "channel_manager", "fake", true)
+	got := h.manager.Do("POST", "/api/channel/yield-preview", &h.w.A1, `{"kind":"availability_cap","value":1,"active":true}`).Want(t, 200,
+		`"availableBefore":2`, `"availableAfter":1`, `"priceBefore":10000`, `"priceAfter":10000`, `"roomType":"Deluxe"`).Body
+	if n := strings.Count(got, `"date"`); n != 39 { // the rates in this hotel run from 23 November to 1 January
+		t.Fatalf("%d nights changed, want 39", n)
+	}
+	h.manager.Do("GET", "/api/yield-rules", &h.w.A1, "").Want(t, 200, "[]")                                                               // a preview saves nothing
+	h.manager.Do("POST", "/api/channel/yield-preview", &h.w.A1, `{"kind":"availability_cap","value":5,"active":true}`).Want(t, 200, "[]") // five is more than the two rooms, so nothing changes
+	h.manager.Do("POST", "/api/channel/yield-preview", &h.w.A1, `{"kind":"free_rooms","value":1,"active":true}`).Want(t, 400)
+	h.desk.Do("POST", "/api/channel/yield-preview", &h.w.A1, `{"kind":"availability_cap","value":1,"active":true}`).Want(t, 403)
+	h.manager.Do("POST", "/api/yield-rules", &h.w.A1, `{"kind":"availability_cap","value":1,"active":true}`).Want(t, 201)
+	h.manager.Do("POST", "/api/channel/yield-preview", &h.w.A1, `{"kind":"availability_cap","value":1,"active":true}`).Want(t, 200, "[]") // already in force
+}
