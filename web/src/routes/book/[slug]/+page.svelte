@@ -3,6 +3,7 @@
 	import { api, ApiError } from '#lib/api.ts';
 	import { formatMoney } from '#lib/booking/money.ts';
 	import { direction, offered, pickLocale, translate } from '#lib/guest/locale.ts';
+	import { canonicalUrl, hotelJsonLd, metaDescription, serializeJsonLd } from '#lib/guest/seo.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import Field from '#lib/ui/Field.svelte';
 
@@ -16,11 +17,12 @@
 		ratePlans: { id: string; roomTypeId: string; name: string }[];
 		extras: { id: string; name: string; unit: string; price: number }[];
 		site: { color: string; logo: string; texts: Record<string, Record<string, string>>; amenities: string[]; photos: { id: string; caption: string }[] };
+		reviews: { count: number; average: number; recent: { rating: number; comment: string; name: string; reply: string; createdAt: string }[] };
 	};
 	type Quote = { total: number; currency: string; soldOut: boolean; lines: { description: string; amount: number }[] };
 	type Made = { code: string; total?: number; currency: string; status: string; checkoutUrl?: string; bankDetails?: string; holdUntil?: string };
 
-	const slug = page.params.slug;
+	const slug = page.params.slug ?? '';
 	const saved = (() => {
 		try {
 			return localStorage.getItem('guest-locale') ?? undefined;
@@ -29,7 +31,8 @@
 		}
 	})();
 
-	let info = $state<Info | null>(null);
+	let { data }: { data: { info: Info } } = $props();
+	const info = $derived<Info | null>(data.info);
 	let missing = $state(false);
 	let locale = $state('en');
 	let step = $state<'room' | 'details' | 'done'>('room');
@@ -62,15 +65,11 @@
 	const typeName = $derived(info?.roomTypes.find((x) => x.id === chosen?.typeId)?.name ?? '');
 	const steps = $derived(['room', 'details', 'done'] as const);
 
+	// The hotel arrives with the page, so search engines read it. The guest's own language is picked here, in the browser.
 	$effect(() => {
-		api
-			.get<Info>(`/api/public/${slug}`)
-			.then((i) => {
-				info = i;
-				locale = pickLocale({ url: page.url.searchParams.get('lang') ?? undefined, saved, browser: navigator.languages, fallback: i.defaultLocale });
-				kind = i.payments[0] ?? '';
-			})
-			.catch(() => (missing = true));
+		if (!info) return;
+		locale = pickLocale({ url: page.url.searchParams.get('lang') ?? undefined, saved, browser: navigator.languages, fallback: info.defaultLocale });
+		kind = info.payments[0] ?? '';
 	});
 	// Back from the payment page: the webhook may take a few seconds to confirm, so ask a few times.
 	$effect(() => {
@@ -96,6 +95,11 @@
 		if (!x) return '';
 		return x[locale]?.[field] || x[info!.defaultLocale]?.[field] || x.en?.[field] || Object.values(x).map((l) => l[field]).find(Boolean) || '';
 	};
+	const origin = $derived(page.url.origin);
+	const description = $derived(info ? metaDescription(info, siteText('tagline'), siteText('description')) : '');
+	const canonical = $derived(canonicalUrl(origin, slug));
+	const ogImage = $derived(info?.site.photos[0] ? `${origin}/api/public/${slug}/photos/${info.site.photos[0].id}` : info?.site.logo ? `${origin}/api/public/${slug}/photos/${info.site.logo}` : '');
+	const ldText = $derived(info ? serializeJsonLd(hotelJsonLd(info, { origin, slug, description })) : '');
 	const hasAbout = $derived(!!info && (!!siteText('tagline') || !!siteText('description') || !!siteText('policies') || info.site.amenities.length > 0 || info.site.photos.length > 0));
 
 	// The hotel's colour replaces --brand for the whole page, and only on this page.
@@ -213,7 +217,21 @@
 	}
 </script>
 
-<svelte:head><title>{info?.name ?? 'Book'}</title></svelte:head>
+<svelte:head>
+	<title>{info?.name ?? 'Book'}</title>
+	{#if info}
+		<meta name="description" content={description} />
+		<link rel="canonical" href={canonical} />
+		<meta name="robots" content="index,follow,max-image-preview:large" />
+		<meta property="og:type" content="website" />
+		<meta property="og:title" content={info.name} />
+		<meta property="og:description" content={description} />
+		<meta property="og:url" content={canonical} />
+		{#if ogImage}<meta property="og:image" content={ogImage} />{/if}
+		<meta name="twitter:card" content={ogImage ? 'summary_large_image' : 'summary'} />
+		{@html '<script type="application/ld+json">' + ldText + '</' + 'script>'}
+	{/if}
+</svelte:head>
 
 {#if missing}
 	<main class="page"><p>{translate('en', 'guest.empty')}</p></main>

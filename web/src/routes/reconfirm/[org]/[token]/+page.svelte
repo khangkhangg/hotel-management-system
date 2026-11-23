@@ -22,7 +22,10 @@
 	}
 </script>
 
-<svelte:head><title>{t('reconfirm.title')}</title></svelte:head>
+<svelte:head>
+	<title>{t('reconfirm.title')}</title>
+	<meta name="robots" content="noindex,nofollow" />
+</svelte:head>
 
 <main class="page">
 	<h1>{t('reconfirm.title')}</h1>

@@ -76,7 +76,10 @@
 	}
 </script>
 
-<svelte:head><title>{t('guest.manage')}</title></svelte:head>
+<svelte:head>
+	<title>{t('guest.manage')}</title>
+	<meta name="robots" content="noindex,nofollow" />
+</svelte:head>
 
 <main class="page">
 	<h1>{t('guest.manage')}</h1>

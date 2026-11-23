@@ -570,3 +570,11 @@ func TestAProviderThatMustAnswerInItsOwnWordsGetsItsAnswerOnAGetReport(t *testin
 	w.Anon("GET", "/api/webhooks/vnpay?vnp_Amount=100&vnp_SecureHash=bad", "").Want(t, 400)
 	w.Anon("POST", "/api/webhooks/stripe", "").Want(t, 404)
 }
+
+func TestThePublicListNamesOnlyHotelsThatHaveRooms(t *testing.T) {
+	h := newHotel(t, 1)
+	h.w.Anon("GET", "/api/public", "").Want(t, 200, `"a1"`)
+	if body := h.w.Anon("GET", "/api/public", "").Body; strings.Contains(body, `"a2"`) {
+		t.Fatalf("a hotel with no rooms is listed: %s", body)
+	}
+}

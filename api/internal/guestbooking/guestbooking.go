@@ -80,6 +80,7 @@ func Mount(card payments.Provider, cardOrg uuid.UUID) httpx.Mount {
 		}
 		mux.HandleFunc("/api/payment-types", owner(h.listTypes, http.MethodGet))
 		mux.HandleFunc("/api/payment-types/{kind}", owner(h.putType, http.MethodPut))
+		mux.HandleFunc("/api/public", public(h.slugs, http.MethodGet))
 		mux.HandleFunc("/api/public/{slug}", public(h.info, http.MethodGet))
 		mux.HandleFunc("/api/public/{slug}/photos/{id}", public(h.photo, http.MethodGet))
 		mux.HandleFunc("/api/public/{slug}/quote", public(h.quote, http.MethodPost))
@@ -952,4 +953,29 @@ func clientIP(r *http.Request) string {
 		return r.RemoteAddr
 	}
 	return ip
+}
+
+// slugs lists the booking pages that search engines may be told about: the hotels that have rooms to sell.
+func (h *handler) slugs(w http.ResponseWriter, r *http.Request) {
+	out := []string{}
+	err := db.WithoutOrg(r.Context(), h.Pool, func(tx pgx.Tx) error {
+		rows, err := tx.Query(r.Context(), `select slug from public_property_slugs()`)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var s string
+			if err := rows.Scan(&s); err != nil {
+				return err
+			}
+			out = append(out, s)
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		httpx.InternalError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, out)
 }

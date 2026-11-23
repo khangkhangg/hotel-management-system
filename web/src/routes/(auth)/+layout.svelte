@@ -5,6 +5,8 @@
 	let { children }: { children: Snippet } = $props();
 </script>
 
+<svelte:head><meta name="robots" content="noindex,nofollow" /></svelte:head>
+
 <main class="auth">
 	<div class="column">
 		<p class="brand">{t('app.name')}</p>
