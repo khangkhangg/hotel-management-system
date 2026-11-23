@@ -37,6 +37,7 @@ type World struct {
 	A1, A2, B1 uuid.UUID
 	Now        time.Time
 	n          int
+	people     []*Person
 }
 
 func Must(t *testing.T, err error) {
@@ -73,7 +74,13 @@ func New(t *testing.T, mounts ...httpx.Mount) *World {
 	return w
 }
 
-func (w *World) Advance(d time.Duration) { w.Now = w.Now.Add(d) }
+// Advance moves the clock. Everyone signed in gets a fresh session, so a long jump does not sign them out.
+func (w *World) Advance(d time.Duration) {
+	w.Now = w.Now.Add(d)
+	for _, p := range w.people {
+		p.signIn()
+	}
+}
 
 // Person is a signed-in user with a session in one organization.
 type Person struct {
@@ -94,15 +101,21 @@ func (w *World) Member(org uuid.UUID, property *uuid.UUID, role string) *Person 
 		return
 	}))
 	Must(w.T, db.WithOrg(Ctx, w.Pool, org, func(tx pgx.Tx) error { return tenant.AddMembership(Ctx, tx, org, p.ID, property, role) }))
+	p.signIn()
+	w.people = append(w.people, p)
+	return p
+}
+
+func (p *Person) signIn() {
+	w := p.W
 	Must(w.T, db.WithoutOrg(Ctx, w.Pool, func(tx pgx.Tx) error {
 		s, err := session.Create(Ctx, tx, p.ID, session.StageFull, "test", w.Now)
 		if err != nil {
 			return err
 		}
 		p.Session = s.ID
-		return session.SetOrganization(Ctx, tx, s.ID, org)
+		return session.SetOrganization(Ctx, tx, s.ID, p.Org)
 	}))
-	return p
 }
 
 type Reply struct {

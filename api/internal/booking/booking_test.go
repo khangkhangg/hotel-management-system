@@ -59,7 +59,7 @@ func (h *hotel) setup(property uuid.UUID, n int) {
 		mgr.Do("POST", "/api/rooms", &property, fmt.Sprintf(`{"roomTypeId":%q,"number":"%d","floor":1}`, rt, 101+i)).Want(t, 201)
 	}
 	rp := newID(t, mgr.Do("POST", "/api/rate-plans", &property, fmt.Sprintf(`{"roomTypeId":%q,"name":"Flexible"}`, rt)).Want(t, 201)).ID
-	mgr.Do("PUT", "/api/rates", &property, fmt.Sprintf(`{"ratePlanId":%q,"from":"2026-12-01","to":"2027-01-01","price":10000}`, rp)).Want(t, 200)
+	mgr.Do("PUT", "/api/rates", &property, fmt.Sprintf(`{"ratePlanId":%q,"from":"2026-11-23","to":"2027-01-01","price":10000}`, rp)).Want(t, 200)
 	if property == w.A1 {
 		h.roomType, h.ratePlan = rt, rp
 	}

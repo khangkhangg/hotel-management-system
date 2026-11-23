@@ -40,6 +40,7 @@ func Mount(mux *http.ServeMux, d httpx.Deps) {
 	mux.HandleFunc("/api/reservations/{id}", route(map[string]e{http.MethodGet: {h.get, view}}))
 	mux.HandleFunc("/api/reservations/{id}/cancel", route(map[string]e{http.MethodPost: {h.cancel, edit}}))
 	mux.HandleFunc("/api/availability", route(map[string]e{http.MethodGet: {h.availability, view}}))
+	mountStay(mux, h, d)
 	mux.HandleFunc("/api/guests", route(map[string]e{http.MethodGet: {h.listGuests, view}}))
 	mux.HandleFunc("/api/guests/{id}", route(map[string]e{http.MethodGet: {h.getGuest, view}, http.MethodPatch: {h.patchGuest, edit}}))
 }
@@ -78,6 +79,26 @@ func fail(w http.ResponseWriter, err error) bool {
 		bad(w, "bad_request", "Check the guest, the dates (1 to 60 nights) and the number of guests.")
 	case errors.Is(err, ErrNotFound), errors.Is(err, pgx.ErrNoRows):
 		notFound(w)
+	case errors.Is(err, ErrWrongType):
+		httpx.Error(w, http.StatusConflict, "wrong_type", "That room is not of the booked room type.")
+	case errors.Is(err, ErrRoomNotReady):
+		httpx.Error(w, http.StatusConflict, "room_not_ready", "That room is not ready. Mark it clean, or assign it anyway with a reason.")
+	case errors.Is(err, ErrRoomTaken):
+		httpx.Error(w, http.StatusConflict, "room_taken", "That room already holds another stay on those nights.")
+	case errors.Is(err, ErrNoRoom):
+		httpx.Error(w, http.StatusConflict, "no_room", "Assign a room before checking in.")
+	case errors.Is(err, ErrTooEarly):
+		httpx.Error(w, http.StatusConflict, "too_early", "That cannot be done before the arrival day.")
+	case errors.Is(err, ErrAlreadyCheckedIn):
+		httpx.Error(w, http.StatusConflict, "already_checked_in", "That guest is already checked in.")
+	case errors.Is(err, ErrNotCheckedIn):
+		httpx.Error(w, http.StatusConflict, "not_checked_in", "That guest is not checked in.")
+	case errors.Is(err, ErrNotConfirmed):
+		httpx.Error(w, http.StatusConflict, "not_confirmed", "Only a confirmed booking can be marked as a no-show.")
+	case errors.Is(err, ErrBadStatus):
+		httpx.Error(w, http.StatusConflict, "bad_status", "The booking is not in a state that allows that.")
+	case errors.Is(err, ErrReason):
+		bad(w, "reason_required", "Give a reason for using a room that is not ready.")
 	case errors.Is(err, ErrAlreadyCancelled):
 		httpx.Error(w, http.StatusConflict, "already_cancelled", "That booking is already cancelled.")
 	case errors.Is(err, ErrCannotCancel):

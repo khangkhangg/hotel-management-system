@@ -83,6 +83,7 @@ begin
   end loop;
 end $$;
 -- +goose StatementEnd
+grant delete on reservation_night to app; -- a stay cut short or moved loses the nights it no longer uses
 
 -- +goose Down
 drop table reservation_night, reservation_room, reservation, guest;
