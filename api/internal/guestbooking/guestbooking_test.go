@@ -18,6 +18,7 @@ import (
 	"hotelpms/api/internal/httpx"
 	"hotelpms/api/internal/payments"
 	"hotelpms/api/internal/rooms"
+	"hotelpms/api/internal/siteprofile"
 	"hotelpms/api/internal/testkit"
 )
 
@@ -50,7 +51,7 @@ func newHotelFor(t *testing.T, nRooms int, cardIsOurs bool) *hotel {
 		if cardIsOurs {
 			owner = w.OrgA
 		}
-		return []httpx.Mount{rooms.Mount, extras.Mount, booking.Mount, folio.Mount, guestbooking.Mount(fake, owner)}
+		return []httpx.Mount{rooms.Mount, extras.Mount, siteprofile.Mount, booking.Mount, folio.Mount, guestbooking.Mount(fake, owner)}
 	})
 	h := &hotel{w: w, fake: fake, prop: &w.A1}
 	h.owner = w.Member(w.OrgA, nil, "owner")
@@ -439,4 +440,36 @@ func TestQuotesAndKeysAreBounded(t *testing.T) {
 	h.w.Anon("POST", "/api/public/a1/quote", bad).Want(t, 400)
 	long := strings.Replace(h.booking("hotel", "2026-12-10", "2026-12-12"), `{"guest"`, `{"key":"`+strings.Repeat("k", 65)+`","guest"`, 1)
 	h.w.Anon("POST", "/api/public/a1/bookings", long).Want(t, 400)
+}
+
+const tinyPNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+
+func TestThePublicPageShowsTheHotelsTextAmenitiesBrandAndPhotos(t *testing.T) {
+	h := newHotel(t, 1)
+	empty := h.w.Anon("GET", "/api/public/a1", "").Want(t, 200, `"site"`).Body
+	if !strings.Contains(empty, `"amenities":[]`) || !strings.Contains(empty, `"photos":[]`) {
+		t.Fatalf("a hotel with no profile: %s", empty)
+	}
+	h.owner.Do("PUT", "/api/site/brand", h.prop, `{"color":"#1F5F4F"}`).Want(t, 204)
+	h.owner.Do("PUT", "/api/site/texts/fr/description", h.prop, `{"body":"Un hôtel calme."}`).Want(t, 204)
+	h.owner.Do("PUT", "/api/site/amenities", h.prop, `{"codes":["pool","wifi"]}`).Want(t, 204)
+	pid := idOf(t, h.owner.Do("POST", "/api/site/photos", h.prop, `{"kind":"gallery","caption":"Pool","data":"`+tinyPNG+`"}`).Want(t, 201))
+	lid := idOf(t, h.owner.Do("POST", "/api/site/photos", h.prop, `{"kind":"logo","caption":"","data":"`+tinyPNG+`"}`).Want(t, 201))
+	got := h.w.Anon("GET", "/api/public/a1", "").Want(t, 200, `"color":"#1F5F4F"`, `"Un hôtel calme."`, `"pool"`, `"wifi"`, `"Pool"`, pid, lid).Body
+	if strings.Contains(got, "base64") || strings.Contains(got, "iVBOR") {
+		t.Fatal("the picture bytes are in the page data")
+	}
+	r := h.w.Anon("GET", "/api/public/a1/photos/"+pid, "").Want(t, 200)
+	if len(r.Body) < 60 || r.Body[1:4] != "PNG" {
+		t.Fatalf("the picture was not served: %q", r.Body)
+	}
+	h.w.Anon("GET", "/api/public/a1/photos/"+lid, "").Want(t, 200)
+}
+
+func TestAPhotoCannotBeReadThroughAnotherHotelsAddress(t *testing.T) {
+	h := newHotel(t, 1)
+	pid := idOf(t, h.owner.Do("POST", "/api/site/photos", h.prop, `{"kind":"gallery","caption":"","data":"`+tinyPNG+`"}`).Want(t, 201))
+	h.w.Anon("GET", "/api/public/a2/photos/"+pid, "").Want(t, 404)
+	h.w.Anon("GET", "/api/public/a1/photos/not-an-id", "").Want(t, 404)
+	h.w.Anon("GET", "/api/public/nowhere/photos/"+pid, "").Want(t, 404)
 }

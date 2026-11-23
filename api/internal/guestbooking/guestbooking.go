@@ -30,6 +30,7 @@ import (
 	"hotelpms/api/internal/mail"
 	"hotelpms/api/internal/payments"
 	"hotelpms/api/internal/ratelimit"
+	"hotelpms/api/internal/siteprofile"
 )
 
 // CardHold is how long a room waits for a card payment (spec 05).
@@ -78,6 +79,7 @@ func Mount(card payments.Provider, cardOrg uuid.UUID) httpx.Mount {
 		mux.HandleFunc("/api/payment-types", owner(h.listTypes, http.MethodGet))
 		mux.HandleFunc("/api/payment-types/{kind}", owner(h.putType, http.MethodPut))
 		mux.HandleFunc("/api/public/{slug}", public(h.info, http.MethodGet))
+		mux.HandleFunc("/api/public/{slug}/photos/{id}", public(h.photo, http.MethodGet))
 		mux.HandleFunc("/api/public/{slug}/quote", public(h.quote, http.MethodPost))
 		mux.HandleFunc("/api/public/{slug}/bookings", public(h.create, http.MethodPost))
 		mux.HandleFunc("/api/public/{slug}/bookings/{code}", public(h.status, http.MethodGet))
@@ -246,14 +248,15 @@ func (h *handler) info(w http.ResponseWriter, r *http.Request) {
 		Name       string    `json:"name"`
 	}
 	out := struct {
-		Name          string     `json:"name"`
-		Currency      string     `json:"currency"`
-		DefaultLocale string     `json:"defaultLocale"`
-		Address       string     `json:"address"`
-		Payments      []string   `json:"payments"`
-		RoomTypes     []roomType `json:"roomTypes"`
-		RatePlans     []ratePlan `json:"ratePlans"`
-		Extras        []extraOut `json:"extras"`
+		Name          string             `json:"name"`
+		Currency      string             `json:"currency"`
+		DefaultLocale string             `json:"defaultLocale"`
+		Address       string             `json:"address"`
+		Payments      []string           `json:"payments"`
+		RoomTypes     []roomType         `json:"roomTypes"`
+		RatePlans     []ratePlan         `json:"ratePlans"`
+		Extras        []extraOut         `json:"extras"`
+		Site          siteprofile.Public `json:"site"`
 	}{RoomTypes: []roomType{}, RatePlans: []ratePlan{}, Extras: []extraOut{}}
 	err := db.WithOrg(r.Context(), h.Pool, org, func(tx pgx.Tx) error {
 		ctx := r.Context()
@@ -261,6 +264,9 @@ func (h *handler) info(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		var err error
+		if out.Site, err = siteprofile.LoadPublic(ctx, tx, prop); err != nil {
+			return err
+		}
 		if out.Payments, err = h.offered(ctx, tx, org, prop); err != nil {
 			return err
 		}
@@ -839,4 +845,38 @@ func extrasOK(in bookIn) bool {
 		}
 	}
 	return true
+}
+
+// photo serves one picture of the hotel. The type was checked when the picture was saved, and the headers keep
+// the browser from guessing another one.
+func (h *handler) photo(w http.ResponseWriter, r *http.Request) {
+	org, prop, ok := h.resolve(w, r)
+	if !ok {
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		httpx.Error(w, http.StatusNotFound, "not_found", "There is nothing at this address.")
+		return
+	}
+	var ctype string
+	var data []byte
+	err = db.WithOrg(r.Context(), h.Pool, org, func(tx pgx.Tx) error {
+		var e error
+		ctype, data, e = siteprofile.PhotoData(r.Context(), tx, prop, id)
+		return e
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		httpx.Error(w, http.StatusNotFound, "not_found", "There is nothing at this address.")
+		return
+	}
+	if err != nil {
+		httpx.InternalError(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", ctype)
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Content-Security-Policy", "default-src 'none'")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	_, _ = w.Write(data)
 }
