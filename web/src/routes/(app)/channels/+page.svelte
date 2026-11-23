@@ -5,17 +5,18 @@
 	import Checkbox from '#lib/ui/Checkbox.svelte';
 	import Field from '#lib/ui/Field.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
-	import Segmented from '#lib/ui/Segmented.svelte';
 	import Select from '#lib/ui/Select.svelte';
+	import StatusBadge from '#lib/ui/StatusBadge.svelte';
 
+	type Profile = { id: string; mode: string; name: string; recommended: boolean; fields: string[]; steps: string[]; reaches: string[]; verified: boolean };
 	type Connection = { mode: string; provider: string; externalHotelId: string; baseUrl: string; hasSecret: boolean; enabled: boolean };
 	type Map = { ratePlanId: string; externalRoomId: string; externalRateId: string };
 	type Plan = { id: string; name: string; roomTypeId: string };
+	type Remote = { RoomID: string; RoomName: string; RateID: string; RateName: string };
+	type Suggestion = { planId: string; roomId: string; rateId: string };
 
-	const providers: Record<string, string[]> = { channel_manager: ['cm_generic'], direct: ['agoda', 'booking_com', 'expedia'] };
-
-	let mode = $state('channel_manager');
-	let provider = $state('cm_generic');
+	let profiles = $state<Profile[]>([]);
+	let provider = $state('');
 	let hotelId = $state('');
 	let baseUrl = $state('');
 	let secretSetting = $state('');
@@ -23,22 +24,31 @@
 	let saved = $state(false);
 	let plans = $state<Plan[]>([]);
 	let codes = $state<Record<string, { room: string; rate: string }>>({});
+	let remote = $state<Remote[]>([]);
+	let listed = $state(false);
+	let suggested = $state(0);
+	let tested = $state<{ ok: boolean; message?: string } | null>(null);
 	let message = $state('');
 	let ok = $state('');
 	let busy = $state(false);
 
+	const profile = $derived(profiles.find((p) => p.id === provider));
+	const pairs = $derived(remote.map((r) => ({ id: `${r.RoomID}|${r.RateID}`, label: `${r.RoomName} · ${r.RateName}` })));
+
 	async function load() {
 		try {
+			profiles = await api.get<Profile[]>('/api/channel/providers');
+			provider = profiles[0]?.id ?? '';
 			const c = await api.get<{ connection: Connection | null; maps: Map[] }>('/api/channel');
+			plans = await api.get<Plan[]>('/api/rate-plans');
+			codes = Object.fromEntries(plans.map((p) => [p.id, { room: '', rate: '' }]));
+			for (const m of c.maps) codes[m.ratePlanId] = { room: m.externalRoomId, rate: m.externalRateId };
 			if (c.connection) {
-				({ mode, provider, enabled } = c.connection);
+				({ provider, enabled } = c.connection);
 				hotelId = c.connection.externalHotelId;
 				baseUrl = c.connection.baseUrl;
 				saved = true;
 			}
-			plans = await api.get<Plan[]>('/api/rate-plans');
-			codes = Object.fromEntries(plans.map((p) => [p.id, { room: '', rate: '' }]));
-			for (const m of c.maps) codes[m.ratePlanId] = { room: m.externalRoomId, rate: m.externalRateId };
 		} catch (e) {
 			message = errorText(e);
 		}
@@ -48,16 +58,12 @@
 		load();
 	});
 
-	function chooseMode(id: string) {
-		mode = id;
-		provider = providers[id][0];
-	}
-
-	async function save(event: SubmitEvent) {
-		event.preventDefault();
+	async function save(event?: SubmitEvent) {
+		event?.preventDefault();
 		message = ok = '';
+		tested = null;
 		try {
-			await api.put('/api/channel', { mode, provider, externalHotelId: hotelId, baseUrl, secretSetting, enabled });
+			await api.put('/api/channel', { mode: profile?.mode, provider, externalHotelId: hotelId, baseUrl, secretSetting, enabled });
 			secretSetting = '';
 			saved = true;
 			ok = t('channels.saved');
@@ -66,14 +72,50 @@
 		}
 	}
 
-	async function saveMap(p: Plan) {
+	async function test() {
 		message = ok = '';
+		busy = true;
 		try {
-			await api.put('/api/channel/map', { ratePlanId: p.id, externalRoomId: codes[p.id].room, externalRateId: codes[p.id].rate });
-			ok = t('channels.mapSaved', { name: p.name });
+			tested = await api.post<{ ok: boolean; message?: string }>('/api/channel/test');
 		} catch (e) {
 			message = errorText(e);
 		}
+		busy = false;
+	}
+
+	async function findMatches() {
+		message = ok = '';
+		busy = true;
+		try {
+			const r = await api.get<{ remote: Remote[]; suggestions: Suggestion[]; listed: boolean }>('/api/channel/remote');
+			remote = r.remote;
+			listed = r.listed;
+			suggested = r.suggestions.length;
+			for (const s of r.suggestions) codes[s.planId] = { room: s.roomId, rate: s.rateId };
+			ok = r.listed ? t('channels.found', { found: r.remote.length, matched: r.suggestions.length }) : t('channels.cannotList');
+		} catch (e) {
+			message = errorText(e);
+		}
+		busy = false;
+	}
+
+	function pick(p: Plan, id: string) {
+		const [room, rate] = id.split('|');
+		codes[p.id] = { room, rate };
+	}
+
+	async function saveMatches() {
+		message = ok = '';
+		busy = true;
+		try {
+			for (const p of plans) {
+				if (codes[p.id].room.trim()) await api.put('/api/channel/map', { ratePlanId: p.id, externalRoomId: codes[p.id].room, externalRateId: codes[p.id].rate });
+			}
+			ok = t('channels.matchesSaved');
+		} catch (e) {
+			message = errorText(e);
+		}
+		busy = false;
 	}
 
 	async function syncNow() {
@@ -95,43 +137,74 @@
 {#if message}<p class="notice danger" role="alert">{message}</p>{/if}
 {#if ok}<p class="notice success" role="status">{ok}</p>{/if}
 
-<form class="card" onsubmit={save}>
-	<h2>{t('channels.how')}</h2>
-	<Segmented
-		options={[
-			{ id: 'channel_manager', label: t('channels.mode.channel_manager') },
-			{ id: 'direct', label: t('channels.mode.direct') }
-		]}
-		value={mode}
-		onchange={chooseMode}
-	/>
-	<p class="muted">{t(`channels.modeNote.${mode}`)}</p>
-	<Select label={t('channels.provider')} options={providers[mode].map((p) => ({ id: p, label: t(`channels.provider.${p}`) }))} bind:value={provider} />
-	<Field label={t('channels.hotelId')} bind:value={hotelId} />
-	<Field label={t('channels.baseUrl')} type="text" placeholder="https://" bind:value={baseUrl} />
-	<Field label={t('channels.secret')} bind:value={secretSetting} placeholder={saved ? t('channels.secretKept') : ''} />
-	<p class="muted">{t('channels.secretNote')}</p>
-	<Checkbox label={t('channels.enabled')} bind:checked={enabled} />
-	<div><Button type="submit">{t('common.save')}</Button></div>
-</form>
+<section class="card">
+	<h2>{t('channels.step1')}</h2>
+	<div class="choices" role="radiogroup" aria-label={t('channels.step1')}>
+		{#each profiles as p (p.id)}
+			<label class="choice" class:on={provider === p.id}>
+				<input type="radio" name="provider" value={p.id} bind:group={provider} />
+				<span>
+					<strong>{p.name}</strong>
+					{#if p.recommended}<StatusBadge tone="info">{t('channels.recommended')}</StatusBadge>{/if}
+					<br />
+					<span class="muted">{t(`channels.mode.${p.mode}`)}{p.reaches.length ? ` · ${p.reaches.join(', ')}` : ''}</span>
+				</span>
+			</label>
+		{/each}
+	</div>
+</section>
+
+{#if profile}
+	<form class="card" onsubmit={save}>
+		<h2>{t('channels.step2', { name: profile.name })}</h2>
+		{#if !profile.verified}<p class="notice" role="note">{t('channels.unverified')}</p>{/if}
+		<ol class="steps">
+			{#each profile.steps as s (s)}<li>{s}</li>{/each}
+		</ol>
+		{#if profile.fields.includes('hotelId')}<Field label={t('channels.hotelId')} bind:value={hotelId} />{/if}
+		{#if profile.fields.includes('baseUrl')}<Field label={t('channels.baseUrl')} placeholder="https://" bind:value={baseUrl} />{/if}
+		{#if profile.fields.includes('secret')}
+			<Field label={t('channels.secret')} bind:value={secretSetting} placeholder={saved ? t('channels.secretKept') : ''} />
+			<p class="muted">{t('channels.secretNote')}</p>
+		{/if}
+		<div class="row">
+			<Button type="submit">{t('common.save')}</Button>
+			<Button variant="secondary" disabled={busy || !saved} onclick={test}>{t('channels.test')}</Button>
+		</div>
+		{#if tested}
+			<p role="status" class="notice" class:success={tested.ok} class:danger={!tested.ok}>{tested.ok ? t('channels.testOk') : t('channels.testFailed', { reason: tested.message ?? '' })}</p>
+		{/if}
+	</form>
+{/if}
 
 {#if saved}
 	<section class="card">
-		<h2>{t('channels.mapping')}</h2>
+		<h2>{t('channels.step3')}</h2>
 		<p class="muted">{t('channels.mappingNote')}</p>
+		<div><Button variant="secondary" disabled={busy} onclick={findMatches}>{t('channels.findMatches')}</Button></div>
 		{#each plans as p (p.id)}
 			<div class="map">
 				<strong>{p.name}</strong>
-				<Field label={t('channels.roomCode')} bind:value={codes[p.id].room} />
-				<Field label={t('channels.rateCode')} bind:value={codes[p.id].rate} />
-				<div><Button variant="secondary" disabled={!codes[p.id].room.trim()} onclick={() => saveMap(p)}>{t('common.save')}</Button></div>
+				{#if listed}
+					<Select label={t('channels.theirs')} options={[{ id: '|', label: t('channels.none') }, ...pairs]} value={`${codes[p.id].room}|${codes[p.id].rate}`} onchange={(id) => pick(p, id)} />
+				{:else}
+					<Field label={t('channels.roomCode')} bind:value={codes[p.id].room} />
+					<Field label={t('channels.rateCode')} bind:value={codes[p.id].rate} />
+				{/if}
 			</div>
 		{/each}
+		<div><Button disabled={busy} onclick={saveMatches}>{t('channels.saveMatches')}</Button></div>
 	</section>
-	<div class="row">
-		<Button onclick={syncNow} disabled={busy || !enabled}>{t('channels.syncNow')}</Button>
-		<Button variant="quiet" href="/sync-log">{t('channels.openLog')}</Button>
-	</div>
+
+	<section class="card">
+		<h2>{t('channels.step4')}</h2>
+		<Checkbox label={t('channels.enabled')} bind:checked={enabled} />
+		<div class="row">
+			<Button disabled={busy} onclick={() => save()}>{t('common.save')}</Button>
+			<Button variant="secondary" onclick={syncNow} disabled={busy || !enabled}>{t('channels.syncNow')}</Button>
+			<Button variant="quiet" href="/sync-log">{t('channels.openLog')}</Button>
+		</div>
+	</section>
 {/if}
 
 <style>
@@ -152,6 +225,28 @@
 		border-radius: var(--radius-md);
 		background: var(--color-surface);
 		font: var(--font-body);
+	}
+	.choices {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(var(--card-min), 1fr));
+		gap: var(--gap-related);
+	}
+	.choice {
+		display: flex;
+		gap: var(--gap-related);
+		padding: var(--space-3);
+		border: var(--border-width) solid var(--color-border);
+		border-radius: var(--radius-md);
+	}
+	.choice.on {
+		border-color: var(--color-focus);
+	}
+	.steps {
+		margin: 0;
+		padding-inline-start: var(--space-6);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
 	}
 	.map {
 		display: grid;

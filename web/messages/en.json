@@ -420,5 +420,20 @@
 	"log.status.error": "Needs you",
 	"log.direction.push": "Sent",
 	"log.direction.pull": "Brought in",
-	"log.direction.compare": "Checked"
+	"log.direction.compare": "Checked",
+	"channels.step1": "Step 1. Choose how to connect",
+	"channels.step2": "Step 2. Connect to {name}",
+	"channels.step3": "Step 3. Match your rooms",
+	"channels.step4": "Step 4. Turn it on",
+	"channels.recommended": "Recommended",
+	"channels.unverified": "This connection is written from the provider’s published message format and has not yet been run against their test system. Try it on a test hotel first.",
+	"channels.test": "Test the connection",
+	"channels.testOk": "The connection works.",
+	"channels.testFailed": "The connection did not work: {reason}",
+	"channels.found": "Found {found} rates on their side and matched {matched} of yours. Check each match, then save.",
+	"channels.cannotList": "This provider cannot list its rooms. Type the codes by hand.",
+	"channels.findMatches": "Find matches",
+	"channels.theirs": "Their room and rate",
+	"channels.none": "Not sold there",
+	"channels.saveMatches": "Save matches"
 }

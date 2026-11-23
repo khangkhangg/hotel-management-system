@@ -1,29 +1,32 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
-test('a manager chooses how to connect and matches a rate plan', async ({ page }) => {
+test('the setup recommends Channex first and a manager connects through the steps', async ({ page }) => {
 	await page.request.get('/api/test/login?email=daniel@hotel.com');
 	await page.goto('/channels');
 	await expect(page.getByRole('heading', { name: 'Channels', level: 1 })).toBeVisible();
-	await page.getByRole('button', { name: 'Straight to the booking sites' }).click();
-	await page.getByLabel('Connect to', { exact: true }).selectOption({ label: 'Agoda' });
-	await page.getByLabel('Your hotel code on their side').fill('AG-1');
-	await page.getByLabel('Address to connect to').fill('https://ota.example.com/connect');
+	await expect(page.getByRole('radio').first()).toBeChecked();
+	await expect(page.getByText('Recommended')).toBeVisible();
+	await page.getByLabel('Your hotel code on their side').fill('PROP-1');
+	await page.getByLabel('Name of the server setting that holds the password or key').fill('CHANNEX_KEY');
 	await page.getByRole('button', { name: 'Save', exact: true }).first().click();
 	await expect(page.getByRole('status')).toHaveText('The connection is saved.');
-	await page.getByLabel('Their room code').first().fill('ROOM-9');
-	await page.getByRole('button', { name: 'Save', exact: true }).nth(1).click();
-	await expect(page.getByRole('status')).toContainText('is matched.');
-	await page.reload();
-	await expect(page.getByLabel('Your hotel code on their side')).toHaveValue('AG-1');
+	await page.getByRole('button', { name: 'Test the connection' }).click();
+	await expect(page.getByText('The connection did not work')).toBeVisible(); // the server has no key under that name
+	await page.getByRole('button', { name: 'Find matches' }).click();
+	await expect(page.getByRole('alert')).toBeVisible(); // nothing to list without a working connection
 });
 
-test('an address that points at the server itself is refused', async ({ page }) => {
+test('a direct OTA is a choice too, and an address that points at the server itself is refused', async ({ page }) => {
 	await page.request.get('/api/test/login?email=daniel@hotel.com');
 	await page.goto('/channels');
+	await page.getByRole('radio', { name: /^Agoda/ }).check();
 	await page.getByLabel('Address to connect to').fill('https://127.0.0.1/x');
 	await page.getByRole('button', { name: 'Save', exact: true }).first().click();
 	await expect(page.getByRole('alert')).toBeVisible();
+	await page.getByLabel('Address to connect to').fill('https://ota.example.com/connect');
+	await page.getByRole('button', { name: 'Save', exact: true }).first().click();
+	await expect(page.getByRole('status')).toHaveText('The connection is saved.');
 });
 
 test('the sync log and the channels page are accessible', async ({ page }) => {
