@@ -96,5 +96,12 @@
 	"amenity.family_rooms": "فیملی کمرے",
 	"amenity.accessible": "قابلِ رسائی کمرے",
 	"guest.promo": "پروموشن کوڈ (اختیاری)",
-	"guest.error.promo_invalid": "یہ پروموشن کوڈ ان تاریخوں کے لیے درست نہیں۔"
+	"guest.error.promo_invalid": "یہ پروموشن کوڈ ان تاریخوں کے لیے درست نہیں۔",
+	"guest.waitlist.title": "ان تاریخوں کے لیے فروخت ہو چکا؟",
+	"guest.waitlist.join": "کمرہ خالی ہو تو مجھے بتائیں",
+	"guest.waitlist.done": "شکریہ۔ ان تاریخوں کے لیے کمرہ خالی ہوا تو ہم آپ کو ای میل کریں گے۔",
+	"reconfirm.title": "براہ کرم اپنے قیام کی تصدیق کریں",
+	"reconfirm.button": "جی ہاں، میں آ رہا ہوں",
+	"reconfirm.done": "شکریہ۔ آپ کے قیام کی تصدیق ہو گئی ہے۔",
+	"reconfirm.invalid": "یہ لنک اب درست نہیں۔"
 }

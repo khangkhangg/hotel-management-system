@@ -6,7 +6,13 @@
 
 	type Item = { reservationId: string; code: string; guest: string; score: number; level: string; reasons: { code: string; text: string }[]; status: string; createdAt: string };
 
+	type Upcoming = { reservationId: string; code: string; guest: string; arrival: string; score: number; level: string; reasons: { code: string; text: string }[] };
+	type Hint = { date: string; roomType: string; rooms: number; booked: number; expected: number; suggestedExtra: number };
+	type Waiting = { name: string; email: string; arrive: string; depart: string; adults: number; notified: boolean };
 	let items = $state<Item[]>([]);
+	let upcoming = $state<Upcoming[]>([]);
+	let hints = $state<Hint[]>([]);
+	let waiting = $state<Waiting[]>([]);
 	let loaded = $state(false);
 	let message = $state('');
 	let ok = $state('');
@@ -14,7 +20,12 @@
 
 	async function load() {
 		try {
-			items = await api.get<Item[]>('/api/risk');
+			[items, upcoming, hints, waiting] = await Promise.all([
+				api.get<Item[]>('/api/risk'),
+				api.get<Upcoming[]>('/api/cancel-risk?days=14').catch(() => []),
+				api.get<Hint[]>('/api/overbooking-hints?days=30').catch(() => []),
+				api.get<Waiting[]>('/api/waitlist').catch(() => [])
+			]);
 			loaded = true;
 		} catch (e) {
 			message = errorText(e);
@@ -69,6 +80,49 @@
 	{/if}
 {/if}
 
+{#if loaded}
+	<section class="card">
+		<h2>{t('risk.upcoming')}</h2>
+		<p class="muted">{t('risk.upcomingNote')}</p>
+		{#if upcoming.filter((u) => u.level !== 'low').length === 0}
+			<p class="muted">{t('risk.upcomingNone')}</p>
+		{:else}
+			<ul class="reasons plain">
+				{#each upcoming.filter((u) => u.level !== 'low').slice(0, 10) as u (u.reservationId)}
+					<li><strong>{u.code}</strong> · {u.guest} · {u.arrival} · {t(`cancelRisk.${u.level}`)}</li>
+				{/each}
+			</ul>
+		{/if}
+	</section>
+
+	<section class="card">
+		<h2>{t('risk.hints')}</h2>
+		<p class="muted">{t('risk.hintsNote')}</p>
+		{#if hints.length === 0}
+			<p class="muted">{t('risk.hintsNone')}</p>
+		{:else}
+			<ul class="reasons plain">
+				{#each hints as h (h.date + h.roomType)}
+					<li>{t('risk.hint', { date: h.date, roomType: h.roomType, booked: h.booked, rooms: h.rooms, extra: h.suggestedExtra })}</li>
+				{/each}
+			</ul>
+		{/if}
+	</section>
+
+	<section class="card">
+		<h2>{t('risk.waitlist')}</h2>
+		{#if waiting.length === 0}
+			<p class="muted">{t('risk.waitlistNone')}</p>
+		{:else}
+			<ul class="reasons plain">
+				{#each waiting as w (w.email + w.arrive + w.depart)}
+					<li>{w.name} · {w.email} · {w.arrive} to {w.depart} · {w.notified ? t('risk.told') : t('risk.waiting')}</li>
+				{/each}
+			</ul>
+		{/if}
+	</section>
+{/if}
+
 <style>
 	h2 {
 		margin: 0;
@@ -99,6 +153,13 @@
 	.reasons {
 		margin: 0;
 		padding-inline-start: var(--space-6);
+	}
+	.plain {
+		list-style: none;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
 	}
 	.row {
 		display: flex;

@@ -96,5 +96,12 @@
 	"amenity.family_rooms": "家庭房",
 	"amenity.accessible": "无障碍客房",
 	"guest.promo": "优惠码（可选）",
-	"guest.error.promo_invalid": "此优惠码不适用于所选日期。"
+	"guest.error.promo_invalid": "此优惠码不适用于所选日期。",
+	"guest.waitlist.title": "所选日期已订完？",
+	"guest.waitlist.join": "有房时通知我",
+	"guest.waitlist.done": "谢谢。如果这些日期有空房，我们会发邮件通知您。",
+	"reconfirm.title": "请确认您的住宿",
+	"reconfirm.button": "是的，我会入住",
+	"reconfirm.done": "谢谢。您的住宿已确认。",
+	"reconfirm.invalid": "此链接已失效。"
 }

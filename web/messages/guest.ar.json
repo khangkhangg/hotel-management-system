@@ -100,5 +100,12 @@
 	"amenity.family_rooms": "غرف عائلية",
 	"amenity.accessible": "غرف مهيأة لذوي الإعاقة",
 	"guest.promo": "رمز الخصم (اختياري)",
-	"guest.error.promo_invalid": "رمز الخصم هذا لا يصلح لهذه التواريخ."
+	"guest.error.promo_invalid": "رمز الخصم هذا لا يصلح لهذه التواريخ.",
+	"guest.waitlist.title": "نفدت الغرف في هذه التواريخ؟",
+	"guest.waitlist.join": "أخبرني إذا توفرت غرفة",
+	"guest.waitlist.done": "شكرًا لك. سنرسل لك بريدًا إلكترونيًا إذا توفرت غرفة في هذه التواريخ.",
+	"reconfirm.title": "يرجى تأكيد إقامتك",
+	"reconfirm.button": "نعم، سأحضر",
+	"reconfirm.done": "شكرًا لك. تم تأكيد إقامتك.",
+	"reconfirm.invalid": "هذا الرابط لم يعد صالحًا."
 }

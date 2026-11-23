@@ -96,5 +96,12 @@
 	"amenity.family_rooms": "फ़ैमिली रूम",
 	"amenity.accessible": "सुगम्य कमरे",
 	"guest.promo": "प्रोमो कोड (वैकल्पिक)",
-	"guest.error.promo_invalid": "यह प्रोमो कोड इन तारीखों के लिए मान्य नहीं है।"
+	"guest.error.promo_invalid": "यह प्रोमो कोड इन तारीखों के लिए मान्य नहीं है।",
+	"guest.waitlist.title": "इन तारीखों के लिए उपलब्ध नहीं?",
+	"guest.waitlist.join": "कमरा खाली होने पर मुझे बताएँ",
+	"guest.waitlist.done": "धन्यवाद। इन तारीखों के लिए कमरा खाली होने पर हम आपको ईमेल करेंगे।",
+	"reconfirm.title": "कृपया अपने ठहराव की पुष्टि करें",
+	"reconfirm.button": "हाँ, मैं आ रहा हूँ",
+	"reconfirm.done": "धन्यवाद। आपके ठहराव की पुष्टि हो गई है।",
+	"reconfirm.invalid": "यह लिंक अब मान्य नहीं है।"
 }

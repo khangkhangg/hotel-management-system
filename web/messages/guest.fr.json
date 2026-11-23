@@ -96,5 +96,12 @@
 	"amenity.family_rooms": "Chambres familiales",
 	"amenity.accessible": "Chambres accessibles",
 	"guest.promo": "Code promo (facultatif)",
-	"guest.error.promo_invalid": "Ce code promo ne s’applique pas à ces dates."
+	"guest.error.promo_invalid": "Ce code promo ne s’applique pas à ces dates.",
+	"guest.waitlist.title": "Complet pour ces dates ?",
+	"guest.waitlist.join": "Prévenez-moi si une chambre se libère",
+	"guest.waitlist.done": "Merci. Nous vous écrirons si une chambre se libère pour ces dates.",
+	"reconfirm.title": "Veuillez confirmer votre séjour",
+	"reconfirm.button": "Oui, je viens",
+	"reconfirm.done": "Merci. Votre séjour est confirmé.",
+	"reconfirm.invalid": "Ce lien n’est plus valable."
 }

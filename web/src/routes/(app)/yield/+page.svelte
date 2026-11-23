@@ -5,13 +5,17 @@
 	import Field from '#lib/ui/Field.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 	import Select from '#lib/ui/Select.svelte';
+	import { formatMoney } from '#lib/booking/money.ts';
+	import { session } from '#lib/session.svelte.ts';
 
 	type Rule = { id: string; kind: string; roomTypeId: string | null; from: string; to: string; value: number; percent: number; active: boolean };
 	type RoomType = { id: string; name: string };
+	type Parity = { date: string; roomType: string; direct: number; channel: number; status: string };
 
 	const kinds = ['auto_close', 'sell_limit', 'availability_cap', 'rate_adjust'];
 
 	let rules = $state<Rule[]>([]);
+	let parity = $state<Parity[]>([]);
 	let roomTypes = $state<RoomType[]>([]);
 	let kind = $state('availability_cap');
 	let roomTypeId = $state('');
@@ -25,7 +29,7 @@
 
 	async function load() {
 		try {
-			[rules, roomTypes] = await Promise.all([api.get<Rule[]>('/api/yield-rules'), api.get<RoomType[]>('/api/room-types')]);
+			[rules, roomTypes, parity] = await Promise.all([api.get<Rule[]>('/api/yield-rules'), api.get<RoomType[]>('/api/room-types'), api.get<Parity[]>('/api/channel/parity').catch(() => [])]);
 		} catch (e) {
 			message = errorText(e);
 		}
@@ -107,6 +111,26 @@
 						<Button variant="secondary" disabled={busy} onclick={() => toggle(r)}>{r.active ? t('yield.switchOff') : t('yield.switchOn')}</Button>
 						<Button variant="quiet" disabled={busy} onclick={() => remove(r)}>{t('yield.remove')}</Button>
 					</div>
+				</li>
+			{/each}
+		</ul>
+	{/if}
+</section>
+
+<section class="card">
+	<h2>{t('yield.parity')}</h2>
+	{#if parity.length === 0}
+		<p class="muted">{t('yield.parityNone')}</p>
+	{:else}
+		<p class="muted">{t('yield.parityNote')}</p>
+		<ul class="rules">
+			{#each parity.slice(0, 30) as p (p.date + p.roomType)}
+				<li>
+					<div>
+						<strong>{p.date} · {p.roomType}</strong>
+						<span class="muted">{t('yield.parityRow', { direct: formatMoney(p.direct, session.currency), channel: formatMoney(p.channel, session.currency) })}</span>
+					</div>
+					<span class:off={p.status === 'channel_higher'}>{t(`yield.parity.${p.status}`)}</span>
 				</li>
 			{/each}
 		</ul>

@@ -44,6 +44,10 @@
 	let phone = $state('');
 	let kind = $state('');
 	let promo = $state('');
+	let searched = $state(false);
+	let wlName = $state('');
+	let wlEmail = $state('');
+	let wlDone = $state(false);
 	let error = $state('');
 	let busy = $state(false);
 	let picked = $state<string[]>([]);
@@ -128,6 +132,8 @@
 	async function search(event: SubmitEvent) {
 		event.preventDefault();
 		error = '';
+		searched = false;
+		wlDone = false;
 		quotes = {};
 		picked = [];
 		requoted = null;
@@ -147,6 +153,22 @@
 				})
 			);
 			quotes = Object.fromEntries(entries.filter((x) => x !== null));
+			searched = true;
+		} catch (e) {
+			error = e instanceof ApiError ? t(`guest.error.${e.code}`) : t('guest.error.generic');
+		}
+		busy = false;
+	}
+
+	const allSoldOut = $derived(searched && !Object.values(quotes).some((q) => !q.soldOut));
+
+	async function joinWaitlist(event: SubmitEvent) {
+		event.preventDefault();
+		error = '';
+		busy = true;
+		try {
+			await api.post(`/api/public/${slug}/waitlist`, { name: wlName, email: wlEmail, arrive: from, depart: to, adults: +adults || 1, locale });
+			wlDone = true;
 		} catch (e) {
 			error = e instanceof ApiError ? t(`guest.error.${e.code}`) : t('guest.error.generic');
 		}
@@ -253,6 +275,20 @@
 			</form>
 			{#if error}<p class="error" role="alert">{error}</p>{/if}
 			{#if info.roomTypes.length === 0}<p class="muted">{t('guest.empty')}</p>{/if}
+			{#if allSoldOut}
+				<section class="about stack" aria-label={t('guest.waitlist.title')}>
+					<h2>{t('guest.waitlist.title')}</h2>
+					{#if wlDone}
+						<p role="status">{t('guest.waitlist.done')}</p>
+					{:else}
+						<form class="stack" onsubmit={joinWaitlist}>
+							<Field label={t('guest.name')} bind:value={wlName} />
+							<Field label={t('guest.email')} type="email" bind:value={wlEmail} />
+							<Button type="submit" disabled={busy}>{t('guest.waitlist.join')}</Button>
+						</form>
+					{/if}
+				</section>
+			{/if}
 			<ul class="rooms">
 				{#each info.ratePlans as p (p.id)}
 					{@const rt = info.roomTypes.find((x) => x.id === p.roomTypeId)}

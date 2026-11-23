@@ -96,5 +96,12 @@
 	"amenity.family_rooms": "ফ্যামিলি রুম",
 	"amenity.accessible": "প্রতিবন্ধীবান্ধব কক্ষ",
 	"guest.promo": "প্রোমো কোড (ঐচ্ছিক)",
-	"guest.error.promo_invalid": "এই প্রোমো কোড এই তারিখগুলোর জন্য প্রযোজ্য নয়।"
+	"guest.error.promo_invalid": "এই প্রোমো কোড এই তারিখগুলোর জন্য প্রযোজ্য নয়।",
+	"guest.waitlist.title": "এই তারিখগুলোতে সব বিক্রি?",
+	"guest.waitlist.join": "কক্ষ খালি হলে আমাকে জানান",
+	"guest.waitlist.done": "ধন্যবাদ। এই তারিখগুলোর জন্য কক্ষ খালি হলে আমরা আপনাকে ইমেইল করব।",
+	"reconfirm.title": "অনুগ্রহ করে আপনার থাকা নিশ্চিত করুন",
+	"reconfirm.button": "হ্যাঁ, আমি আসছি",
+	"reconfirm.done": "ধন্যবাদ। আপনার থাকা নিশ্চিত হয়েছে।",
+	"reconfirm.invalid": "এই লিংক আর বৈধ নয়।"
 }
