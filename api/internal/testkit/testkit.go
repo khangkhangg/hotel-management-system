@@ -172,3 +172,18 @@ func (r Reply) Want(t *testing.T, status int, contains ...string) Reply {
 	}
 	return r
 }
+
+// AnonWith sends a request with no session, no CSRF token and the given headers, as a payment provider's webhook arrives.
+func (w *World) AnonWith(method, path, body string, headers map[string]string) Reply {
+	w.T.Helper()
+	req, err := http.NewRequest(method, w.Srv.URL+path, strings.NewReader(body))
+	Must(w.T, err)
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	res, err := http.DefaultClient.Do(req)
+	Must(w.T, err)
+	defer res.Body.Close()
+	b, _ := io.ReadAll(res.Body)
+	return Reply{res.StatusCode, string(b)}
+}

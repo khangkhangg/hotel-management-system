@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"net/http"
+	"strings"
 )
 
 const (
@@ -34,6 +35,11 @@ func (d Deps) issueCSRF(w http.ResponseWriter, r *http.Request) {
 // A page on another site can make the browser send the cookie but cannot read it, so it cannot send the header.
 func (d Deps) csrf(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A payment provider cannot hold our cookie; its webhooks prove themselves with a signature instead.
+		if strings.HasPrefix(r.URL.Path, "/api/webhooks/") {
+			next.ServeHTTP(w, r)
+			return
+		}
 		switch r.Method {
 		case http.MethodGet, http.MethodHead, http.MethodOptions:
 			next.ServeHTTP(w, r)

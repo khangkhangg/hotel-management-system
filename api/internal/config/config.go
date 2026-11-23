@@ -19,6 +19,8 @@ type Config struct {
 	SMTPURL            string
 	GoogleClientID     string
 	GoogleClientSecret string
+	StripeSecretKey    string
+	StripeWebhookKey   string
 	CookieSecure       bool
 }
 
@@ -32,6 +34,8 @@ func Load() (Config, error) {
 		SMTPURL:            os.Getenv("SMTP_URL"),
 		GoogleClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
 		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+		StripeSecretKey:    os.Getenv("STRIPE_SECRET_KEY"),
+		StripeWebhookKey:   os.Getenv("STRIPE_WEBHOOK_SECRET"),
 		CookieSecure:       true,
 	}
 	if c.DatabaseURL == "" {

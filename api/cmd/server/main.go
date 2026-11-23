@@ -19,10 +19,12 @@ import (
 	"hotelpms/api/internal/app"
 	"hotelpms/api/internal/config"
 	"hotelpms/api/internal/db"
+	"hotelpms/api/internal/guestbooking"
 	"hotelpms/api/internal/httpx"
 	"hotelpms/api/internal/mail"
 	"hotelpms/api/internal/notify"
 	"hotelpms/api/internal/password"
+	"hotelpms/api/internal/payments"
 	"hotelpms/api/internal/session"
 )
 
@@ -72,6 +74,10 @@ func main() {
 	}
 	defer hub.Close()
 
+	var card payments.Provider // nil leaves card payment off until the owner's Stripe keys are configured
+	if cfg.StripeSecretKey != "" && cfg.StripeWebhookKey != "" {
+		card = payments.NewStripe(cfg.StripeSecretKey, cfg.StripeWebhookKey, "")
+	}
 	var google httpx.Mount
 	if cfg.GoogleClientID != "" {
 		google = app.GoogleFor(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.BaseURL)
@@ -81,6 +87,7 @@ func main() {
 
 	go notify.RunSweeper(ctx, pool, sender, 30*time.Second)
 	go alerts.RunSweeper(ctx, pool, time.Minute)
+	go guestbooking.RunSweeper(ctx, pool, time.Minute)
 	go activity.RunNightly(ctx, pool)
 	go purgeSessions(ctx, pool)
 
@@ -89,7 +96,7 @@ func main() {
 		addr = "127.0.0.1:8080"
 	}
 	// No WriteTimeout: the notification stream is a response that stays open.
-	srv := &http.Server{Addr: addr, Handler: app.NewHandler(deps, hub, google), ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{Addr: addr, Handler: app.NewHandler(deps, hub, google, card), ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)

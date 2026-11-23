@@ -59,6 +59,14 @@ type Reservation struct {
 	Currency string    `json:"currency"`
 }
 
+// record writes the audit row for the person in ctx, or for the guest site when nobody is signed in.
+func record(ctx context.Context, tx pgx.Tx, orgID uuid.UUID, e audit.Entry) error {
+	if audit.WhoFrom(ctx).UserID == uuid.Nil {
+		return audit.RecordSystem(ctx, tx, orgID, "guest-site", e)
+	}
+	return audit.Record(ctx, tx, e)
+}
+
 // NormalizeEmail lowercases and trims an address, so one person is one guest however it is typed.
 func NormalizeEmail(s string) string { return strings.ToLower(strings.TrimSpace(s)) }
 
@@ -200,7 +208,7 @@ func Create(ctx context.Context, tx pgx.Tx, orgID, propertyID uuid.UUID, in Crea
 			}
 		}
 	}
-	return res, audit.Record(ctx, tx, audit.Entry{Action: "reservation.created", TargetType: "reservation", TargetID: res.ID, TargetLabel: res.Code,
+	return res, record(ctx, tx, orgID, audit.Entry{Action: "reservation.created", TargetType: "reservation", TargetID: res.ID, TargetLabel: res.Code,
 		After: map[string]any{"total": total, "currency": currency, "rooms": len(stays), "source": source}})
 }
 
@@ -273,6 +281,6 @@ func Cancel(ctx context.Context, tx pgx.Tx, orgID, propertyID, id uuid.UUID, now
 	if _, err := tx.Exec(ctx, `update reservation set status = 'cancelled', cancelled_at = $2 where id = $1`, id, now); err != nil {
 		return err
 	}
-	return audit.Record(ctx, tx, audit.Entry{Action: "reservation.cancelled", TargetType: "reservation", TargetID: id, TargetLabel: code,
+	return record(ctx, tx, orgID, audit.Entry{Action: "reservation.cancelled", TargetType: "reservation", TargetID: id, TargetLabel: code,
 		Before: map[string]string{"status": status}, After: map[string]string{"status": "cancelled"}})
 }

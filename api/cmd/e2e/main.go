@@ -22,10 +22,12 @@ import (
 	"hotelpms/api/internal/app"
 	"hotelpms/api/internal/db"
 	"hotelpms/api/internal/db/testdb"
+	"hotelpms/api/internal/guestbooking"
 	"hotelpms/api/internal/httpx"
 	"hotelpms/api/internal/mail"
 	"hotelpms/api/internal/notify"
 	"hotelpms/api/internal/password"
+	"hotelpms/api/internal/payments"
 	"hotelpms/api/internal/session"
 	"hotelpms/api/internal/staff"
 	"hotelpms/api/internal/tenant"
@@ -62,9 +64,10 @@ func main() {
 	defer hub.Close()
 	deps := httpx.Deps{Pool: pool, Mail: sender, Now: time.Now, BaseURL: baseURL}
 
+	go guestbooking.RunSweeper(ctx, pool, 2*time.Second)
 	go alerts.RunSweeper(ctx, pool, 2*time.Second) // the browser tests do not wait a minute for an alert
 	mux := http.NewServeMux()
-	mux.Handle("/", app.NewHandler(deps, hub, nil))
+	mux.Handle("/", app.NewHandler(deps, hub, nil, payments.NewFake()))
 	mux.HandleFunc("/api/test/last-code", lastMatch(sender, codeRE, 0))
 	mux.HandleFunc("/api/test/last-link", lastMatch(sender, linkRE, 1))
 	mux.HandleFunc("/api/test/owner-invite", func(w http.ResponseWriter, r *http.Request) {
