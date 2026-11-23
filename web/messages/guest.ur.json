@@ -103,5 +103,20 @@
 	"reconfirm.title": "براہ کرم اپنے قیام کی تصدیق کریں",
 	"reconfirm.button": "جی ہاں، میں آ رہا ہوں",
 	"reconfirm.done": "شکریہ۔ آپ کے قیام کی تصدیق ہو گئی ہے۔",
-	"reconfirm.invalid": "یہ لنک اب درست نہیں۔"
+	"reconfirm.invalid": "یہ لنک اب درست نہیں۔",
+	"manage.review.title": "اپنے قیام کا جائزہ دیں",
+	"manage.review.rating": "درجہ بندی",
+	"manage.review.comment": "آپ کا تبصرہ (اختیاری)",
+	"manage.review.send": "جائزہ بھیجیں",
+	"manage.review.thanks": "آپ کے جائزے کا شکریہ۔",
+	"manage.chat.title": "ہوٹل کے ساتھ پیغامات",
+	"manage.chat.label": "پیغام لکھیں",
+	"manage.chat.send": "پیغام بھیجیں",
+	"manage.chat.empty": "ابھی کوئی پیغام نہیں۔",
+	"manage.chat.you": "آپ",
+	"manage.chat.hotel": "ہوٹل",
+	"guest.reviews": "مہمانوں کے جائزے",
+	"guest.reviewsCount.one": "{count} جائزہ",
+	"guest.reviewsCount.other": "{count} جائزے",
+	"guest.reviewRating": "5 میں سے {rating}"
 }

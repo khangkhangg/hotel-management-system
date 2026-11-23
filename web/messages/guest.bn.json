@@ -103,5 +103,20 @@
 	"reconfirm.title": "অনুগ্রহ করে আপনার থাকা নিশ্চিত করুন",
 	"reconfirm.button": "হ্যাঁ, আমি আসছি",
 	"reconfirm.done": "ধন্যবাদ। আপনার থাকা নিশ্চিত হয়েছে।",
-	"reconfirm.invalid": "এই লিংক আর বৈধ নয়।"
+	"reconfirm.invalid": "এই লিংক আর বৈধ নয়।",
+	"manage.review.title": "আপনার থাকার রিভিউ দিন",
+	"manage.review.rating": "রেটিং",
+	"manage.review.comment": "আপনার মন্তব্য (ঐচ্ছিক)",
+	"manage.review.send": "রিভিউ পাঠান",
+	"manage.review.thanks": "আপনার রিভিউয়ের জন্য ধন্যবাদ।",
+	"manage.chat.title": "হোটেলের সঙ্গে বার্তা",
+	"manage.chat.label": "একটি বার্তা লিখুন",
+	"manage.chat.send": "বার্তা পাঠান",
+	"manage.chat.empty": "এখনো কোনো বার্তা নেই।",
+	"manage.chat.you": "আপনি",
+	"manage.chat.hotel": "হোটেল",
+	"guest.reviews": "অতিথিদের রিভিউ",
+	"guest.reviewsCount.one": "{count}টি রিভিউ",
+	"guest.reviewsCount.other": "{count}টি রিভিউ",
+	"guest.reviewRating": "৫-এর মধ্যে {rating}"
 }

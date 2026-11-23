@@ -105,5 +105,22 @@
 	"reconfirm.title": "Подтвердите, пожалуйста, ваше проживание",
 	"reconfirm.button": "Да, я приеду",
 	"reconfirm.done": "Спасибо. Ваше проживание подтверждено.",
-	"reconfirm.invalid": "Эта ссылка больше не действует."
+	"reconfirm.invalid": "Эта ссылка больше не действует.",
+	"manage.review.title": "Оцените ваше проживание",
+	"manage.review.rating": "Оценка",
+	"manage.review.comment": "Ваш комментарий (необязательно)",
+	"manage.review.send": "Отправить отзыв",
+	"manage.review.thanks": "Спасибо за ваш отзыв.",
+	"manage.chat.title": "Сообщения с отелем",
+	"manage.chat.label": "Напишите сообщение",
+	"manage.chat.send": "Отправить сообщение",
+	"manage.chat.empty": "Сообщений пока нет.",
+	"manage.chat.you": "Вы",
+	"manage.chat.hotel": "Отель",
+	"guest.reviews": "Отзывы гостей",
+	"guest.reviewsCount.one": "{count} отзыв",
+	"guest.reviewsCount.other": "{count} отзыва",
+	"guest.reviewRating": "{rating} из 5",
+	"guest.reviewsCount.few": "{count} отзыва",
+	"guest.reviewsCount.many": "{count} отзывов"
 }

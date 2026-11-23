@@ -103,5 +103,20 @@
 	"reconfirm.title": "请确认您的住宿",
 	"reconfirm.button": "是的，我会入住",
 	"reconfirm.done": "谢谢。您的住宿已确认。",
-	"reconfirm.invalid": "此链接已失效。"
+	"reconfirm.invalid": "此链接已失效。",
+	"manage.review.title": "评价您的住宿",
+	"manage.review.rating": "评分",
+	"manage.review.comment": "您的留言（可选）",
+	"manage.review.send": "提交评价",
+	"manage.review.thanks": "感谢您的评价。",
+	"manage.chat.title": "与酒店的消息",
+	"manage.chat.label": "写一条消息",
+	"manage.chat.send": "发送消息",
+	"manage.chat.empty": "暂无消息。",
+	"manage.chat.you": "您",
+	"manage.chat.hotel": "酒店",
+	"guest.reviews": "客人评价",
+	"guest.reviewsCount.one": "{count} 条评价",
+	"guest.reviewsCount.other": "{count} 条评价",
+	"guest.reviewRating": "{rating} 分（满分 5 分）"
 }

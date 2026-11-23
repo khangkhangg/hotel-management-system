@@ -5,6 +5,7 @@ const files = import.meta.glob('../../../messages/guest.*.json', { eager: true, 
 const dict = (code: string) => files[`../../../messages/guest.${code}.json`];
 const holes = (s: string) => (s.match(/\{\w+\}/g) ?? []).sort().join();
 const forms = /\.(zero|one|two|few|many|other)$/;
+const plurals = ['guest.nights', 'guest.reviewsCount'];
 
 describe('draft translations wait for a native reviewer', () => {
 	const en = dict('en');
@@ -17,8 +18,8 @@ describe('draft translations wait for a native reviewer', () => {
 				expect(d[k], `${k} is missing`).toBeTruthy();
 				expect(holes(d[k]), k).toBe(holes(v));
 			}
-			expect(d['guest.nights.other'], 'guest.nights.other').toContain('{count}');
-			for (const k of Object.keys(d)) expect(k in en || (forms.test(k) && k.startsWith('guest.nights.')), `${k} is not an English key`).toBe(true);
+			for (const base of plurals) expect(d[`${base}.other`], `${base}.other`).toContain('{count}');
+			for (const k of Object.keys(d)) expect(k in en || (forms.test(k) && plurals.some((b) => k.startsWith(`${b}.`))), `${k} is not an English key`).toBe(true);
 		});
 	}
 

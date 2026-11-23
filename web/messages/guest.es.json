@@ -103,5 +103,20 @@
 	"reconfirm.title": "Confirma tu estancia",
 	"reconfirm.button": "Sí, voy a ir",
 	"reconfirm.done": "Gracias. Tu estancia está confirmada.",
-	"reconfirm.invalid": "Este enlace ya no es válido."
+	"reconfirm.invalid": "Este enlace ya no es válido.",
+	"manage.review.title": "Valora tu estancia",
+	"manage.review.rating": "Valoración",
+	"manage.review.comment": "Tu comentario (opcional)",
+	"manage.review.send": "Enviar valoración",
+	"manage.review.thanks": "Gracias por tu valoración.",
+	"manage.chat.title": "Mensajes con el hotel",
+	"manage.chat.label": "Escribe un mensaje",
+	"manage.chat.send": "Enviar mensaje",
+	"manage.chat.empty": "Aún no hay mensajes.",
+	"manage.chat.you": "Tú",
+	"manage.chat.hotel": "Hotel",
+	"guest.reviews": "Opiniones de huéspedes",
+	"guest.reviewsCount.one": "{count} opinión",
+	"guest.reviewsCount.other": "{count} opiniones",
+	"guest.reviewRating": "{rating} de 5"
 }

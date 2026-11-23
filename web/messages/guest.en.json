@@ -103,5 +103,20 @@
 	"reconfirm.title": "Please confirm your stay",
 	"reconfirm.button": "Yes, I am coming",
 	"reconfirm.done": "Thank you. Your stay is confirmed.",
-	"reconfirm.invalid": "This link is not valid any more."
+	"reconfirm.invalid": "This link is not valid any more.",
+	"manage.review.title": "Review your stay",
+	"manage.review.rating": "Rating",
+	"manage.review.comment": "Your comment (optional)",
+	"manage.review.send": "Send review",
+	"manage.review.thanks": "Thank you for your review.",
+	"manage.chat.title": "Messages with the hotel",
+	"manage.chat.label": "Write a message",
+	"manage.chat.send": "Send message",
+	"manage.chat.empty": "No messages yet.",
+	"manage.chat.you": "You",
+	"manage.chat.hotel": "Hotel",
+	"guest.reviews": "Guest reviews",
+	"guest.reviewsCount.one": "{count} review",
+	"guest.reviewsCount.other": "{count} reviews",
+	"guest.reviewRating": "{rating} out of 5"
 }

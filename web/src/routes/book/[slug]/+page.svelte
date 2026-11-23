@@ -100,7 +100,7 @@
 	const canonical = $derived(canonicalUrl(origin, slug));
 	const ogImage = $derived(info?.site.photos[0] ? `${origin}/api/public/${slug}/photos/${info.site.photos[0].id}` : info?.site.logo ? `${origin}/api/public/${slug}/photos/${info.site.logo}` : '');
 	const ldText = $derived(info ? serializeJsonLd(hotelJsonLd(info, { origin, slug, description })) : '');
-	const hasAbout = $derived(!!info && (!!siteText('tagline') || !!siteText('description') || !!siteText('policies') || info.site.amenities.length > 0 || info.site.photos.length > 0));
+	const hasAbout = $derived(!!info && (!!siteText('tagline') || !!siteText('description') || !!siteText('policies') || info.site.amenities.length > 0 || info.site.photos.length > 0 || info.reviews.count > 0));
 
 	// The hotel's colour replaces --brand for the whole page, and only on this page.
 	$effect(() => {
@@ -277,6 +277,19 @@
 							{#each info.site.amenities as a (a)}<li>{t(`amenity.${a}`)}</li>{/each}
 						</ul>
 					{/if}
+					{#if info.reviews.count > 0}
+						<h3>{t('guest.reviews')}</h3>
+						<p><strong>{t('guest.reviewRating', { rating: info.reviews.average })}</strong> · {t('guest.reviewsCount', { count: info.reviews.count })}</p>
+						<ul class="reviews">
+							{#each info.reviews.recent as r (r.createdAt + r.name)}
+								<li>
+									<strong>{r.name}</strong> <span class="muted">{t('guest.reviewRating', { rating: r.rating })}</span>
+									{#if r.comment}<p class="text">{r.comment}</p>{/if}
+									{#if r.reply}<p class="text muted">{r.reply}</p>{/if}
+								</li>
+							{/each}
+						</ul>
+					{/if}
 					{#if siteText('policies')}
 						<h3>{t('guest.policies')}</h3>
 						<p class="text">{siteText('policies')}</p>
@@ -430,6 +443,14 @@
 		aspect-ratio: 3 / 2;
 		object-fit: cover;
 		border-radius: var(--radius-md);
+	}
+	.reviews {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3);
 	}
 	.amenities {
 		list-style: none;

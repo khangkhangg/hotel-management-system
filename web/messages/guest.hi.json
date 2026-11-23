@@ -103,5 +103,20 @@
 	"reconfirm.title": "कृपया अपने ठहराव की पुष्टि करें",
 	"reconfirm.button": "हाँ, मैं आ रहा हूँ",
 	"reconfirm.done": "धन्यवाद। आपके ठहराव की पुष्टि हो गई है।",
-	"reconfirm.invalid": "यह लिंक अब मान्य नहीं है।"
+	"reconfirm.invalid": "यह लिंक अब मान्य नहीं है।",
+	"manage.review.title": "अपने ठहराव की समीक्षा करें",
+	"manage.review.rating": "रेटिंग",
+	"manage.review.comment": "आपकी टिप्पणी (वैकल्पिक)",
+	"manage.review.send": "समीक्षा भेजें",
+	"manage.review.thanks": "आपकी समीक्षा के लिए धन्यवाद।",
+	"manage.chat.title": "होटल के साथ संदेश",
+	"manage.chat.label": "संदेश लिखें",
+	"manage.chat.send": "संदेश भेजें",
+	"manage.chat.empty": "अभी कोई संदेश नहीं है।",
+	"manage.chat.you": "आप",
+	"manage.chat.hotel": "होटल",
+	"guest.reviews": "मेहमानों की समीक्षाएँ",
+	"guest.reviewsCount.one": "{count} समीक्षा",
+	"guest.reviewsCount.other": "{count} समीक्षाएँ",
+	"guest.reviewRating": "5 में से {rating}"
 }

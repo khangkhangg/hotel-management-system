@@ -3,6 +3,7 @@
 	import { api, ApiError } from '#lib/api.ts';
 	import { formatMoney } from '#lib/booking/money.ts';
 	import { pickLocale, translate } from '#lib/guest/locale.ts';
+	import GuestVoice from '#lib/guest/GuestVoice.svelte';
 	import Button from '#lib/ui/Button.svelte';
 	import Field from '#lib/ui/Field.svelte';
 
@@ -125,6 +126,7 @@
 			<p class="muted">{t('manage.change')}</p>
 		</section>
 	{/if}
+	{#if view && token}<GuestVoice {token} {locale} {t} />{/if}
 </main>
 
 <style>
