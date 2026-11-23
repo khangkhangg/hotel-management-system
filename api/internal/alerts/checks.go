@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"hotelpms/api/internal/access"
+	"hotelpms/api/internal/channels"
 	"hotelpms/api/internal/folio"
 )
 
@@ -26,6 +27,7 @@ var registry = []check{
 	{kind: "refund_waiting", role: access.Manager, find: refundWaiting},
 	{kind: "paid_late", role: access.Manager, find: paidLate},
 	{kind: "booking_review", role: access.Manager, find: bookingReview},
+	{kind: "price_parity", role: access.Manager, find: priceParity},
 	{kind: "channel_trouble", role: access.Manager, defaults: map[string]float64{"staleHours": 3}, find: channelTrouble},
 	{kind: "tag_not_answered", role: access.FrontDesk, defaults: map[string]float64{"hours": 4}, find: tagNotAnswered},
 }
@@ -508,4 +510,26 @@ func bookingReview(ctx context.Context, tx pgx.Tx, sc scope) ([]Finding, error) 
 			Action: openAction("Open the review queue", "/risk")})
 	}
 	return out, rows.Err()
+}
+
+// priceParity finds nights in the next 14 days where a booking site is sent a lower price than the hotel's own page.
+func priceParity(ctx context.Context, tx pgx.Tx, sc scope) ([]Finding, error) {
+	rows, err := channels.Parity(ctx, tx, sc.orgID, sc.propertyID, sc.now)
+	if err != nil {
+		return nil, err
+	}
+	last := sc.today.AddDate(0, 0, 14).Format("2006-01-02")
+	lower := 0
+	for _, r := range rows {
+		if r.Status == "channel_lower" && r.Date <= last {
+			lower++
+		}
+	}
+	if lower == 0 {
+		return nil, nil
+	}
+	return []Finding{{SubjectType: "property", Subject: sc.propertyID, Severity: "warning",
+		Text:   fmt.Sprintf("The booking sites are sent a lower price than your booking page on %d nights in the next 14 days.", lower),
+		Facts:  map[string]any{"nights": lower},
+		Action: openAction("Open the yield rules", "/yield")}}, nil
 }

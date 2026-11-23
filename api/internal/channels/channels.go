@@ -53,6 +53,7 @@ func Mount(factory Factory) httpx.Mount {
 		mux.HandleFunc("/api/channel", httpx.Methods(map[string]http.HandlerFunc{http.MethodGet: wrap(h.get), http.MethodPut: wrap(h.put)}))
 		mux.HandleFunc("/api/channel/map", httpx.Methods(map[string]http.HandlerFunc{http.MethodPut: wrap(h.putMap)}))
 		mux.HandleFunc("/api/channel/sync", httpx.Methods(map[string]http.HandlerFunc{http.MethodPost: wrap(h.syncNow)}))
+		mux.HandleFunc("/api/channel/parity", httpx.Methods(map[string]http.HandlerFunc{http.MethodGet: wrap(h.parity)}))
 		mux.HandleFunc("/api/channel/providers", httpx.Methods(map[string]http.HandlerFunc{http.MethodGet: wrap(h.providers)}))
 		mux.HandleFunc("/api/channel/test", httpx.Methods(map[string]http.HandlerFunc{http.MethodPost: wrap(h.test)}))
 		mux.HandleFunc("/api/channel/remote", httpx.Methods(map[string]http.HandlerFunc{http.MethodGet: wrap(h.remote)}))
@@ -312,6 +313,7 @@ type loaded struct {
 	conn  Connection
 	maps  []mapping
 	slots []Slot
+	meta  []slotMeta // one for each slot
 	since time.Time
 	today time.Time
 }
@@ -478,9 +480,11 @@ func load(ctx context.Context, tx pgx.Tx, org, prop uuid.UUID, now time.Time, l 
 				s.Close()
 				return err
 			}
+			direct := sl.Price
 			night := yieldrules.Apply(yieldrules.Night{Date: sl.Date, RoomTypeID: m.roomType, Total: total, Taken: taken, Available: sl.Available, Price: sl.Price}, rules)
 			sl.Available, sl.Price = night.Available, night.Price
 			l.slots = append(l.slots, sl)
+			l.meta = append(l.meta, slotMeta{roomType: m.roomType, direct: direct})
 		}
 		s.Close()
 		if err := s.Err(); err != nil {

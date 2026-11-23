@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/google/uuid"
+	"hotelpms/api/internal/alerts"
 	"hotelpms/api/internal/booking"
 	"hotelpms/api/internal/channels"
 	"hotelpms/api/internal/db"
@@ -364,5 +365,43 @@ func TestYieldRulesChangeWhatTheChannelSeesAndNeverTheStock(t *testing.T) {
 		if s.Date == "2026-12-09" && s.Available != 3 {
 			t.Fatalf("a deleted rule still applies: %+v", s)
 		}
+	}
+}
+
+func TestParityShowsWhereTheChannelPriceDiffersFromTheBookingPage(t *testing.T) {
+	h := newHotel(t, 2)
+	h.connect(t, "channel_manager", "fake", true)
+	h.manager.Do("GET", "/api/channel/parity", &h.w.A1, "").Want(t, 200, "[]")
+	h.manager.Do("POST", "/api/reservations", &h.w.A1, fmt.Sprintf(`{"guest":{"name":"Guest"},"rooms":[{"roomTypeId":%q,"ratePlanId":%q,"from":"2026-12-10","to":"2026-12-11","adults":2,"children":0}]}`, h.rt, h.rp)).Want(t, 201)
+	h.manager.Do("POST", "/api/yield-rules", &h.w.A1, `{"kind":"rate_adjust","value":1,"percent":10,"active":true}`).Want(t, 201)
+	got := h.manager.Do("GET", "/api/channel/parity", &h.w.A1, "").Want(t, 200, `"date":"2026-12-10"`, `"direct":10000`, `"channel":11000`, `"status":"channel_higher"`, `"roomType":"Deluxe"`).Body
+	if strings.Count(got, `"date"`) != 1 {
+		t.Fatalf("only the night the rule changed differs: %s", got)
+	}
+	h.manager.Do("POST", "/api/yield-rules", &h.w.A1, `{"kind":"rate_adjust","value":1,"percent":-30,"active":true}`).Want(t, 201)
+	h.manager.Do("GET", "/api/channel/parity", &h.w.A1, "").Want(t, 200, `"channel":7700`, `"status":"channel_lower"`)
+	h.desk.Do("GET", "/api/channel/parity", &h.w.A1, "").Want(t, 403)
+}
+
+func TestAnAlertWarnsWhenABookingSiteUndercutsTheBookingPage(t *testing.T) {
+	h := newHotel(t, 2)
+	h.connect(t, "channel_manager", "fake", true)
+	open := func() string {
+		testkit.Must(t, alerts.Run(testkit.Ctx, h.w.Pool, h.w.Now))
+		return h.row(t, `select count(*)::text from alert where check_kind = 'price_parity' and status = 'open'`)
+	}
+	if n := open(); n != "0" {
+		t.Fatalf("%s alerts with no rule", n)
+	}
+	h.manager.Do("POST", "/api/yield-rules", &h.w.A1, `{"kind":"rate_adjust","value":5,"percent":10,"active":true}`).Want(t, 201)
+	if n := open(); n != "0" {
+		t.Fatalf("a higher channel price raised %s alerts", n)
+	}
+	h.manager.Do("POST", "/api/yield-rules", &h.w.A1, `{"kind":"rate_adjust","value":5,"percent":-30,"active":true}`).Want(t, 201)
+	if n := open(); n != "1" {
+		t.Fatalf("%s alerts for a lower channel price", n)
+	}
+	if n := open(); n != "1" {
+		t.Fatalf("a second run made %s alerts", n)
 	}
 }
