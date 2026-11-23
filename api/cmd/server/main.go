@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -79,10 +80,24 @@ func main() {
 
 	var cardOrg uuid.UUID
 	var card payments.Provider // nil leaves card payment off until the owner's Stripe keys are configured
-	if cfg.StripeSecretKey != "" && cfg.StripeWebhookKey != "" {
+	// One online payment provider at a time: Stripe, else VNPay, else MoMo, whichever has its keys set.
+	switch {
+	case cfg.StripeSecretKey != "" && cfg.StripeWebhookKey != "":
 		card = payments.NewStripe(cfg.StripeSecretKey, cfg.StripeWebhookKey, "")
 		if cardOrg, err = uuid.Parse(cfg.StripeOrgID); err != nil {
 			log.Fatal("STRIPE_ORGANIZATION_ID must be the id of the organization that owns the Stripe account")
+		}
+	case cfg.VNPayTmnCode != "" && cfg.VNPayHashSecret != "":
+		card = payments.NewVNPay(cfg.VNPayTmnCode, cfg.VNPayHashSecret, cfg.VNPayURL)
+		if cardOrg, err = uuid.Parse(cfg.PaymentOrgID); err != nil {
+			log.Fatal("PAYMENT_ORGANIZATION_ID must be the id of the organization that owns the VNPay account")
+		}
+	case cfg.MoMoPartnerCode != "" && cfg.MoMoSecretKey != "":
+		m := payments.NewMoMo(cfg.MoMoPartnerCode, cfg.MoMoAccessKey, cfg.MoMoSecretKey, cfg.MoMoURL)
+		m.IPNURL = strings.TrimRight(cfg.BaseURL, "/") + "/api/webhooks/momo"
+		card = m
+		if cardOrg, err = uuid.Parse(cfg.PaymentOrgID); err != nil {
+			log.Fatal("PAYMENT_ORGANIZATION_ID must be the id of the organization that owns the MoMo account")
 		}
 	}
 	var google httpx.Mount

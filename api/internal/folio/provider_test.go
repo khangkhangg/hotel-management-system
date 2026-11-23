@@ -63,3 +63,14 @@ func TestACardPaymentCannotBeRefundedWhenNoCardProviderIsSetUp(t *testing.T) {
 	p, _ := cardPayment(t, h)
 	h.desk.Do("POST", "/api/payments/"+p+"/refunds", &h.prop, `{"amount":3000,"reason":"wrong amount"}`).Want(t, 502, "provider_refused")
 }
+
+func TestAProviderWithNoRefundCallStillLetsStaffRecordTheRefund(t *testing.T) {
+	card := payments.NewFake()
+	card.Manual = true
+	h := newHotelCard(t, card)
+	p, res := cardPayment(t, h)
+	h.desk.Do("POST", "/api/payments/"+p+"/refunds", &h.prop, `{"amount":3000,"reason":"wrong amount"}`).Want(t, 201, `"status":"done"`)
+	if v := h.folio(h.desk, res); v.Refunded != 3000 {
+		t.Fatalf("%+v", v)
+	}
+}

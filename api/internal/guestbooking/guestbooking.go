@@ -87,7 +87,7 @@ func Mount(card payments.Provider, cardOrg uuid.UUID) httpx.Mount {
 		mux.HandleFunc("/api/public/{slug}/bookings/{code}", public(h.status, http.MethodGet))
 		h.mountManage(mux)
 		mux.HandleFunc("/api/reservations/{id}/confirm-payment", httpx.Methods(map[string]http.HandlerFunc{http.MethodPost: httpx.Wrap(access.Require(d, access.PaymentsTake)(http.HandlerFunc(h.confirmPayment)))}))
-		mux.HandleFunc("/api/webhooks/{provider}", public(h.webhook, http.MethodPost))
+		mux.HandleFunc("/api/webhooks/{provider}", httpx.Methods(map[string]http.HandlerFunc{http.MethodPost: h.webhook, http.MethodGet: h.webhook}))
 	}
 }
 
@@ -565,7 +565,7 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 		c, err := h.card.CreateCheckout(r.Context(), payments.CheckoutRequest{
 			Reference: org.String() + ":" + out.Code, Amount: out.Total, Currency: out.Currency, Description: "Booking " + out.Code,
 			SuccessURL: h.BaseURL + "/book/" + r.PathValue("slug") + "?done=" + out.Code, CancelURL: h.BaseURL + "/book/" + r.PathValue("slug"),
-			Key: "booking-" + resID.String(), ExpiresAt: out.HoldUntil, ThreeDS: assessed.Level != "low",
+			Key: "booking-" + resID.String(), ExpiresAt: out.HoldUntil, ThreeDS: assessed.Level != "low", ClientIP: clientIP(r),
 		})
 		if err != nil {
 			// Give the room back at once, so the guest's retry is not turned away by their own hold.
@@ -633,7 +633,7 @@ func (h *handler) webhook(w http.ResponseWriter, r *http.Request) {
 	orgText, code, found := strings.Cut(ev.Reference, ":")
 	org, perr := uuid.Parse(orgText)
 	if ev.Type != payments.Paid || !found || perr != nil {
-		w.WriteHeader(http.StatusNoContent) // nothing for us to do, and an error would only make the provider retry
+		h.ack(w) // nothing for us to do, and an error would only make the provider retry
 		return
 	}
 	var confirmed *madeOut
@@ -703,7 +703,7 @@ func (h *handler) webhook(w http.ResponseWriter, r *http.Request) {
 	if confirmed != nil && guestEmail != "" {
 		h.mailGuest(guestEmail, *confirmed, "")
 	}
-	w.WriteHeader(http.StatusNoContent)
+	h.ack(w)
 }
 
 // status tells a guest where their booking stands, by the code they were given. It holds no personal data.
@@ -931,4 +931,21 @@ func (h *handler) assess(ctx context.Context, tx pgx.Tx, org, prop, res uuid.UUI
 	out := risk.Score(risk.Signals{Email: in.Guest.Email, Name: in.Guest.Name, Nights: nights, DaysToArrival: days, Card: in.PaymentKind == "card",
 		FromAddressLastHour: fromAddr, ForEmailLastDay: forEmail})
 	return out, risk.Record(ctx, tx, org, prop, res, ipHash, mailHash, out, now)
+}
+
+// ack answers a provider's payment report. Most providers want an empty reply, and some want a reply in their own words.
+func (h *handler) ack(w http.ResponseWriter) {
+	if r, ok := h.card.(payments.Responder); ok {
+		r.WriteAck(w)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func clientIP(r *http.Request) string {
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return ip
 }

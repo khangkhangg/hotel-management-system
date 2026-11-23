@@ -37,6 +37,9 @@ func (h *handler) pay() Pay {
 	}
 	return func(ctx context.Context, ref string, amount int64, key string) error {
 		_, err := h.card.RefundPayment(ctx, ref, amount, key)
+		if errors.Is(err, payments.ErrManualRefund) {
+			return nil // the provider has no refund call, so staff return the money in its portal and the folio records it
+		}
 		return err
 	}
 }

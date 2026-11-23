@@ -22,6 +22,14 @@ type Config struct {
 	StripeSecretKey    string
 	StripeWebhookKey   string
 	StripeOrgID        string // the organization whose Stripe account the keys belong to
+	VNPayTmnCode       string
+	VNPayHashSecret    string
+	VNPayURL           string
+	MoMoPartnerCode    string
+	MoMoAccessKey      string
+	MoMoSecretKey      string
+	MoMoURL            string
+	PaymentOrgID       string // the organization whose VNPay or MoMo account the keys belong to
 	CookieSecure       bool
 }
 
@@ -38,6 +46,14 @@ func Load() (Config, error) {
 		StripeSecretKey:    os.Getenv("STRIPE_SECRET_KEY"),
 		StripeWebhookKey:   os.Getenv("STRIPE_WEBHOOK_SECRET"),
 		StripeOrgID:        os.Getenv("STRIPE_ORGANIZATION_ID"),
+		VNPayTmnCode:       os.Getenv("VNPAY_TMN_CODE"),
+		VNPayHashSecret:    os.Getenv("VNPAY_HASH_SECRET"),
+		VNPayURL:           os.Getenv("VNPAY_URL"),
+		MoMoPartnerCode:    os.Getenv("MOMO_PARTNER_CODE"),
+		MoMoAccessKey:      os.Getenv("MOMO_ACCESS_KEY"),
+		MoMoSecretKey:      os.Getenv("MOMO_SECRET_KEY"),
+		MoMoURL:            os.Getenv("MOMO_URL"),
+		PaymentOrgID:       os.Getenv("PAYMENT_ORGANIZATION_ID"),
 		CookieSecure:       true,
 	}
 	if c.DatabaseURL == "" {

@@ -560,3 +560,13 @@ func TestAFixedAmountNeverTakesMoreThanTheRoomPrice(t *testing.T) {
 	h.mgr.Do("POST", "/api/promo-codes", h.prop, `{"code":"HUGE","kind":"amount","value":99999999,"active":true}`).Want(t, 201)
 	h.w.Anon("POST", "/api/public/a1/quote", withPromo(h.booking("hotel", "2026-12-10", "2026-12-12"), "HUGE")).Want(t, 200, `"total":0`)
 }
+
+func TestAProviderThatMustAnswerInItsOwnWordsGetsItsAnswerOnAGetReport(t *testing.T) {
+	vn := payments.NewVNPay("TMN1", "secret", "")
+	w := testkit.NewWith(t, func(w *testkit.World) []httpx.Mount {
+		return []httpx.Mount{guestbooking.Mount(vn, w.OrgA)}
+	})
+	// A report with a wrong signature is refused, and a good one for a booking we do not have is answered, so it is not sent again.
+	w.Anon("GET", "/api/webhooks/vnpay?vnp_Amount=100&vnp_SecureHash=bad", "").Want(t, 400)
+	w.Anon("POST", "/api/webhooks/stripe", "").Want(t, 404)
+}

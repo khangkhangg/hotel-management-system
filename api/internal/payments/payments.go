@@ -29,6 +29,9 @@ const (
 var (
 	ErrSignature = errors.New("payments: the webhook signature is wrong or too old")
 	ErrProvider  = errors.New("payments: the provider refused the request")
+	ErrCurrency  = errors.New("payments: this provider takes only Vietnamese dong")
+	// ErrManualRefund means the provider has no refund call here. The money is returned in its own merchant portal.
+	ErrManualRefund = errors.New("payments: refund this payment in the merchant portal of the provider")
 )
 
 type CheckoutRequest struct {
@@ -40,6 +43,7 @@ type CheckoutRequest struct {
 	CancelURL   string
 	Key         string    // idempotency key: the same key never charges twice
 	ExpiresAt   time.Time // after this the payment page no longer takes money, so a late payment cannot happen
+	ClientIP    string    // the guest's network address, which some providers ask for
 	ThreeDS     bool      // ask the card for a 3-D Secure check, which moves a fraud chargeback to the card issuer
 }
 
@@ -208,6 +212,7 @@ type Fake struct {
 	mu           sync.Mutex
 	Checkouts    []CheckoutRequest
 	Refunds      []string
+	Manual       bool // RefundPayment says the refund is made in the merchant portal
 	FailRefunds  bool
 	FailCheckout bool
 	byKey        map[string]Checkout
@@ -235,6 +240,9 @@ func (f *Fake) CreateCheckout(_ context.Context, r CheckoutRequest) (Checkout, e
 func (f *Fake) RefundPayment(_ context.Context, paymentRef string, amount int64, key string) (Refund, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.Manual {
+		return Refund{}, ErrManualRefund
+	}
 	if f.FailRefunds {
 		return Refund{}, ErrProvider
 	}
@@ -258,3 +266,6 @@ func (f *Fake) ParseWebhook(r *http.Request, _ time.Time) (Event, error) {
 	ev = Event{ID: in.ID, Type: in.Type, Reference: in.Reference, PaymentRef: in.PaymentRef, Amount: in.Amount, Currency: in.Currency}
 	return ev, nil
 }
+
+// Responder is a provider that must answer its payment report in its own words, and not with an empty reply.
+type Responder interface{ WriteAck(w http.ResponseWriter) }
