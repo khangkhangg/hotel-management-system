@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"github.com/google/uuid"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -21,7 +22,7 @@ func TestEveryAreaIsMountedAndNeedsASession(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(hub.Close)
-	h := app.NewHandler(httpx.Deps{Pool: pool, Mail: mail.NewFake(), Now: time.Now}, hub, nil, nil)
+	h := app.NewHandler(httpx.Deps{Pool: pool, Mail: mail.NewFake(), Now: time.Now}, hub, nil, nil, uuid.Nil)
 
 	get := func(method, path string) int {
 		req := httptest.NewRequest(method, path, strings.NewReader("{}"))
@@ -52,7 +53,7 @@ func TestGoogleSignInIsMountedWhenConfigured(t *testing.T) {
 	pool := testdb.New(t)
 	hub, _ := notify.NewHub(pool)
 	t.Cleanup(hub.Close)
-	h := app.NewHandler(httpx.Deps{Pool: pool, Mail: mail.NewFake(), Now: time.Now}, hub, app.GoogleFor("id", "secret", "https://app.example.com"), nil)
+	h := app.NewHandler(httpx.Deps{Pool: pool, Mail: mail.NewFake(), Now: time.Now}, hub, app.GoogleFor("id", "secret", "https://app.example.com"), nil, uuid.Nil)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, httptest.NewRequest("GET", "/api/sign-in/google/start", nil))
 	if rec.Code != http.StatusFound || !strings.Contains(rec.Header().Get("Location"), "accounts.google.com") {

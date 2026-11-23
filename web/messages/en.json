@@ -318,5 +318,7 @@
 	"site.kind.bank_transfer": "Bank transfer",
 	"site.kind.bank_transferNote": "The guest sees your bank details. The booking is cancelled if no transfer arrives in time.",
 	"site.kind.card": "Card online",
-	"site.kind.cardNote": "The guest pays on the payment provider's page. Needs the provider keys in the server settings."
+	"site.kind.cardNote": "The guest pays on the payment provider's page. Needs the provider keys in the server settings.",
+	"panel.confirmPayment": "Mark payment received",
+	"panel.paymentConfirmed": "Payment recorded and booking confirmed."
 }

@@ -38,7 +38,8 @@ type CheckoutRequest struct {
 	Description string
 	SuccessURL  string
 	CancelURL   string
-	Key         string // idempotency key: the same key never charges twice
+	Key         string    // idempotency key: the same key never charges twice
+	ExpiresAt   time.Time // after this the payment page no longer takes money, so a late payment cannot happen
 }
 
 type Checkout struct{ ID, URL string }
@@ -111,6 +112,9 @@ func (s *Stripe) CreateCheckout(ctx context.Context, r CheckoutRequest) (Checkou
 	f.Set("client_reference_id", r.Reference)
 	f.Set("success_url", r.SuccessURL)
 	f.Set("cancel_url", r.CancelURL)
+	if !r.ExpiresAt.IsZero() {
+		f.Set("expires_at", strconv.FormatInt(r.ExpiresAt.Unix(), 10))
+	}
 	f.Set("line_items[0][quantity]", "1")
 	f.Set("line_items[0][price_data][currency]", strings.ToLower(r.Currency))
 	f.Set("line_items[0][price_data][unit_amount]", strconv.FormatInt(stripeAmount(r.Amount, r.Currency), 10))
@@ -197,11 +201,12 @@ func (s *Stripe) ParseWebhook(r *http.Request, now time.Time) (Event, error) {
 
 // Fake is the provider tests use. It records what it was asked and never calls out.
 type Fake struct {
-	mu          sync.Mutex
-	Checkouts   []CheckoutRequest
-	Refunds     []string
-	FailRefunds bool
-	byKey       map[string]Checkout
+	mu           sync.Mutex
+	Checkouts    []CheckoutRequest
+	Refunds      []string
+	FailRefunds  bool
+	FailCheckout bool
+	byKey        map[string]Checkout
 }
 
 func NewFake() *Fake { return &Fake{byKey: map[string]Checkout{}} }
@@ -211,6 +216,9 @@ func (f *Fake) Name() string { return "fake" }
 func (f *Fake) CreateCheckout(_ context.Context, r CheckoutRequest) (Checkout, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.FailCheckout {
+		return Checkout{}, ErrProvider
+	}
 	if c, ok := f.byKey[r.Key]; ok {
 		return c, nil
 	}

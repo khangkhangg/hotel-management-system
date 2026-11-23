@@ -14,6 +14,7 @@ import (
 	"hotelpms/api/internal/db"
 	"hotelpms/api/internal/folio"
 	"hotelpms/api/internal/guestbooking"
+	"hotelpms/api/internal/httpx"
 	"hotelpms/api/internal/payments"
 	"hotelpms/api/internal/rooms"
 	"hotelpms/api/internal/testkit"
@@ -37,10 +38,19 @@ func idOf(t *testing.T, r testkit.Reply) string {
 }
 
 // newHotel opens a property at /a1 with one Deluxe room type, nRooms rooms, one rate plan at 100.00 and every payment type on.
-func newHotel(t *testing.T, nRooms int) *hotel {
+func newHotel(t *testing.T, nRooms int) *hotel { return newHotelFor(t, nRooms, true) }
+
+// newHotelFor opens the hotel; cardIsOurs says whether the card provider account belongs to this hotel's organization.
+func newHotelFor(t *testing.T, nRooms int, cardIsOurs bool) *hotel {
 	t.Helper()
 	fake := payments.NewFake()
-	w := testkit.New(t, rooms.Mount, booking.Mount, folio.Mount, guestbooking.Mount(fake))
+	w := testkit.NewWith(t, func(w *testkit.World) []httpx.Mount {
+		owner := uuid.New()
+		if cardIsOurs {
+			owner = w.OrgA
+		}
+		return []httpx.Mount{rooms.Mount, booking.Mount, folio.Mount, guestbooking.Mount(fake, owner)}
+	})
 	h := &hotel{w: w, fake: fake, prop: &w.A1}
 	h.owner = w.Member(w.OrgA, nil, "owner")
 	h.mgr = w.Member(w.OrgA, &w.A1, "manager")
@@ -178,13 +188,13 @@ func TestAForgedWebhookIsRefusedAndRecordsNothing(t *testing.T) {
 func TestAnUnpaidHoldIsReleasedAndALatePaymentIsFlagged(t *testing.T) {
 	h := newHotel(t, 1)
 	m := h.book(t, "card", "2026-12-10", "2026-12-12")
-	h.w.Advance(10 * time.Minute)
+	h.w.Advance(20 * time.Minute)
 	n, err := guestbooking.ExpireHolds(testkit.Ctx, h.w.Pool, h.w.Now)
 	testkit.Must(t, err)
 	if n != 0 {
-		t.Fatalf("released %d holds inside the 15 minutes", n)
+		t.Fatalf("released %d holds inside the 30 minutes", n)
 	}
-	h.w.Advance(6 * time.Minute)
+	h.w.Advance(11 * time.Minute)
 	n, err = guestbooking.ExpireHolds(testkit.Ctx, h.w.Pool, h.w.Now)
 	testkit.Must(t, err)
 	if n != 1 {
@@ -258,4 +268,116 @@ func TestNoCardDataIsKeptAnywhere(t *testing.T) {
 	h := newHotel(t, 1)
 	body := strings.Replace(h.booking("card", "2026-12-10", "2026-12-12"), `"paymentKind"`, `"cardNumber":"4242424242424242","paymentKind"`, 1)
 	h.w.Anon("POST", "/api/public/a1/bookings", body).Want(t, 400)
+}
+
+func (h *hotel) deskConfirm(t *testing.T, code string, status int) {
+	t.Helper()
+	desk := h.w.Member(h.w.OrgA, &h.w.A1, "front_desk")
+	id := h.row(t, `select id::text from reservation where code = $1`, code)
+	desk.Do("POST", "/api/reservations/"+id+"/confirm-payment", h.prop, "").Want(t, status)
+}
+
+func TestStaffConfirmingATransferKeepsTheRoomPastTheHold(t *testing.T) {
+	h := newHotel(t, 1)
+	b := h.book(t, "bank_transfer", "2026-12-10", "2026-12-12")
+	h.deskConfirm(t, b.Code, 204)
+	if got := h.row(t, `select status || coalesce(hold_until::text, '-') from reservation where code = $1`, b.Code); got != "confirmed-" {
+		t.Fatalf("%s", got)
+	}
+	if got := h.row(t, `select count(*)::text from payment where method = 'bank_transfer' and amount = $1`, b.Total); got != "1" {
+		t.Fatalf("%s payments", got)
+	}
+	h.w.Advance(30 * time.Hour)
+	n, err := guestbooking.ExpireHolds(testkit.Ctx, h.w.Pool, h.w.Now)
+	testkit.Must(t, err)
+	if n != 0 {
+		t.Fatalf("released a confirmed booking")
+	}
+	h.deskConfirm(t, b.Code, 409) // nothing is waiting any more
+}
+
+func TestTheGuestSiteIsNotAFreeForAllForBots(t *testing.T) {
+	h := newHotel(t, 8)
+	for i := 0; i < 5; i++ {
+		h.book(t, "hotel", "2026-12-10", "2026-12-11")
+	}
+	h.w.Anon("POST", "/api/public/a1/bookings", h.booking("hotel", "2026-12-10", "2026-12-11")).Want(t, 429)
+	h.w.Advance(11 * time.Minute)
+	h.book(t, "hotel", "2026-12-10", "2026-12-11")
+}
+
+func TestABookingNeedsARealEmailAndSaneSizes(t *testing.T) {
+	h := newHotel(t, 1)
+	for _, bad := range []string{
+		strings.Replace(h.booking("hotel", "2026-12-10", "2026-12-12"), "mai@hotel.com", "", 1),
+		strings.Replace(h.booking("hotel", "2026-12-10", "2026-12-12"), "mai@hotel.com", "not-an-email", 1),
+		strings.Replace(h.booking("hotel", "2026-12-10", "2026-12-12"), "mai@hotel.com", strings.Repeat("a", 300)+"@x.com", 1),
+		h.booking("hotel", "2026-12-10", "2027-02-20"),
+	} {
+		h.w.Anon("POST", "/api/public/a1/bookings", bad).Want(t, 400)
+	}
+}
+
+func TestTheGuestCanLookUpTheirBookingByCode(t *testing.T) {
+	h := newHotel(t, 1)
+	m := h.book(t, "card", "2026-12-10", "2026-12-12")
+	r := h.w.Anon("GET", "/api/public/a1/bookings/"+m.Code, "").Want(t, 200, `"status":"pending"`)
+	if strings.Contains(r.Body, "mai@hotel.com") || strings.Contains(r.Body, "Mai") {
+		t.Fatalf("personal data in %s", r.Body)
+	}
+	h.w.Anon("GET", "/api/public/a1/bookings/NOSUCH", "").Want(t, 404)
+	if !strings.Contains(h.fake.Checkouts[0].SuccessURL, "/book/a1?done="+m.Code) {
+		t.Fatalf("return address %s", h.fake.Checkouts[0].SuccessURL)
+	}
+}
+
+func TestTheGuestIsEmailedTheBookingCode(t *testing.T) {
+	h := newHotel(t, 2)
+	a := h.book(t, "hotel", "2026-12-10", "2026-12-12")
+	sent := h.w.Mail.Sent()
+	if len(sent) != 1 || sent[0].To != "mai@hotel.com" || !strings.Contains(sent[0].Text, a.Code) {
+		t.Fatalf("%+v", sent)
+	}
+	c := h.book(t, "card", "2026-12-10", "2026-12-12")
+	if len(h.w.Mail.Sent()) != 1 {
+		t.Fatal("a card guest was emailed before paying")
+	}
+	h.hook(t, "evt_mail", "paid", c.Code, c.Total).Want(t, 204)
+	if got := h.w.Mail.Sent(); len(got) != 2 || !strings.Contains(got[1].Text, c.Code) {
+		t.Fatalf("%+v", got)
+	}
+}
+
+func TestAFailedCheckoutDoesNotLeaveAGhostHold(t *testing.T) {
+	h := newHotel(t, 1)
+	h.fake.FailCheckout = true
+	h.w.Anon("POST", "/api/public/a1/bookings", h.booking("card", "2026-12-10", "2026-12-12")).Want(t, 502, "provider_unavailable")
+	if got := h.row(t, `select coalesce(sum(sold),0)::text from inventory`); got != "0" {
+		t.Fatalf("sold %s", got)
+	}
+	h.fake.FailCheckout = false
+	h.book(t, "card", "2026-12-10", "2026-12-12")
+}
+
+func TestAPaymentThatDoesNotCoverTheBookingIsNotTakenAsPaid(t *testing.T) {
+	h := newHotel(t, 2)
+	a := h.book(t, "card", "2026-12-10", "2026-12-12")
+	h.hook(t, "evt_short", "paid", a.Code, a.Total-1).Want(t, 204)
+	if got := h.row(t, `select status || paid_late::text from reservation where code = $1`, a.Code); got != "pendingtrue" {
+		t.Fatalf("%s", got)
+	}
+	b := h.book(t, "card", "2026-12-10", "2026-12-12")
+	body := fmt.Sprintf(`{"id":"evt_eur","type":"paid","reference":"%s:%s","paymentRef":"pi_2","amount":%d,"currency":"EUR"}`, h.w.OrgA, b.Code, b.Total)
+	h.w.AnonWith("POST", "/api/webhooks/fake", body, map[string]string{"X-Fake-Signature": "ok"}).Want(t, 204)
+	if got := h.row(t, `select status from reservation where code = $1`, b.Code); got != "pending" {
+		t.Fatalf("%s", got)
+	}
+}
+
+func TestCardIsOnlyOfferedToTheOrganizationThatOwnsTheProviderAccount(t *testing.T) {
+	h := newHotelFor(t, 1, false)
+	if r := h.w.Anon("GET", "/api/public/a1", "").Want(t, 200); strings.Contains(r.Body, `"card"`) {
+		t.Fatalf("%s", r.Body)
+	}
+	h.w.Anon("POST", "/api/public/a1/bookings", h.booking("card", "2026-12-10", "2026-12-12")).Want(t, 409, "payment_type_off")
 }

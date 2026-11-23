@@ -68,7 +68,7 @@ func TestStripeCheckoutSendsAnIdempotencyKeyAndNoCardData(t *testing.T) {
 	s := payments.NewStripe("sk_test", "whsec", srv.URL)
 	c, err := s.CreateCheckout(context.Background(), payments.CheckoutRequest{
 		Reference: "RES-1", Amount: 22000, Currency: "USD", Description: "Deluxe, 2 nights",
-		SuccessURL: "https://x.test/ok", CancelURL: "https://x.test/no", Key: "booking-1",
+		SuccessURL: "https://x.test/ok", CancelURL: "https://x.test/no", Key: "booking-1", ExpiresAt: now.Add(30 * time.Minute),
 	})
 	if err != nil || c.URL != "https://checkout.stripe.test/pay/cs_9" {
 		t.Fatalf("%+v %v", c, err)
@@ -76,7 +76,7 @@ func TestStripeCheckoutSendsAnIdempotencyKeyAndNoCardData(t *testing.T) {
 	if got.Header.Get("Idempotency-Key") != "booking-1" || got.Header.Get("Authorization") != "Bearer sk_test" {
 		t.Fatalf("headers %v", got.Header)
 	}
-	for _, want := range []string{"client_reference_id=RES-1", "mode=payment", "line_items%5B0%5D%5Bprice_data%5D%5Bunit_amount%5D=22000", "price_data%5D%5Bcurrency%5D=usd"} {
+	for _, want := range []string{"client_reference_id=RES-1", "mode=payment", "line_items%5B0%5D%5Bprice_data%5D%5Bunit_amount%5D=22000", "price_data%5D%5Bcurrency%5D=usd", fmt.Sprintf("expires_at=%d", now.Add(30*time.Minute).Unix())} {
 		if !strings.Contains(form, want) {
 			t.Fatalf("missing %s in %s", want, form)
 		}

@@ -40,7 +40,7 @@ const (
 
 var (
 	codeRE = regexp.MustCompile(`\b\d{6}\b`)
-	linkRE = regexp.MustCompile(baseURL + `(/(?:invite|reset)/[A-Za-z0-9_-]+)`)
+	linkRE = regexp.MustCompile(baseURL + `(/(?:invite|reset)/[A-Za-z0-9_-]+|/book/[a-z0-9-]+/manage\?token=[A-Za-z0-9._-]+)`)
 )
 
 func main() {
@@ -67,7 +67,7 @@ func main() {
 	go guestbooking.RunSweeper(ctx, pool, 2*time.Second)
 	go alerts.RunSweeper(ctx, pool, 2*time.Second) // the browser tests do not wait a minute for an alert
 	mux := http.NewServeMux()
-	mux.Handle("/", app.NewHandler(deps, hub, nil, payments.NewFake()))
+	mux.Handle("/", app.NewHandler(deps, hub, nil, payments.NewFake(), uuid.Nil))
 	mux.HandleFunc("/api/test/last-code", lastMatch(sender, codeRE, 0))
 	mux.HandleFunc("/api/test/last-link", lastMatch(sender, linkRE, 1))
 	mux.HandleFunc("/api/test/owner-invite", func(w http.ResponseWriter, r *http.Request) {

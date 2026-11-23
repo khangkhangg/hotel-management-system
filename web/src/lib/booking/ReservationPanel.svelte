@@ -134,6 +134,7 @@
 					<Button onclick={() => run('check-in', undefined, t('panel.checkedIn'))}>{t('panel.checkIn')}</Button>
 					<Button variant="secondary" onclick={() => run('no-show', undefined, t('panel.noShown'))}>{t('panel.noShow')}</Button>
 				{/if}
+				{#if res.status === 'pending'}<Button onclick={() => run('confirm-payment', undefined, t('panel.paymentConfirmed'))}>{t('panel.confirmPayment')}</Button>{/if}
 				{#if res.status === 'checked_in'}<Button onclick={() => run('check-out', undefined, t('panel.checkedOut'))}>{t('panel.checkOut')}</Button>{/if}
 				{#if res.status === 'confirmed' || res.status === 'pending'}<Button variant="quiet" onclick={() => run('cancel', undefined, t('panel.cancelled'))}>{t('panel.cancel')}</Button>{/if}
 			</p>

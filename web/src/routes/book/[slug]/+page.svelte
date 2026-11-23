@@ -16,7 +16,7 @@
 		ratePlans: { id: string; roomTypeId: string; name: string }[];
 	};
 	type Quote = { total: number; currency: string; soldOut: boolean; lines: { description: string; amount: number }[] };
-	type Made = { code: string; total: number; currency: string; status: string; checkoutUrl?: string; bankDetails?: string; holdUntil?: string };
+	type Made = { code: string; total?: number; currency: string; status: string; checkoutUrl?: string; bankDetails?: string; holdUntil?: string };
 
 	const slug = page.params.slug;
 	const saved = (() => {
@@ -62,6 +62,24 @@
 				kind = i.payments[0] ?? '';
 			})
 			.catch(() => (missing = true));
+	});
+	// Back from the payment page: the webhook may take a few seconds to confirm, so ask a few times.
+	$effect(() => {
+		const code = page.url.searchParams.get('done');
+		if (!code) return;
+		let tries = 0;
+		let timer: ReturnType<typeof setTimeout>;
+		const look = async () => {
+			try {
+				made = await api.get<Made>(`/api/public/${slug}/bookings/${code}`);
+				step = 'done';
+				if (made.status === 'pending' && ++tries < 10) timer = setTimeout(look, 2000);
+			} catch {
+				missing = true;
+			}
+		};
+		look();
+		return () => clearTimeout(timer);
 	});
 	$effect(() => {
 		document.documentElement.lang = locale;
@@ -129,6 +147,7 @@
 {:else if info}
 	<header class="top">
 		<h1>{info.name}</h1>
+		<Button variant="quiet" href={`/book/${slug}/manage`}>{t('guest.manage')}</Button>
 		{#if offered().length > 1}
 			<label class="lang">
 				<span class="visually-hidden">{t('guest.language')}</span>
@@ -214,7 +233,7 @@
 			<section class="card stack">
 				<h2>{t('guest.done.title', { state: t(`guest.done.${made.status}`) })}</h2>
 				<p>{t('guest.done.code')}: <strong>{made.code}</strong></p>
-				<p><strong>{money(made.total)}</strong></p>
+				{#if made.total !== undefined}<p><strong>{money(made.total)}</strong></p>{/if}
 				{#if made.holdUntil}<p class="muted">{t('guest.done.holdUntil', { time: new Date(made.holdUntil).toLocaleString(locale) })}</p>{/if}
 				{#if made.bankDetails}<p>{t('guest.done.bank')}</p><pre>{made.bankDetails}</pre>{/if}
 			</section>

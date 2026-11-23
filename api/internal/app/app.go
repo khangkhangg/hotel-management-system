@@ -2,6 +2,7 @@
 package app
 
 import (
+	"github.com/google/uuid"
 	"net/http"
 
 	"hotelpms/api/internal/access"
@@ -21,8 +22,8 @@ import (
 )
 
 // NewHandler mounts every area of the API. google is nil when Google sign-in is not configured.
-func NewHandler(d httpx.Deps, hub *notify.Hub, google httpx.Mount, card payments.Provider) http.Handler {
-	mounts := []httpx.Mount{signin.Mount, access.Mount, staff.Mount, activity.Mount, notify.Mount(hub), rooms.Mount, booking.Mount, folio.Mount, housekeeping.Mount, alerts.Mount, notes.Mount(hub), guestbooking.Mount(card)}
+func NewHandler(d httpx.Deps, hub *notify.Hub, google httpx.Mount, card payments.Provider, cardOrg uuid.UUID) http.Handler {
+	mounts := []httpx.Mount{signin.Mount, access.Mount, staff.Mount, activity.Mount, notify.Mount(hub), rooms.Mount, booking.Mount, folio.Mount, housekeeping.Mount, alerts.Mount, notes.Mount(hub), guestbooking.Mount(card, cardOrg)}
 	if google != nil {
 		mounts = append(mounts, google)
 	}

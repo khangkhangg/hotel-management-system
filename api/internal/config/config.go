@@ -21,6 +21,7 @@ type Config struct {
 	GoogleClientSecret string
 	StripeSecretKey    string
 	StripeWebhookKey   string
+	StripeOrgID        string // the organization whose Stripe account the keys belong to
 	CookieSecure       bool
 }
 
@@ -36,6 +37,7 @@ func Load() (Config, error) {
 		GoogleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
 		StripeSecretKey:    os.Getenv("STRIPE_SECRET_KEY"),
 		StripeWebhookKey:   os.Getenv("STRIPE_WEBHOOK_SECRET"),
+		StripeOrgID:        os.Getenv("STRIPE_ORGANIZATION_ID"),
 		CookieSecure:       true,
 	}
 	if c.DatabaseURL == "" {

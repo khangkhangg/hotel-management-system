@@ -6,10 +6,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
+	netmail "net/mail"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,11 +27,12 @@ import (
 	"hotelpms/api/internal/folio"
 	"hotelpms/api/internal/httpx"
 	"hotelpms/api/internal/ids"
+	"hotelpms/api/internal/mail"
 	"hotelpms/api/internal/payments"
 )
 
 // CardHold is how long a room waits for a card payment (spec 05).
-const CardHold = 15 * time.Minute
+const CardHold = 30 * time.Minute // Stripe will not expire a payment page sooner
 
 var kinds = []string{"hotel", "bank_transfer", "card"}
 
@@ -39,13 +44,58 @@ var (
 
 type handler struct {
 	httpx.Deps
-	card payments.Provider // nil when no card provider is configured
+	card    payments.Provider // nil when no card provider is configured
+	cardOrg uuid.UUID         // the one organization whose Stripe account the keys belong to
+	limits  limiter
 }
 
-// Mount registers the routes. card is the provider behind the "card" payment type; nil switches card payment off everywhere.
-func Mount(card payments.Provider) httpx.Mount {
+// limiter counts requests per key in a sliding window, in memory.
+// shortcut: per server process, so several servers each allow the full count; move to the database when there is more than one.
+type limiter struct {
+	mu   sync.Mutex
+	hits map[string][]time.Time
+}
+
+func (l *limiter) allow(key string, now time.Time, max int, window time.Duration) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.hits == nil {
+		l.hits = map[string][]time.Time{}
+	}
+	keep := l.hits[key][:0]
+	for _, t := range l.hits[key] {
+		if now.Sub(t) < window {
+			keep = append(keep, t)
+		}
+	}
+	if len(keep) >= max {
+		l.hits[key] = keep
+		return false
+	}
+	l.hits[key] = append(keep, now)
+	return true
+}
+
+func (h *handler) throttled(w http.ResponseWriter, r *http.Request, what string, max int, window time.Duration) bool {
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		ip = r.RemoteAddr
+	}
+	if h.limits.allow(what+":"+ip, h.Clock(), max, window) {
+		return false
+	}
+	httpx.Error(w, http.StatusTooManyRequests, "slow_down", "Too many requests. Wait a few minutes and try again.")
+	return true
+}
+
+// cardCurrencies are the currencies whose Stripe amounts were checked against our minor units.
+var cardCurrencies = []string{"USD", "EUR", "GBP", "VND", "JPY", "KRW", "IDR", "SGD", "THB", "AUD", "CAD"}
+
+// Mount registers the routes. card is the provider behind the "card" payment type, and cardOrg the organization its account belongs to;
+// card payment is offered to no other organization, so one hotel's guests can never pay into another hotel's account.
+func Mount(card payments.Provider, cardOrg uuid.UUID) httpx.Mount {
 	return func(mux *http.ServeMux, d httpx.Deps) {
-		h := &handler{d, card}
+		h := &handler{Deps: d, card: card, cardOrg: cardOrg}
 		owner := func(f http.HandlerFunc, method string) http.HandlerFunc {
 			return httpx.Methods(map[string]http.HandlerFunc{method: httpx.Wrap(access.Require(d, access.PaymentsConfigure)(f))})
 		}
@@ -57,6 +107,9 @@ func Mount(card payments.Provider) httpx.Mount {
 		mux.HandleFunc("/api/public/{slug}", public(h.info, http.MethodGet))
 		mux.HandleFunc("/api/public/{slug}/quote", public(h.quote, http.MethodPost))
 		mux.HandleFunc("/api/public/{slug}/bookings", public(h.create, http.MethodPost))
+		mux.HandleFunc("/api/public/{slug}/bookings/{code}", public(h.status, http.MethodGet))
+		h.mountManage(mux)
+		mux.HandleFunc("/api/reservations/{id}/confirm-payment", httpx.Methods(map[string]http.HandlerFunc{http.MethodPost: httpx.Wrap(access.Require(d, access.PaymentsTake)(http.HandlerFunc(h.confirmPayment)))}))
 		mux.HandleFunc("/api/webhooks/{provider}", public(h.webhook, http.MethodPost))
 	}
 }
@@ -179,7 +232,12 @@ func (h *handler) resolve(w http.ResponseWriter, r *http.Request) (org, prop uui
 }
 
 // offered lists the enabled payment types the guest may use. Card needs a configured provider.
-func (h *handler) offered(ctx context.Context, tx pgx.Tx, prop uuid.UUID) ([]string, error) {
+func (h *handler) offered(ctx context.Context, tx pgx.Tx, org, prop uuid.UUID) ([]string, error) {
+	var currency string
+	if err := tx.QueryRow(ctx, `select currency from property where id = $1`, prop).Scan(&currency); err != nil {
+		return nil, err
+	}
+	cardOK := h.card != nil && org == h.cardOrg && slices.Contains(cardCurrencies, currency)
 	rows, err := tx.Query(ctx, `select kind from payment_type where property_id = $1 and enabled order by kind`, prop)
 	if err != nil {
 		return nil, err
@@ -191,7 +249,7 @@ func (h *handler) offered(ctx context.Context, tx pgx.Tx, prop uuid.UUID) ([]str
 		if err := rows.Scan(&k); err != nil {
 			return nil, err
 		}
-		if k != "card" || h.card != nil {
+		if k != "card" || cardOK {
 			out = append(out, k)
 		}
 	}
@@ -229,7 +287,7 @@ func (h *handler) info(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		var err error
-		if out.Payments, err = h.offered(ctx, tx, prop); err != nil {
+		if out.Payments, err = h.offered(ctx, tx, org, prop); err != nil {
 			return err
 		}
 		rows, err := tx.Query(ctx, `select id, name, base_guests, max_guests from room_type where property_id = $1 order by name`, prop)
@@ -331,7 +389,7 @@ func bookingError(w http.ResponseWriter, err error) bool {
 // shortcut: this locks the inventory rows for a moment per quote, fine for one hotel, replace with a read-only price when traffic grows.
 func (h *handler) quote(w http.ResponseWriter, r *http.Request) {
 	org, prop, ok := h.resolve(w, r)
-	if !ok {
+	if !ok || h.throttled(w, r, "quote", 30, time.Minute) {
 		return
 	}
 	var in bookIn
@@ -376,15 +434,15 @@ type madeOut struct {
 
 func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 	org, prop, ok := h.resolve(w, r)
-	if !ok {
+	if !ok || h.throttled(w, r, "book", 5, 10*time.Minute) {
 		return
 	}
 	var in bookIn
 	if !readJSON(w, r, &in) {
 		return
 	}
-	if !slices.Contains(kinds, in.PaymentKind) {
-		httpx.Error(w, http.StatusBadRequest, "bad_request", "Choose how you will pay.")
+	if !slices.Contains(kinds, in.PaymentKind) || !sane(in) {
+		httpx.Error(w, http.StatusBadRequest, "bad_request", "Check your name, email and the dates, then try again.")
 		return
 	}
 	now := h.Clock()
@@ -392,7 +450,7 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 	var resID uuid.UUID
 	err := db.WithOrg(r.Context(), h.Pool, org, func(tx pgx.Tx) error {
 		ctx := r.Context()
-		on, err := h.offered(ctx, tx, prop)
+		on, err := h.offered(ctx, tx, org, prop)
 		if err != nil {
 			return err
 		}
@@ -434,17 +492,55 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 	if in.PaymentKind == "card" {
 		c, err := h.card.CreateCheckout(r.Context(), payments.CheckoutRequest{
 			Reference: org.String() + ":" + out.Code, Amount: out.Total, Currency: out.Currency, Description: "Booking " + out.Code,
-			SuccessURL: h.BaseURL + "/book/done?code=" + out.Code, CancelURL: h.BaseURL + "/book/cancelled?code=" + out.Code,
-			Key: "booking-" + resID.String(),
+			SuccessURL: h.BaseURL + "/book/" + r.PathValue("slug") + "?done=" + out.Code, CancelURL: h.BaseURL + "/book/" + r.PathValue("slug"),
+			Key: "booking-" + resID.String(), ExpiresAt: out.HoldUntil,
 		})
 		if err != nil {
-			// The room stays held until the hold runs out; the guest can try again.
+			// Give the room back at once, so the guest's retry is not turned away by their own hold.
+			_ = db.WithOrg(r.Context(), h.Pool, org, func(tx pgx.Tx) error { return booking.Cancel(r.Context(), tx, org, prop, resID, now) })
 			httpx.Error(w, http.StatusBadGateway, "provider_unavailable", "The payment page could not be opened. Try again in a moment.")
 			return
 		}
 		out.CheckoutURL = c.URL
+	} else {
+		h.mailGuest(in.Guest.Email, out, out.BankDetails)
 	}
 	httpx.JSON(w, http.StatusCreated, out)
+}
+
+// sane refuses bookings no real guest would send: a bad email, oversized text, or a stay no hotel takes online.
+func sane(in bookIn) bool {
+	a, err := netmail.ParseAddress(in.Guest.Email)
+	if err != nil || a.Address != in.Guest.Email || len(in.Guest.Email) > 200 || len(in.Guest.Phone) > 50 || len(in.Guest.Name) > 200 || len(in.Guest.Country) > 100 {
+		return false
+	}
+	if len(in.Rooms) < 1 || len(in.Rooms) > 4 {
+		return false
+	}
+	for _, r := range in.Rooms {
+		from, e1 := time.Parse("2006-01-02", r.From)
+		to, e2 := time.Parse("2006-01-02", r.To)
+		if e1 != nil || e2 != nil || to.Sub(from) > 30*24*time.Hour || r.Adults < 1 || r.Adults > 10 || r.Children < 0 || r.Children > 10 {
+			return false
+		}
+	}
+	return true
+}
+
+// mailGuest sends the confirmation after the booking is saved. A failed send never undoes a booking.
+func (h *handler) mailGuest(to string, m madeOut, bank string) {
+	text := fmt.Sprintf("Your booking code is %s.\nStatus: %s.\nTotal: %d %s (minor units).\n", m.Code, m.Status, m.Total, m.Currency)
+	if bank != "" {
+		text += "Send the transfer to:\n" + bank + "\n"
+	}
+	if !m.HoldUntil.IsZero() {
+		text += "We hold your room until " + m.HoldUntil.UTC().Format("2006-01-02 15:04 MST") + ".\n"
+	}
+	if h.Mail != nil {
+		h.Spawn(func() {
+			_ = h.Mail.Send(context.Background(), mail.Message{To: to, Subject: "Your booking " + m.Code, Text: text})
+		})
+	}
 }
 
 // webhook records a payment the provider reports. The signature is the only proof, so nothing is read before it is checked.
@@ -465,6 +561,8 @@ func (h *handler) webhook(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent) // nothing for us to do, and an error would only make the provider retry
 		return
 	}
+	var confirmed *madeOut
+	var guestEmail string
 	err = db.WithOrg(r.Context(), h.Pool, org, func(tx pgx.Tx) error {
 		ctx := r.Context()
 		tag, err := tx.Exec(ctx, `insert into payment_event (provider, event_id, organization_id, received_at) values ($1, $2, $3, $4) on conflict do nothing`, h.card.Name(), ev.ID, org, now)
@@ -482,7 +580,11 @@ func (h *handler) webhook(w http.ResponseWriter, r *http.Request) {
 			}
 			return err
 		}
-		folioID, _, err := folio.Ensure(ctx, tx, org, prop, id, now)
+		folioID, currency, err := folio.Ensure(ctx, tx, org, prop, id, now)
+		if err != nil {
+			return err
+		}
+		due, _, err := folio.Balance(ctx, tx, org, prop, id, now)
 		if err != nil {
 			return err
 		}
@@ -495,8 +597,19 @@ func (h *handler) webhook(w http.ResponseWriter, r *http.Request) {
 		entry := audit.Entry{Action: "payment.recorded", TargetType: "folio", TargetID: folioID, TargetLabel: "card_online", After: map[string]any{"paymentId": payID, "amount": ev.Amount}}
 		switch status {
 		case "pending":
-			// shortcut: any paid event confirms; a part payment is not told apart from a full one, replace when deposits are added.
+			if !strings.EqualFold(ev.Currency, currency) || ev.Amount < due {
+				// Money arrived but does not cover the booking: keep it pending and tell staff instead of confirming.
+				if _, err := tx.Exec(ctx, `update reservation set paid_late = true where id = $1`, id); err != nil {
+					return err
+				}
+				entry.Action = "payment.short"
+				break
+			}
 			if _, err := tx.Exec(ctx, `update reservation set status = 'confirmed', hold_until = null where id = $1`, id); err != nil {
+				return err
+			}
+			confirmed = &madeOut{Code: code, Total: due, Currency: currency, Status: "confirmed"}
+			if err := tx.QueryRow(ctx, `select g.email from reservation r join guest g on g.id = r.guest_id where r.id = $1`, id).Scan(&guestEmail); err != nil {
 				return err
 			}
 		case "cancelled":
@@ -512,7 +625,96 @@ func (h *handler) webhook(w http.ResponseWriter, r *http.Request) {
 		httpx.InternalError(w, err)
 		return
 	}
+	if confirmed != nil && guestEmail != "" {
+		h.mailGuest(guestEmail, *confirmed, "")
+	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// status tells a guest where their booking stands, by the code they were given. It holds no personal data.
+func (h *handler) status(w http.ResponseWriter, r *http.Request) {
+	org, _, ok := h.resolve(w, r)
+	if !ok || h.throttled(w, r, "status", 60, time.Minute) {
+		return
+	}
+	var out struct {
+		Code      string    `json:"code"`
+		Status    string    `json:"status"`
+		Currency  string    `json:"currency"`
+		HoldUntil time.Time `json:"holdUntil,omitzero"`
+	}
+	err := db.WithOrg(r.Context(), h.Pool, org, func(tx pgx.Tx) error {
+		var hold *time.Time
+		err := tx.QueryRow(r.Context(), `select r.code, r.status, r.currency, r.hold_until from reservation r join property p on p.id = r.property_id where r.code = $1 and p.slug = $2`, r.PathValue("code"), r.PathValue("slug")).Scan(&out.Code, &out.Status, &out.Currency, &hold)
+		if hold != nil {
+			out.HoldUntil = *hold
+		}
+		return err
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		httpx.Error(w, http.StatusNotFound, "not_found", "There is no booking with that code.")
+		return
+	}
+	if err != nil {
+		httpx.InternalError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, out)
+}
+
+var errNotPending = errors.New("guestbooking: nothing is waiting for a transfer")
+
+// confirmPayment lets staff mark a bank transfer as received: the payment is recorded and the room is kept.
+func (h *handler) confirmPayment(w http.ResponseWriter, r *http.Request) {
+	a, ok := scope(w, r)
+	if !ok {
+		return
+	}
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		httpx.Error(w, http.StatusNotFound, "not_found", "There is nothing at this address.")
+		return
+	}
+	now := h.Clock()
+	err = db.WithOrg(r.Context(), h.Pool, a.OrgID, func(tx pgx.Tx) error {
+		ctx := r.Context()
+		var status string
+		var kind *string
+		var code string
+		if err := tx.QueryRow(ctx, `select status, payment_kind, code from reservation where id = $1 and property_id = $2 for update`, id, a.PropertyID).Scan(&status, &kind, &code); err != nil {
+			return err
+		}
+		if status != "pending" || kind == nil || *kind != "bank_transfer" {
+			return errNotPending
+		}
+		folioID, _, err := folio.Ensure(ctx, tx, a.OrgID, a.PropertyID, id, now)
+		if err != nil {
+			return err
+		}
+		due, _, err := folio.Balance(ctx, tx, a.OrgID, a.PropertyID, id, now)
+		if err != nil {
+			return err
+		}
+		if due > 0 {
+			if _, err := tx.Exec(ctx, `insert into payment (id, organization_id, folio_id, method, amount, note, created_at) values ($1, $2, $3, 'bank_transfer', $4, '', $5)`, ids.New(), a.OrgID, folioID, due, now); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.Exec(ctx, `update reservation set status = 'confirmed', hold_until = null where id = $1`, id); err != nil {
+			return err
+		}
+		return audit.Record(ctx, tx, audit.Entry{Action: "payment.recorded", TargetType: "reservation", TargetID: id, TargetLabel: code, After: map[string]any{"method": "bank_transfer", "amount": due}})
+	})
+	switch {
+	case errors.Is(err, errNotPending):
+		httpx.Error(w, http.StatusConflict, "not_pending", "No bank transfer is waiting on this booking.")
+	case errors.Is(err, pgx.ErrNoRows):
+		httpx.Error(w, http.StatusNotFound, "not_found", "There is nothing at this address.")
+	case err != nil:
+		httpx.InternalError(w, err)
+	default:
+		w.WriteHeader(http.StatusNoContent)
+	}
 }
 
 // ExpireHolds cancels pending bookings whose hold has run out and gives their rooms back. It returns how many it cancelled.
@@ -536,6 +738,7 @@ func ExpireHolds(ctx context.Context, pool *pgxpool.Pool, now time.Time) (int, e
 		return 0, err
 	}
 	n := 0
+	var failed []error
 	for _, s := range all {
 		err := db.WithOrg(ctx, pool, s.org, func(tx pgx.Tx) error {
 			rows, err := tx.Query(ctx, `select id from reservation where property_id = $1 and status = 'pending' and hold_until <= $2 order by hold_until for update`, s.prop, now)
@@ -561,10 +764,10 @@ func ExpireHolds(ctx context.Context, pool *pgxpool.Pool, now time.Time) (int, e
 			return rows.Err()
 		})
 		if err != nil {
-			return n, err
+			failed = append(failed, err) // one property's trouble must not keep the others' rooms held
 		}
 	}
-	return n, nil
+	return n, errors.Join(failed...)
 }
 
 // RunSweeper releases expired holds every interval until ctx ends.

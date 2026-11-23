@@ -282,6 +282,11 @@ func Decide(ctx context.Context, tx pgx.Tx, propertyID, refundID, by uuid.UUID, 
 	return audit.Record(ctx, tx, audit.Entry{Action: action, TargetType: "payment", TargetID: paymentID, After: map[string]any{"refundId": refundID, "amount": amount}})
 }
 
+// RefreshPayment recomputes a payment's status from its refunds.
+func RefreshPayment(ctx context.Context, tx pgx.Tx, paymentID uuid.UUID) error {
+	return refreshPayment(ctx, tx, paymentID)
+}
+
 func refreshPayment(ctx context.Context, tx pgx.Tx, paymentID uuid.UUID) error {
 	_, err := tx.Exec(ctx,
 		`update payment p set status = case

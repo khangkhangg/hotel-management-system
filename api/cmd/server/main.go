@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"errors"
+	"github.com/google/uuid"
 	"log"
 	"net/http"
 	"os"
@@ -74,9 +75,13 @@ func main() {
 	}
 	defer hub.Close()
 
+	var cardOrg uuid.UUID
 	var card payments.Provider // nil leaves card payment off until the owner's Stripe keys are configured
 	if cfg.StripeSecretKey != "" && cfg.StripeWebhookKey != "" {
 		card = payments.NewStripe(cfg.StripeSecretKey, cfg.StripeWebhookKey, "")
+		if cardOrg, err = uuid.Parse(cfg.StripeOrgID); err != nil {
+			log.Fatal("STRIPE_ORGANIZATION_ID must be the id of the organization that owns the Stripe account")
+		}
 	}
 	var google httpx.Mount
 	if cfg.GoogleClientID != "" {
@@ -96,7 +101,7 @@ func main() {
 		addr = "127.0.0.1:8080"
 	}
 	// No WriteTimeout: the notification stream is a response that stays open.
-	srv := &http.Server{Addr: addr, Handler: app.NewHandler(deps, hub, google, card), ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{Addr: addr, Handler: app.NewHandler(deps, hub, google, card, cardOrg), ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
