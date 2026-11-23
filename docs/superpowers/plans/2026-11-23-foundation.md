@@ -1,5 +1,7 @@
 # Foundation (milestone 1) Implementation Plan
 
+> **Status 2026-11-23:** all 15 tasks are done and committed on `milestone-1-foundation`, and the whole-branch review fixes are in. Rulings and deferred minors are in the pull request description.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Staff can be invited, sign in with two steps, see only what their role allows in a responsive app shell, and every action is recorded in a tamper-evident activity trail.
@@ -94,9 +96,9 @@ web/
 **Interfaces:**
 - Produces: `config.Load() (Config, error)` with fields `DatabaseURL, BaseURL, SMTPURL, GoogleClientID, GoogleClientSecret, CookieSecure`. `httpx.NewRouter(deps Deps) http.Handler`. `GET /api/health` returns `{"status":"ok"}`.
 
-- [ ] **Step 1: Install Go 1.23+ and PostgreSQL 16+ on the machine.** Neither is installed on the owner's Windows PC as of 2026-11-23. Run `go version` and `psql --version` to confirm.
-- [ ] **Step 2: Run `git init` in the project root and add the remote** `https://github.com/khangkhangg/hotel-management-system`. Do not push until the owner says so.
-- [ ] **Step 3: Write the failing test**
+- [x] **Step 1: Install Go 1.23+ and PostgreSQL 16+ on the machine.** Neither is installed on the owner's Windows PC as of 2026-11-23. Run `go version` and `psql --version` to confirm.
+- [x] **Step 2: Run `git init` in the project root and add the remote** `https://github.com/khangkhangg/hotel-management-system`. Do not push until the owner says so.
+- [x] **Step 3: Write the failing test**
 
 ```go
 func TestHealth(t *testing.T) {
@@ -108,12 +110,12 @@ func TestHealth(t *testing.T) {
 }
 ```
 
-- [ ] **Step 4: Run `go test ./...` in `api/`.** Expected: FAIL, `httpx` undefined.
-- [ ] **Step 5: Implement `config.Load`, `httpx.NewRouter` and `cmd/server/main.go`** using `net/http` with Go 1.22 pattern routes.
-- [ ] **Step 6: Scaffold the web app** with `npx sv create web` (SvelteKit minimal, TypeScript), then add Bits UI, `lucide-svelte`, Paraglide JS, Vitest and Playwright.
-- [ ] **Step 7: Write `ci.yml`** with three jobs: `go test ./...` against a PostgreSQL 16 service, `npm run check && npm test` in `web/`, and `npx @enmera/ai-design-check web/src`.
-- [ ] **Step 8: Run `go test ./...` and `npm run check`.** Expected: PASS.
-- [ ] **Step 9: Commit** with message `chore: project skeleton`.
+- [x] **Step 4: Run `go test ./...` in `api/`.** Expected: FAIL, `httpx` undefined.
+- [x] **Step 5: Implement `config.Load`, `httpx.NewRouter` and `cmd/server/main.go`** using `net/http` with Go 1.22 pattern routes.
+- [x] **Step 6: Scaffold the web app** with `npx sv create web` (SvelteKit minimal, TypeScript), then add Bits UI, `lucide-svelte`, Paraglide JS, Vitest and Playwright.
+- [x] **Step 7: Write `ci.yml`** with three jobs: `go test ./...` against a PostgreSQL 16 service, `npm run check && npm test` in `web/`, and `npx @enmera/ai-design-check web/src`.
+- [x] **Step 8: Run `go test ./...` and `npm run check`.** Expected: PASS.
+- [x] **Step 9: Commit** with message `chore: project skeleton`.
 
 ### Task 2: Database base, tenancy and row-level security
 
@@ -132,7 +134,7 @@ func TestHealth(t *testing.T) {
 - Tables: `organization`, `property`, `app_user`, `membership` as in spec 03. `app_user.email` is unique and stored normalised. `membership` is unique on `(user_id, property_id)` and has `role` checked against the 5 roles.
 - Two database roles: `migrator` owns the tables, `app` has only the rights the API needs.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```go
 func TestRLSBlocksOtherOrganization(t *testing.T) {
@@ -159,11 +161,11 @@ func TestCreateRejectsSameEmailInAnotherForm(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run `go test ./internal/db/... ./internal/account/...`.** Expected: FAIL, packages undefined.
-- [ ] **Step 3: Write `0001_tenancy.sql`.** Enable RLS on `property` and `membership` with policy `organization_id = current_setting('app.org_id')::uuid`. Force RLS for the `app` role.
-- [ ] **Step 4: Implement the functions in the Interfaces block.** `NormalizeEmail` trims and lowercases. It does not strip dots or plus tags.
-- [ ] **Step 5: Run the tests.** Expected: PASS.
-- [ ] **Step 6: Commit** with message `feat: tenancy tables and row-level security`.
+- [x] **Step 2: Run `go test ./internal/db/... ./internal/account/...`.** Expected: FAIL, packages undefined.
+- [x] **Step 3: Write `0001_tenancy.sql`.** Enable RLS on `property` and `membership` with policy `organization_id = current_setting('app.org_id')::uuid`. Force RLS for the `app` role.
+- [x] **Step 4: Implement the functions in the Interfaces block.** `NormalizeEmail` trims and lowercases. It does not strip dots or plus tags.
+- [x] **Step 5: Run the tests.** Expected: PASS.
+- [x] **Step 6: Commit** with message `feat: tenancy tables and row-level security`.
 
 ### Task 3: Passwords
 
@@ -179,7 +181,7 @@ func TestCreateRejectsSameEmailInAnotherForm(t *testing.T) {
   - `password.Check(ctx context.Context, bc BreachChecker, plain string) error` returning `ErrTooShort` or `ErrBreached`
   - `password.NewRangeChecker(client *http.Client) BreachChecker` sends only the first 5 characters of the SHA-1 hash to the Have I Been Pwned range API
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```go
 func TestCheckPolicy(t *testing.T) {
@@ -200,10 +202,10 @@ func TestBreachCheckerDownDoesNotBlock(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run `go test ./internal/password/...`.** Expected: FAIL.
-- [ ] **Step 3: Implement.** Argon2id parameters: memory 64 MiB, 3 iterations, 2 threads, 16-byte salt, 32-byte key. Length is counted in Unicode characters, not bytes. A breach-check error is logged and treated as "not breached".
-- [ ] **Step 4: Run the tests.** Expected: PASS.
-- [ ] **Step 5: Commit** with message `feat: password hashing and policy`.
+- [x] **Step 2: Run `go test ./internal/password/...`.** Expected: FAIL.
+- [x] **Step 3: Implement.** Argon2id parameters: memory 64 MiB, 3 iterations, 2 threads, 16-byte salt, 32-byte key. Length is counted in Unicode characters, not bytes. A breach-check error is logged and treated as "not breached".
+- [x] **Step 4: Run the tests.** Expected: PASS.
+- [x] **Step 5: Commit** with message `feat: password hashing and policy`.
 
 ### Task 4: Sessions and trusted devices
 
@@ -223,7 +225,7 @@ func TestBreachCheckerDownDoesNotBlock(t *testing.T) {
   - `session.SetCookie(w http.ResponseWriter, id string, secure bool)`, `session.ReadCookie(r *http.Request) string`. Cookie name `sid`.
 - Session IDs and device tokens are 32 random bytes, base64url. Only a SHA-256 hash is stored.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```go
 func TestSessionExpiry(t *testing.T) {
@@ -258,10 +260,10 @@ func TestCookieAttributes(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run `go test ./internal/session/...`.** Expected: FAIL.
-- [ ] **Step 3: Write the migration** for `session` and `trusted_device`, then implement the Interfaces block.
-- [ ] **Step 4: Run the tests.** Expected: PASS.
-- [ ] **Step 5: Commit** with message `feat: sessions and trusted devices`.
+- [x] **Step 2: Run `go test ./internal/session/...`.** Expected: FAIL.
+- [x] **Step 3: Write the migration** for `session` and `trusted_device`, then implement the Interfaces block.
+- [x] **Step 4: Run the tests.** Expected: PASS.
+- [x] **Step 5: Commit** with message `feat: sessions and trusted devices`.
 
 ### Task 5: Email codes
 
@@ -276,7 +278,7 @@ func TestCookieAttributes(t *testing.T) {
   - `otp.Issue(ctx, pool, sender mail.Sender, u account.User, where otp.Where, now time.Time) error` returns `ErrTooMany` or `ErrSendFailed`. `Where{Browser, Place string}` goes into the email.
   - `otp.Verify(ctx, pool, userID uuid.UUID, code string, now time.Time) error` returns `ErrWrong`, `ErrExpired` or `ErrCancelled`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```go
 func TestCodeLifecycle(t *testing.T) {
@@ -325,10 +327,10 @@ func TestCodeIsStoredHashedAndEmailHasNoLink(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run `go test ./internal/otp/...`.** Expected: FAIL.
-- [ ] **Step 3: Implement.** Generate the code with `crypto/rand`. Issuing a new code cancels the user's earlier unused codes. `Verify` locks the challenge row with `SELECT ... FOR UPDATE` and compares hashes in constant time. A failed send deletes the challenge row.
-- [ ] **Step 4: Run the tests.** Expected: PASS.
-- [ ] **Step 5: Commit** with message `feat: email codes`.
+- [x] **Step 2: Run `go test ./internal/otp/...`.** Expected: FAIL.
+- [x] **Step 3: Implement.** Generate the code with `crypto/rand`. Issuing a new code cancels the user's earlier unused codes. `Verify` locks the challenge row with `SELECT ... FOR UPDATE` and compares hashes in constant time. A failed send deletes the challenge row.
+- [x] **Step 4: Run the tests.** Expected: PASS.
+- [x] **Step 5: Commit** with message `feat: email codes`.
 
 ### Task 6: Two-step sign-in over HTTP
 
@@ -348,7 +350,7 @@ func TestCodeIsStoredHashedAndEmailHasNoLink(t *testing.T) {
   - `GET /api/csrf` → `{token}`. Every non-GET route requires header `X-CSRF-Token`.
 - `httpx.RequireSession(next http.Handler) http.Handler` puts the full `session.Session` in the request context. `httpx.SessionFrom(ctx) session.Session`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```go
 func TestPasswordAloneGivesNoAccess(t *testing.T) {
@@ -379,10 +381,10 @@ func TestNoMembershipGets403(t *testing.T)    { /* /api/me returns 403 no_access
 func TestTwoOrganizationsMustChoose(t *testing.T) { /* next is "choose_organization" with 2 entries; /api/me is 401 until chosen */ }
 ```
 
-- [ ] **Step 2: Run `go test ./internal/signin/...`.** Expected: FAIL.
-- [ ] **Step 3: Implement.** For an unknown email, run `password.Verify` against a fixed dummy hash so timing matches. Rate-limit counters live in table `signin_attempt(key, at)`. The clock is injected through `Deps.Now func() time.Time`.
-- [ ] **Step 4: Run the tests.** Expected: PASS.
-- [ ] **Step 5: Commit** with message `feat: two-step sign-in`.
+- [x] **Step 2: Run `go test ./internal/signin/...`.** Expected: FAIL.
+- [x] **Step 3: Implement.** For an unknown email, run `password.Verify` against a fixed dummy hash so timing matches. Rate-limit counters live in table `signin_attempt(key, at)`. The clock is injected through `Deps.Now func() time.Time`.
+- [x] **Step 4: Run the tests.** Expected: PASS.
+- [x] **Step 5: Commit** with message `feat: two-step sign-in`.
 
 ### Task 7: Google sign-in
 
@@ -398,7 +400,7 @@ func TestTwoOrganizationsMustChoose(t *testing.T) { /* next is "choose_organizat
   - `GET /api/sign-in/google/callback?code&state` → 302 to `/sign-in/code` with a pending session, or to `/sign-in?error=google_not_invited`
 - Column `app_user.google_subject` (unique, nullable), added in `api/migrations/0005_google.sql`.
 
-- [ ] **Step 1: Write the failing tests** with a fake `IDTokenVerifier`.
+- [x] **Step 1: Write the failing tests** with a fake `IDTokenVerifier`.
 
 ```go
 func TestGoogleUnknownEmailIsRefused(t *testing.T) {
@@ -412,10 +414,10 @@ func TestGoogleSubjectIsBoundOnFirstUse(t *testing.T) { /* second sign-in with t
 func TestGoogleStateMismatchIsRefused(t *testing.T)   { /* callback with a different state → 400 */ }
 ```
 
-- [ ] **Step 2: Run `go test ./internal/signin/... -run Google`.** Expected: FAIL.
-- [ ] **Step 3: Implement** with `coreos/go-oidc` and `golang.org/x/oauth2`. `state` and the PKCE verifier are stored in a short-lived signed cookie.
-- [ ] **Step 4: Run the tests.** Expected: PASS.
-- [ ] **Step 5: Commit** with message `feat: Google sign-in`.
+- [x] **Step 2: Run `go test ./internal/signin/... -run Google`.** Expected: FAIL.
+- [x] **Step 3: Implement** with `coreos/go-oidc` and `golang.org/x/oauth2`. `state` and the PKCE verifier are stored in a short-lived signed cookie.
+- [x] **Step 4: Run the tests.** Expected: PASS.
+- [x] **Step 5: Commit** with message `feat: Google sign-in`.
 
 ### Task 8: Roles and permissions
 
@@ -433,7 +435,7 @@ func TestGoogleStateMismatchIsRefused(t *testing.T)   { /* callback with a diffe
   - `access.ActorFrom(ctx) Actor`
   - `POST /api/view-as` `{role}` sets `Session.ViewAs`. Only an owner may call it. An empty role clears it.
 
-- [ ] **Step 1: Write the failing test.** The table below is the matrix from spec 01, copied cell by cell.
+- [x] **Step 1: Write the failing test.** The table below is the matrix from spec 01, copied cell by cell.
 
 ```go
 func TestMatrixMatchesSpec(t *testing.T) {
@@ -472,10 +474,10 @@ func TestOnlyOwnerCanViewAs(t *testing.T)         { /* manager POST /api/view-as
 func TestPropertyOfAnotherOrganization(t *testing.T) { /* X-Property-Id of another org → 403, and RLS returns no row */ }
 ```
 
-- [ ] **Step 2: Run `go test ./internal/access/...`.** Expected: FAIL.
-- [ ] **Step 3: Implement.** An owner's membership has a null `property_id` and applies to every property of the organization.
-- [ ] **Step 4: Run the tests.** Expected: PASS.
-- [ ] **Step 5: Commit** with message `feat: roles and permission checks`.
+- [x] **Step 2: Run `go test ./internal/access/...`.** Expected: FAIL.
+- [x] **Step 3: Implement.** An owner's membership has a null `property_id` and applies to every property of the organization.
+- [x] **Step 4: Run the tests.** Expected: PASS.
+- [x] **Step 5: Commit** with message `feat: roles and permission checks`.
 
 ### Task 9: Invites and user management
 
@@ -493,7 +495,7 @@ func TestPropertyOfAnotherOrganization(t *testing.T) { /* X-Property-Id of anoth
   - `PATCH /api/staff/{id}` `{role?, propertyId?}`, `POST /api/staff/{id}/deactivate`, `POST /api/staff/{id}/reset-sign-in`
   - `POST /api/password-reset` `{email}` → always 204. `POST /api/password-reset/{token}` `{password}` → 204.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```go
 func TestInviteExpiresAfter7Days(t *testing.T)   { /* GET token at +7d+1m → 404 */ }
@@ -509,10 +511,10 @@ func TestPasswordResetAnswersSameForUnknownEmail(t *testing.T) { /* 204 and no e
 func TestThreeResetEmailsPerHour(t *testing.T)   { /* 4th request sends nothing */ }
 ```
 
-- [ ] **Step 2: Run `go test ./internal/staff/...`.** Expected: FAIL.
-- [ ] **Step 3: Implement.** Tokens are 32 random bytes and stored hashed. Accepting locks the invite row. Users are never hard-deleted.
-- [ ] **Step 4: Run the tests.** Expected: PASS.
-- [ ] **Step 5: Commit** with message `feat: invites and user management`.
+- [x] **Step 2: Run `go test ./internal/staff/...`.** Expected: FAIL.
+- [x] **Step 3: Implement.** Tokens are 32 random bytes and stored hashed. Accepting locks the invite row. Users are never hard-deleted.
+- [x] **Step 4: Run the tests.** Expected: PASS.
+- [x] **Step 5: Commit** with message `feat: invites and user management`.
 
 ### Task 10: Activity trail
 
@@ -533,7 +535,7 @@ func TestThreeResetEmailsPerHour(t *testing.T)   { /* 4th request sends nothing 
   - `GET /api/activity/target/{type}/{id}` → the same items without `ip` and `place`, for anyone who can read the target
 - Action names recorded in this milestone: `signin.succeeded`, `signin.failed`, `signout`, `user.invited`, `user.joined`, `user.role_changed`, `user.deactivated`, `user.signin_reset`, `password.changed`, `view_as.changed`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```go
 func TestAppRoleCannotChangeTrail(t *testing.T) {
@@ -559,12 +561,12 @@ func TestEveryWriteRouteRecordsOneRow(t *testing.T)    { /* walk the router's no
 func TestTwoWritesAtOnceKeepOneChain(t *testing.T)     { /* 20 concurrent Record calls: seq is 1..20 with no gap and VerifyChain is clean */ }
 ```
 
-- [ ] **Step 2: Run `go test ./internal/audit/...`.** Expected: FAIL.
-- [ ] **Step 3: Write the migration.** `audit_log` has `seq bigint` per organization, `prev_hash`, `row_hash`. Grant the `app` role `INSERT` and `SELECT` only.
-- [ ] **Step 4: Implement.** `Record` takes an advisory lock on the organization, reads the last `row_hash`, and stores `row_hash = sha256(prev_hash || canonical JSON of the row)`. `Before` and `After` pass through a redactor that drops keys named `password`, `code`, `token`, `secret`.
-- [ ] **Step 5: Add `audit.Record` calls** to the handlers of Tasks 6 to 9, inside their existing transactions.
-- [ ] **Step 6: Run `go test ./...`.** Expected: PASS.
-- [ ] **Step 7: Commit** with message `feat: tamper-evident activity trail`.
+- [x] **Step 2: Run `go test ./internal/audit/...`.** Expected: FAIL.
+- [x] **Step 3: Write the migration.** `audit_log` has `seq bigint` per organization, `prev_hash`, `row_hash`. Grant the `app` role `INSERT` and `SELECT` only.
+- [x] **Step 4: Implement.** `Record` takes an advisory lock on the organization, reads the last `row_hash`, and stores `row_hash = sha256(prev_hash || canonical JSON of the row)`. `Before` and `After` pass through a redactor that drops keys named `password`, `code`, `token`, `secret`.
+- [x] **Step 5: Add `audit.Record` calls** to the handlers of Tasks 6 to 9, inside their existing transactions.
+- [x] **Step 6: Run `go test ./...`.** Expected: PASS.
+- [x] **Step 7: Commit** with message `feat: tamper-evident activity trail`.
 
 ### Task 11: Notifications core
 
@@ -586,7 +588,7 @@ func TestTwoWritesAtOnceKeepOneChain(t *testing.T)     { /* 20 concurrent Record
   - `GET /api/notification-preferences`, `PUT /api/notification-preferences` `{quietFrom, quietTo, email:{urgent,actionNeeded}}`
 - Delivery rules: `Urgent` goes in-app and by email and ignores quiet hours. `ActionNeeded` goes in-app, and by email if the user chose so. `Info` goes in-app only.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```go
 func TestSameKeyUpdatesOneNotification(t *testing.T) {
@@ -605,10 +607,10 @@ func TestStreamDeliversWithoutReload(t *testing.T)  { /* open the SSE stream, Se
 func TestStreamIsPerUser(t *testing.T)              { /* user B's stream receives nothing for a notification sent to user A */ }
 ```
 
-- [ ] **Step 2: Run `go test ./internal/notify/...`.** Expected: FAIL.
-- [ ] **Step 3: Implement.** Use PostgreSQL `LISTEN/NOTIFY` on channel `notifications` to wake the SSE handlers. Quiet hours are evaluated in the property's time zone.
-- [ ] **Step 4: Run the tests.** Expected: PASS.
-- [ ] **Step 5: Commit** with message `feat: notifications with dedupe, escalation and live stream`.
+- [x] **Step 2: Run `go test ./internal/notify/...`.** Expected: FAIL.
+- [x] **Step 3: Implement.** Use PostgreSQL `LISTEN/NOTIFY` on channel `notifications` to wake the SSE handlers. Quiet hours are evaluated in the property's time zone.
+- [x] **Step 4: Run the tests.** Expected: PASS.
+- [x] **Step 5: Commit** with message `feat: notifications with dedupe, escalation and live stream`.
 
 ### Task 12: Design tokens and shared components
 
@@ -628,7 +630,7 @@ func TestStreamIsPerUser(t *testing.T)              { /* user B's stream receive
   - `AlertList`: `items: {id, level: 'urgent' | 'today', title, reason, action}[]`, `onact(id)`, `ondismiss(id)`
 - `tokens.css` defines every value in Global Constraints as a CSS custom property in two layers: raw palette and scale values, then meaning tokens such as `--color-action`, `--color-text-muted`, `--color-surface`, `--color-border`, `--color-status-success-bg`, `--space-4`, `--radius-control`, `--font-size-body`, `--control-height`, `--duration-screen`, `--ease-standard`, `--layer-popover`. Components use meaning tokens only. A hotel brand colour overrides `--color-action` and the tokens derived from it on the page root, and nothing else.
 
-- [ ] **Step 1: Write the failing tests** with `@testing-library/svelte`.
+- [x] **Step 1: Write the failing tests** with `@testing-library/svelte`.
 
 ```ts
 test('icon-only button has an accessible name', () => {
@@ -653,11 +655,11 @@ test('a brand override changes the action colour and no status colour', () => { 
 test('every token the spec lists exists', () => { /* the values in Global Constraints: sizes 12,14,16,20,28; spacing 4,8,12,16,24,32; radius 4,8,12; control height 44; the 5 breakpoint-related sizes */ });
 ```
 
-- [ ] **Step 2: Run `npm test` in `web/`.** Expected: FAIL.
-- [ ] **Step 3: Implement the components.** Build `Segmented` and `HoverCard` on Bits UI primitives. Write each component's CSS in its own `<style>` block using `var(--token)` only, with no literal colour, size, duration or layer. Use CSS logical properties. Hover styles sit inside `@media (hover: hover)`.
-- [ ] **Step 4: Build `/dev/components`**, a page that shows every component in every variant. It is the target for the design checker and for visual review.
-- [ ] **Step 5: Run `npm test` and `npx @enmera/ai-design-check web/src`.** Expected: tests PASS, 0 errors and 0 warnings.
-- [ ] **Step 6: Commit** with message `feat: design tokens and shared components`.
+- [x] **Step 2: Run `npm test` in `web/`.** Expected: FAIL.
+- [x] **Step 3: Implement the components.** Build `Segmented` and `HoverCard` on Bits UI primitives. Write each component's CSS in its own `<style>` block using `var(--token)` only, with no literal colour, size, duration or layer. Use CSS logical properties. Hover styles sit inside `@media (hover: hover)`.
+- [x] **Step 4: Build `/dev/components`**, a page that shows every component in every variant. It is the target for the design checker and for visual review.
+- [x] **Step 5: Run `npm test` and `npx @enmera/ai-design-check web/src`.** Expected: tests PASS, 0 errors and 0 warnings.
+- [x] **Step 6: Commit** with message `feat: design tokens and shared components`.
 
 ### Task 13: Sign-in screens
 
@@ -676,7 +678,7 @@ test('every token the spec lists exists', () => { /* the values in Global Constr
   - No access: "Your account has no access. Ask your manager."
   - Google not invited: "This Google account has not been invited. Ask your manager for an invite."
 
-- [ ] **Step 1: Write the failing Playwright tests** against the API started with the fake mail sender and a test-only route `GET /api/test/last-code?email=`.
+- [x] **Step 1: Write the failing Playwright tests** against the API started with the fake mail sender and a test-only route `GET /api/test/last-code?email=`.
 
 ```ts
 test('sign in with password and code', async ({ page }) => {
@@ -697,10 +699,10 @@ for (const width of [390, 744, 1280]) test(`sign-in has no sideways scroll at ${
 test('sign-in pages pass axe', async ({ page }) => { /* 0 violations on each auth page */ });
 ```
 
-- [ ] **Step 2: Run `npx playwright test e2e/sign-in.spec.ts`.** Expected: FAIL.
-- [ ] **Step 3: Implement the pages.** The code input has `inputmode="numeric"`, `autocomplete="one-time-code"` and a 16 px font. Each page has one filled primary button.
-- [ ] **Step 4: Run the tests.** Expected: PASS.
-- [ ] **Step 5: Commit** with message `feat: sign-in, code, invite and reset screens`.
+- [x] **Step 2: Run `npx playwright test e2e/sign-in.spec.ts`.** Expected: FAIL.
+- [x] **Step 3: Implement the pages.** The code input has `inputmode="numeric"`, `autocomplete="one-time-code"` and a 16 px font. Each page has one filled primary button.
+- [x] **Step 4: Run the tests.** Expected: PASS.
+- [x] **Step 5: Commit** with message `feat: sign-in, code, invite and reset screens`.
 
 ### Task 14: App shell, staff screen and activity screen
 
@@ -721,7 +723,7 @@ test('sign-in pages pass axe', async ({ page }) => { /* 0 violations on each aut
   - A user in two organizations sees `/sign-in/organization` before the shell.
   - Changing screen fades the content in and raises it 8 px over 200 ms.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 // nav.test.ts
@@ -747,11 +749,11 @@ test('reduced motion removes the screen animation', async ({ page }) => { /* emu
 for (const width of [390, 744, 1280]) test(`shell, staff and activity pass axe and do not scroll sideways at ${width}`, async ({ page }) => {});
 ```
 
-- [ ] **Step 2: Run `npm test` and `npx playwright test e2e/shell.spec.ts`.** Expected: FAIL.
-- [ ] **Step 3: Implement.** The staff table scrolls inside its own box on narrow screens. Each list has an empty state with the next step: "No one has been invited yet. Invite your first user."
-- [ ] **Step 4: Run all web tests and `npx @enmera/ai-design-check web/src`.** Expected: PASS, 0 errors and 0 warnings.
-- [ ] **Step 5: Look at the shell, Staff and Activity at 390, 744 and 1280 px** next to the mockup canvas, and answer the four questions of spec 08 for each area. Record the answers in the pull request description.
-- [ ] **Step 6: Commit** with message `feat: app shell, staff and activity screens`.
+- [x] **Step 2: Run `npm test` and `npx playwright test e2e/shell.spec.ts`.** Expected: FAIL.
+- [x] **Step 3: Implement.** The staff table scrolls inside its own box on narrow screens. Each list has an empty state with the next step: "No one has been invited yet. Invite your first user."
+- [x] **Step 4: Run all web tests and `npx @enmera/ai-design-check web/src`.** Expected: PASS, 0 errors and 0 warnings.
+- [x] **Step 5: Look at the shell, Staff and Activity at 390, 744 and 1280 px** next to the mockup canvas, and answer the four questions of spec 08 for each area. Record the answers in the pull request description.
+- [x] **Step 6: Commit** with message `feat: app shell, staff and activity screens`.
 
 ### Task 15: Nightly chain check and first-owner setup
 
@@ -766,7 +768,7 @@ for (const width of [390, 744, 1280]) test(`shell, staff and activity pass axe a
   - River periodic job `audit.VerifyAllArgs{}` at 03:00 UTC. A broken chain sends an `Urgent` notification with key `trail-broken:{orgID}` to owners.
   - Command `server setup --org "Sample Hotel" --property "Sample Hotel" --timezone "Asia/Ho_Chi_Minh" --currency USD --owner-email owner@example.com` creates the organization, the property and an owner invite, and prints the invite link once.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```go
 func TestBrokenChainAlertsOwners(t *testing.T)  { /* tamper as migrator, run the job: owner has 1 urgent notification, manager has 0 */ }
@@ -775,10 +777,10 @@ func TestSetupCreatesOwnerInvite(t *testing.T)  { /* 1 organization, 1 property,
 func TestSetupRefusesSecondRunForSameEmail(t *testing.T) { /* clear error, nothing created */ }
 ```
 
-- [ ] **Step 2: Run `go test ./...`.** Expected: FAIL.
-- [ ] **Step 3: Implement.**
-- [ ] **Step 4: Run `go test ./...`, `npm test` and `npx playwright test`.** Expected: PASS.
-- [ ] **Step 5: Commit** with message `feat: nightly trail check and first-owner setup`.
+- [x] **Step 2: Run `go test ./...`.** Expected: FAIL.
+- [x] **Step 3: Implement.**
+- [x] **Step 4: Run `go test ./...`, `npm test` and `npx playwright test`.** Expected: PASS.
+- [x] **Step 5: Commit** with message `feat: nightly trail check and first-owner setup`.
 
 ---
 
