@@ -304,5 +304,6 @@
 	"overview.today": "today",
 	"overview.tonight": "tonight",
 	"overview.ofRooms": "of {n} rooms",
-	"overview.more": "More screens"
+	"overview.more": "More screens",
+	"panel.badAmount": "Enter the amount as a plain number, such as 120 or 12.50."
 }

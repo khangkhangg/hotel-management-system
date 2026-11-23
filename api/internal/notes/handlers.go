@@ -291,8 +291,9 @@ func (h *handler) patch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Body   *string `json:"body"`
-		Pinned *bool   `json:"pinned"`
+		Body         *string `json:"body"`
+		Pinned       *bool   `json:"pinned"`
+		Acknowledged bool    `json:"acknowledged"`
 	}
 	if !httpx.Decode(w, r, &in) {
 		return
@@ -302,8 +303,9 @@ func (h *handler) patch(w http.ResponseWriter, r *http.Request) {
 		var author uuid.UUID
 		var created time.Time
 		var reservation *uuid.UUID
-		var removed bool
-		if err := tx.QueryRow(ctx, `select author_id, created_at, reservation_id, removed_at is not null from note where id = $1 and property_id = $2 for update`, id, a.PropertyID).Scan(&author, &created, &reservation, &removed); err != nil || removed {
+		var removed, forHousekeeping bool
+		var guest string
+		if err := tx.QueryRow(ctx, `select n.author_id, n.created_at, n.reservation_id, n.removed_at is not null, n.for_housekeeping, coalesce(g.name, '') from note n left join reservation r on r.id = n.reservation_id left join guest g on g.id = r.guest_id where n.id = $1 and n.property_id = $2 for update of n`, id, a.PropertyID).Scan(&author, &created, &reservation, &removed, &forHousekeeping, &guest); err != nil || removed {
 			return ErrNotFound
 		}
 		mine, manager := author == a.UserID, access.Can(a.Role, access.UsersManage)
@@ -317,6 +319,10 @@ func (h *handler) patch(w http.ResponseWriter, r *http.Request) {
 			}
 			if h.Clock().Sub(created) > editWindow {
 				return ErrEditWindowClosed
+			}
+			// Housekeeping reads this note, so an edit that adds the guest name gets the same reminder as writing one.
+			if forHousekeeping && !in.Acknowledged && namesGuest(body, guest) {
+				return ErrGuestName
 			}
 			if _, err := tx.Exec(ctx, `update note set body = $2, edited_at = $3 where id = $1`, id, body, h.Clock()); err != nil {
 				return err

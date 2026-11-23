@@ -460,7 +460,10 @@ func (h *handler) listPayments(w http.ResponseWriter, r *http.Request) {
 		rows, err := tx.Query(r.Context(),
 			`select p.id, r.id, r.code, g.name, p.method, p.amount, p.status, f.currency, p.created_at
 			 from payment p join folio f on f.id = p.folio_id join reservation r on r.id = f.reservation_id join guest g on g.id = r.guest_id
-			 where f.property_id = $1 and p.created_at >= $2 and p.created_at < $3 order by p.created_at`, a.PropertyID, from, to)
+			 join property pr on pr.id = f.property_id
+			 where f.property_id = $1
+			   and p.created_at >= ($2::date::timestamp at time zone pr.time_zone) and p.created_at < ($3::date::timestamp at time zone pr.time_zone)
+			 order by p.created_at`, a.PropertyID, from, to)
 		if err != nil {
 			return err
 		}

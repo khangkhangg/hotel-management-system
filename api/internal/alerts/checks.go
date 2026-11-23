@@ -36,7 +36,13 @@ func Kinds() []string {
 	return out
 }
 
+// zeroDecimal lists the currencies whose smallest unit is the whole unit. The web uses the same list.
+var zeroDecimal = map[string]bool{"VND": true, "JPY": true, "KRW": true, "CLP": true, "IDR": true}
+
 func money(amount int64, currency string) string {
+	if zeroDecimal[currency] {
+		return fmt.Sprintf("%d %s", amount, currency)
+	}
 	return fmt.Sprintf("%d.%02d %s", amount/100, amount%100, currency)
 }
 
@@ -94,6 +100,7 @@ func freeRoom(ctx context.Context, tx pgx.Tx, sc scope, reservationID, roomType 
 		`select rm.id, rm.number from room rm, (select stay from reservation_room where reservation_id = $2 and active order by id limit 1) s
 		 where rm.property_id = $1 and rm.room_type_id = $3 and rm.status in ('clean', 'inspect')
 		   and not exists (select 1 from reservation_room x where x.room_id = rm.id and x.active and x.stay && s.stay)
+		   and not exists (select 1 from maintenance_ticket t where t.room_id = rm.id and t.status <> 'done' and t.blocks_from is not null and daterange(t.blocks_from, t.blocks_to, '[)') && s.stay)
 		 order by rm.status = 'clean' desc, rm.number limit 1`, sc.propertyID, reservationID, roomType).Scan(&id, &number)
 	if err == pgx.ErrNoRows {
 		return uuid.Nil, "", false, nil

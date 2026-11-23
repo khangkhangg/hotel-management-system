@@ -419,3 +419,11 @@ func TestNotesAreInternalAndAppearNowhereGuestFacing(t *testing.T) {
 		}
 	}
 }
+
+func TestEditingAHousekeepingNoteRunsTheGuestNameCheckAgain(t *testing.T) {
+	h := newHotel(t)
+	h.desk.Do("POST", "/api/reservations/"+h.res+"/assign", &h.prop, fmt.Sprintf(`{"roomId":%q}`, h.roomID())).Want(t, 204)
+	id := idOf(t, h.note(h.desk, fmt.Sprintf(`{"body":"Extra towels","mentions":[{"userId":%q}]}`, h.keeper.ID)).Want(t, 201))
+	h.desk.Do("PATCH", "/api/notes/"+id, &h.prop, `{"body":"Extra towels for Mai Pham"}`).Want(t, 409, "contains_guest_name")
+	h.desk.Do("PATCH", "/api/notes/"+id, &h.prop, `{"body":"Extra towels for Mai Pham","acknowledged":true}`).Want(t, 204)
+}

@@ -19,23 +19,25 @@ func (h *handler) properties(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type row struct {
-		ID   uuid.UUID `json:"id"`
-		Name string    `json:"name"`
+		ID       uuid.UUID `json:"id"`
+		Name     string    `json:"name"`
+		Currency string    `json:"currency"`
+		Today    string    `json:"today"` // the date there right now: a hotel day is a date in the property's time zone
 	}
 	out := []row{}
 	err := db.WithOrg(ctx, h.Pool, *s.OrgID, func(tx pgx.Tx) error {
 		rows, err := tx.Query(ctx,
-			`select p.id, p.name from property p
+			`select p.id, p.name, p.currency, to_char(($2::timestamptz at time zone p.time_zone)::date, 'YYYY-MM-DD') from property p
 			 where exists (select 1 from membership m where m.user_id = $1 and m.organization_id = p.organization_id and m.status = 'active'
 			               and (m.property_id is null or m.property_id = p.id))
-			 order by p.name`, s.UserID)
+			 order by p.name`, s.UserID, h.Clock())
 		if err != nil {
 			return err
 		}
 		defer rows.Close()
 		for rows.Next() {
 			var p row
-			if err := rows.Scan(&p.ID, &p.Name); err != nil {
+			if err := rows.Scan(&p.ID, &p.Name, &p.Currency, &p.Today); err != nil {
 				return err
 			}
 			out = append(out, p)

@@ -7,7 +7,7 @@ export type Me = {
 	memberships: { propertyId: string; propertyName: string; role: Role }[];
 	viewAs: string;
 };
-export type Property = { id: string; name: string };
+export type Property = { id: string; name: string; currency: string; today: string };
 
 const remembered = (key: string): string | null => {
 	try {
@@ -43,6 +43,15 @@ class SessionStore {
 
 	get viewingAs(): Role | null {
 		return (this.current?.viewAs as Role) || null;
+	}
+
+	/** The date now at the active property: a hotel day is a date in the property's time zone, not the browser's. */
+	get today(): string {
+		return this.properties.find((p) => p.id === this.activeProperty)?.today ?? new Date().toISOString().slice(0, 10);
+	}
+
+	get currency(): string {
+		return this.properties.find((p) => p.id === this.activeProperty)?.currency ?? 'USD';
 	}
 
 	get propertyName(): string {

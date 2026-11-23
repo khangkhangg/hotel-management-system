@@ -12,7 +12,7 @@
 
 	type Task = { id: string; roomId: string; roomNumber: string; floor: number; roomType: string; status: string; roomStatus: string; arrivalToday: boolean; departureToday: boolean };
 
-	const today = new Date().toISOString().slice(0, 10);
+	const today = session.today;
 	let rooms = $state<Room[]>([]);
 	let types = $state<RoomType[]>([]);
 	let tasks = $state<Task[]>([]);

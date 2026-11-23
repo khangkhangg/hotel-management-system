@@ -10,3 +10,14 @@ export function formatMoney(amount: number, currency: string): string {
 		return `${value.toFixed(digits)} ${currency}`;
 	}
 }
+
+/** Typed text as an amount in the smallest unit, or null when it is not a plain positive amount. "1,500" is refused rather than read as 1.50. */
+export function parseMoney(text: string, currency: string): number | null {
+	const digits = zeroDecimal.has(currency) ? 0 : 2;
+	const match = new RegExp(`^(\\d+)(?:[.,](\\d{1,${digits || 1}}))?$`).exec(text.trim());
+	if (!match || (digits === 0 && match[2] !== undefined)) return null;
+	const whole = Number(match[1]);
+	const fraction = digits === 0 ? 0 : Number((match[2] ?? '').padEnd(2, '0'));
+	const amount = digits === 0 ? whole : whole * 100 + fraction;
+	return amount > 0 ? amount : null;
+}

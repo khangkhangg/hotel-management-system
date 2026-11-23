@@ -3,7 +3,10 @@ package folio_test
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -307,4 +310,117 @@ func TestThePaymentsListShowsTodaysTakingsAndWaitingRefunds(t *testing.T) {
 	h.desk.Do("GET", "/api/payments?from=2026-11-25&to=2026-11-24", &h.prop, "").Want(t, 400)
 	rev := h.w.Member(h.w.OrgA, &h.prop, "revenue")
 	rev.Do("GET", "/api/payments?from=2026-11-23&to=2026-11-24", &h.prop, "").Want(t, 403)
+}
+
+func TestTenRefundsAtOnceCannotExceedThePayment(t *testing.T) {
+	h := newHotel(t)
+	f := h.folio(h.desk, h.reservation()).FolioID
+	p := pay(t, h, f, 10000)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	created := 0
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			r := h.mgr.Do("POST", "/api/payments/"+p+"/refunds", &h.prop, `{"amount":10000,"reason":"all of it"}`)
+			mu.Lock()
+			defer mu.Unlock()
+			if r.Status == 201 {
+				created++
+			} else if r.Status != 409 {
+				t.Errorf("status %d: %s", r.Status, r.Body)
+			}
+		}()
+	}
+	wg.Wait()
+	if created != 1 {
+		t.Fatalf("%d refunds of the full amount were accepted", created)
+	}
+}
+
+func TestSplittingARefundDoesNotGetAroundTheLimit(t *testing.T) {
+	h := newHotel(t)
+	f := h.folio(h.desk, h.reservation()).FolioID
+	p := pay(t, h, f, 20000)
+	h.owner.Do("PUT", "/api/refund-limits", &h.prop, `{"front_desk":5000}`).Want(t, 204)
+	h.desk.Do("POST", "/api/payments/"+p+"/refunds", &h.prop, `{"amount":3000,"reason":"one"}`).Want(t, 201, `"status":"done"`)
+	h.desk.Do("POST", "/api/payments/"+p+"/refunds", &h.prop, `{"amount":3000,"reason":"two"}`).Want(t, 201, `"status":"pending"`)
+}
+
+func TestReadingAFolioManyTimesAtOnceKeepsOneLinePerNight(t *testing.T) {
+	h := newHotel(t)
+	res := h.reservation()
+	var wg sync.WaitGroup
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() { defer wg.Done(); h.desk.Do("GET", "/api/reservations/"+res+"/folio", &h.prop, "") }()
+	}
+	wg.Wait()
+	if v := h.folio(h.desk, res); len(v.Lines) != 2 || v.Total != 20000 {
+		t.Fatalf("%+v", v)
+	}
+}
+
+func TestAFolioIsFrozenOnceTheGuestHasCheckedOut(t *testing.T) {
+	h := newHotel(t)
+	res := h.reservation()
+	h.w.Advance(17 * 24 * time.Hour) // the 10th
+	h.mgr.Do("POST", "/api/reservations/"+res+"/assign", &h.prop, fmt.Sprintf(`{"roomId":%q}`, h.roomID())).Want(t, 204)
+	h.desk.Do("POST", "/api/reservations/"+res+"/check-in", &h.prop, "").Want(t, 204)
+	f := h.folio(h.desk, res)
+	pay(t, h, f.FolioID, int(f.Total))
+	h.w.Advance(48 * time.Hour)
+	h.desk.Do("POST", "/api/reservations/"+res+"/check-out", &h.prop, "").Want(t, 204)
+	h.owner.Do("POST", "/api/tax-rules", &h.prop, `{"name":"VAT","percent":10}`).Want(t, 201)
+	if v := h.folio(h.desk, res); v.Balance != 0 || v.Total != f.Total {
+		t.Fatalf("a new tax rule changed a closed folio: %+v", v)
+	}
+}
+
+func TestACancelledBookingOwesOnlyWhatTheRatePlanSays(t *testing.T) {
+	h := newHotel(t)
+	strict := idOf(t, h.mgr.Do("POST", "/api/rate-plans", &h.prop, fmt.Sprintf(`{"roomTypeId":%q,"name":"Strict","freeCancelUntilDays":2,"freeCancelUntilTime":"18:00","lateCancelPenalty":"first_night"}`, h.rt)).Want(t, 201))
+	h.mgr.Do("PUT", "/api/rates", &h.prop, fmt.Sprintf(`{"ratePlanId":%q,"from":"2026-11-23","to":"2027-01-01","price":10000}`, strict)).Want(t, 200)
+	for _, n := range []string{"102", "103"} {
+		h.mgr.Do("POST", "/api/rooms", &h.prop, fmt.Sprintf(`{"roomTypeId":%q,"number":%q,"floor":1}`, h.rt, n)).Want(t, 201)
+	}
+	book := func(plan string) string {
+		return idOf(t, h.desk.Do("POST", "/api/reservations", &h.prop, fmt.Sprintf(
+			`{"guest":{"name":"Mai Pham"},"rooms":[{"roomTypeId":%q,"ratePlanId":%q,"from":"2026-12-10","to":"2026-12-12","adults":1,"children":0}]}`, h.rt, plan)).Want(t, 201))
+	}
+	early, late, flexible := book(strict), book(strict), book(h.rp)
+	h.desk.Do("POST", "/api/reservations/"+early+"/cancel", &h.prop, "").Want(t, 204)
+	if v := h.folio(h.desk, early); v.Total != 0 {
+		t.Fatalf("free cancellation still owes %d", v.Total)
+	}
+	h.desk.Do("POST", "/api/reservations/"+flexible+"/cancel", &h.prop, "").Want(t, 204)
+	if v := h.folio(h.desk, flexible); v.Total != 0 {
+		t.Fatalf("a plan with no penalty owes %d", v.Total)
+	}
+	h.w.Advance(16*24*time.Hour + 2*time.Hour) // the 9th, after the 8th at 18:00
+	h.desk.Do("POST", "/api/reservations/"+late+"/cancel", &h.prop, "").Want(t, 204)
+	v := h.folio(h.desk, late)
+	if v.Total != 10000 || len(v.Lines) != 1 || v.Lines[0].Kind != "adjustment" || !strings.Contains(v.Lines[0].Description, "cancellation") {
+		t.Fatalf("a late cancellation should cost the first night: %+v", v)
+	}
+}
+
+func (h *hotel) roomID() string {
+	var rows []struct{ ID string }
+	must(h.w.T, json.Unmarshal([]byte(h.mgr.Do("GET", "/api/rooms", &h.prop, "").Want(h.w.T, 200).Body), &rows))
+	return rows[0].ID
+}
+
+func TestThePaymentsDayFollowsThePropertysTimeZone(t *testing.T) {
+	h := newHotel(t)
+	must(t, db.WithOrg(testkit.Ctx, h.w.Pool, h.w.OrgA, func(tx pgx.Tx) error {
+		_, err := tx.Exec(testkit.Ctx, `update property set time_zone = 'Asia/Ho_Chi_Minh' where id = $1`, h.prop)
+		return err
+	}))
+	f := h.folio(h.desk, h.reservation()).FolioID
+	h.w.Advance(8 * time.Hour) // 20:00 UTC on the 23rd, which is 03:00 on the 24th at the hotel
+	pay(t, h, f, 5000)
+	h.desk.Do("GET", "/api/payments?from=2026-11-24&to=2026-11-25", &h.prop, "").Want(t, 200, `"amount":5000`)
+	h.desk.Do("GET", "/api/payments?from=2026-11-23&to=2026-11-24", &h.prop, "").Want(t, 200, `"payments":[]`)
 }

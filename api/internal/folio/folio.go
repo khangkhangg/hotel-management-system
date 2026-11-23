@@ -50,8 +50,26 @@ func Ensure(ctx context.Context, tx pgx.Tx, orgID, propertyID, reservationID uui
 
 // sync rebuilds the automatic room and tax lines from the reservation's nights. Lines people added stay as they are.
 func sync(ctx context.Context, tx pgx.Tx, orgID, propertyID, folioID, reservationID uuid.UUID, now time.Time) error {
+	var status string
+	var cancelledAt *time.Time
+	if err := tx.QueryRow(ctx, `select status, cancelled_at from reservation where id = $1`, reservationID).Scan(&status, &cancelledAt); err != nil {
+		return err
+	}
+	if status == "checked_out" {
+		// What a guest owed at checkout does not change when a tax rule is added later.
+		var built int
+		if err := tx.QueryRow(ctx, `select count(*) from folio_line where folio_id = $1 and auto`, folioID).Scan(&built); err != nil {
+			return err
+		}
+		if built > 0 {
+			return nil
+		}
+	}
 	if _, err := tx.Exec(ctx, `delete from folio_line where folio_id = $1 and auto`, folioID); err != nil {
 		return err
+	}
+	if status == "cancelled" || status == "no_show" {
+		return penaltyLines(ctx, tx, orgID, folioID, reservationID, status, cancelledAt, now)
 	}
 	rows, err := tx.Query(ctx, `select name, (percent * 100)::bigint, inclusive from tax_rule where property_id = $1 and applies_to in ('all', 'room') order by name`, propertyID)
 	if err != nil {
@@ -192,11 +210,14 @@ func Refund(ctx context.Context, tx pgx.Tx, orgID, propertyID, paymentID, by uui
 	if amount < 1 || reason == "" || len(reason) > 500 {
 		return uuid.Nil, "", ErrBad
 	}
+	// Lock the payment first and count its refunds in a second statement. In one statement the count would use the
+	// snapshot taken before the lock, and two refunds sent at once would not see each other.
 	var paid, taken int64
-	if err = tx.QueryRow(ctx,
-		`select p.amount, coalesce((select sum(amount) from refund where payment_id = p.id and status in ('done', 'pending')), 0)
-		 from payment p join folio f on f.id = p.folio_id where p.id = $1 and f.property_id = $2 for update of p`, paymentID, propertyID).Scan(&paid, &taken); err != nil {
+	if err = tx.QueryRow(ctx, `select p.amount from payment p join folio f on f.id = p.folio_id where p.id = $1 and f.property_id = $2 for update of p`, paymentID, propertyID).Scan(&paid); err != nil {
 		return uuid.Nil, "", ErrNotFound
+	}
+	if err = tx.QueryRow(ctx, `select coalesce(sum(amount), 0) from refund where payment_id = $1 and status in ('done', 'pending')`, paymentID).Scan(&taken); err != nil {
+		return uuid.Nil, "", err
 	}
 	if amount > paid-taken {
 		return uuid.Nil, "", ErrRefundTooLarge
@@ -206,7 +227,8 @@ func Refund(ctx context.Context, tx pgx.Tx, orgID, propertyID, paymentID, by uui
 		return uuid.Nil, "", err
 	}
 	status = "pending"
-	if amount <= limit {
+	// The limit covers what this payment has already given back, so splitting a refund does not get around it.
+	if taken+amount <= limit {
 		status = "done"
 	}
 	id = ids.New()
@@ -280,4 +302,72 @@ func Balance(ctx context.Context, tx pgx.Tx, orgID, propertyID, reservationID uu
 		      - coalesce((select sum(amount) from payment where folio_id = $1), 0)
 		      + coalesce((select sum(r.amount) from refund r join payment p on p.id = r.payment_id where p.folio_id = $1 and r.status = 'done'), 0)`, id).Scan(&balance)
 	return balance, currency, err
+}
+
+// penaltyLines gives a cancelled or no-show booking the fee its rate plan asks for, and nothing else. A cancellation
+// before the plan's free-cancellation deadline costs nothing; a no-show and a non-refundable plan always count as late.
+func penaltyLines(ctx context.Context, tx pgx.Tx, orgID, folioID, reservationID uuid.UUID, status string, cancelledAt *time.Time, now time.Time) error {
+	rows, err := tx.Query(ctx,
+		`select p.late_cancel_penalty, coalesce(p.late_cancel_percent, 0), p.free_cancel_until_days, coalesce(to_char(p.free_cancel_until_time, 'HH24:MI'), '00:00'), lower(rr.stay),
+		        coalesce((select price from reservation_night where reservation_room_id = rr.id order by date limit 1), 0),
+		        coalesce((select sum(price) from reservation_night where reservation_room_id = rr.id), 0)
+		 from reservation_room rr join rate_plan p on p.id = rr.rate_plan_id where rr.reservation_id = $1 order by rr.id`, reservationID)
+	if err != nil {
+		return err
+	}
+	type fee struct {
+		penalty       string
+		percent       int64
+		days          *int
+		at            string
+		arrival       time.Time
+		first, nights int64
+	}
+	var fees []fee
+	for rows.Next() {
+		var f fee
+		if err := rows.Scan(&f.penalty, &f.percent, &f.days, &f.at, &f.arrival, &f.first, &f.nights); err != nil {
+			rows.Close()
+			return err
+		}
+		fees = append(fees, f)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	when := now
+	if cancelledAt != nil {
+		when = *cancelledAt
+	}
+	var total int64
+	for _, f := range fees {
+		late := status == "no_show" || f.days == nil
+		if !late {
+			clock, _ := time.Parse("15:04", f.at)
+			deadline := f.arrival.AddDate(0, 0, -*f.days).Add(time.Duration(clock.Hour())*time.Hour + time.Duration(clock.Minute())*time.Minute)
+			late = when.After(deadline)
+		}
+		if !late {
+			continue
+		}
+		switch f.penalty {
+		case "first_night":
+			total += f.first
+		case "percent":
+			total += (f.nights*f.percent*2 + 100) / 200
+		case "full":
+			total += f.nights
+		}
+	}
+	if total == 0 {
+		return nil
+	}
+	what := "Late cancellation fee"
+	if status == "no_show" {
+		what = "No-show fee"
+	}
+	_, err = tx.Exec(ctx, `insert into folio_line (id, organization_id, folio_id, kind, description, unit_price, auto, created_at) values ($1, $2, $3, 'adjustment', $4, $5, true, $6)`,
+		ids.New(), orgID, folioID, what, total, now)
+	return err
 }

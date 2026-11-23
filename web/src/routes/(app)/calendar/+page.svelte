@@ -14,7 +14,7 @@
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 
 	const DAYS = 14;
-	const today = new Date().toISOString().slice(0, 10);
+	const today = session.today;
 
 	let start = $state(today);
 	let data = $state<CalendarData>({ rooms: [], stays: [] });

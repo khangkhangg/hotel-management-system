@@ -93,9 +93,13 @@ func (in *roomTypeIn) valid() bool {
 }
 
 type roomTypeOut struct {
-	ID uuid.UUID `json:"id"`
-	roomTypeIn
-	Rooms int `json:"rooms"`
+	ID              uuid.UUID `json:"id"`
+	Name            string    `json:"name"`
+	BaseGuests      int       `json:"baseGuests"`
+	MaxGuests       int       `json:"maxGuests"`
+	ExtraAdultPrice *int64    `json:"extraAdultPrice,omitempty"` // left out for roles that must not see prices
+	ExtraChildPrice *int64    `json:"extraChildPrice,omitempty"`
+	Rooms           int       `json:"rooms"`
 }
 
 func (h *handler) listRoomTypes(w http.ResponseWriter, r *http.Request) {
@@ -114,8 +118,12 @@ func (h *handler) listRoomTypes(w http.ResponseWriter, r *http.Request) {
 		defer rows.Close()
 		for rows.Next() {
 			var t roomTypeOut
-			if err := rows.Scan(&t.ID, &t.Name, &t.BaseGuests, &t.MaxGuests, &t.ExtraAdultPrice, &t.ExtraChildPrice, &t.Rooms); err != nil {
+			var adult, child int64
+			if err := rows.Scan(&t.ID, &t.Name, &t.BaseGuests, &t.MaxGuests, &adult, &child, &t.Rooms); err != nil {
 				return err
+			}
+			if access.Can(a.Role, access.ReservationsView) || access.Can(a.Role, access.RatesEdit) {
+				t.ExtraAdultPrice, t.ExtraChildPrice = &adult, &child
 			}
 			out = append(out, t)
 		}
@@ -231,11 +239,15 @@ func (h *handler) createRoom(w http.ResponseWriter, r *http.Request) {
 		if err := tx.QueryRow(ctx, `select 1 from room_type where id = $1 and property_id = $2`, in.RoomTypeID, a.PropertyID).Scan(&one); err != nil {
 			return errNotFound
 		}
+		var today time.Time
+		if err := tx.QueryRow(ctx, `select ($1::timestamptz at time zone time_zone)::date from property where id = $2`, h.Clock(), a.PropertyID).Scan(&today); err != nil {
+			return err
+		}
 		if _, err := tx.Exec(ctx, `insert into room (id, organization_id, property_id, room_type_id, number, floor, created_at) values ($1, $2, $3, $4, $5, $6, $7)`,
 			id, a.OrgID, a.PropertyID, in.RoomTypeID, in.Number, in.Floor, h.Clock()); err != nil {
 			return err
 		}
-		if err := EnsureInventory(ctx, tx, a.OrgID, in.RoomTypeID, h.Clock().UTC().Truncate(24*time.Hour)); err != nil {
+		if err := EnsureInventory(ctx, tx, a.OrgID, in.RoomTypeID, today); err != nil {
 			return err
 		}
 		return audit.Record(ctx, tx, audit.Entry{Action: "room.created", TargetType: "room", TargetID: id, TargetLabel: in.Number, After: in})

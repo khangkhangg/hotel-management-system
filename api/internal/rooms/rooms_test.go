@@ -3,6 +3,7 @@ package rooms_test
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -198,4 +199,15 @@ func date(s string) time.Time {
 		panic(err)
 	}
 	return d
+}
+
+func TestHousekeepingSeesRoomTypesWithoutPrices(t *testing.T) {
+	w, mgr, _ := setup(t)
+	roomType(t, w, mgr, "Deluxe")
+	hk := w.Member(w.OrgA, &w.A1, "housekeeping")
+	body := hk.Do("GET", "/api/room-types", &w.A1, "").Want(t, 200, "Deluxe").Body
+	if strings.Contains(body, "extraAdultPrice") || strings.Contains(body, "extraChildPrice") {
+		t.Fatalf("housekeeping sees prices: %s", body)
+	}
+	mgr.Do("GET", "/api/room-types", &w.A1, "").Want(t, 200, "extraAdultPrice")
 }

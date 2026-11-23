@@ -507,3 +507,37 @@ func TestTheStatusSaysWhenTheChecksLastRan(t *testing.T) {
 	}
 	h.w.Anon("GET", "/api/alerts/status", "").Want(t, 401)
 }
+
+func TestAmountsInAlertsFollowTheCurrencysDecimals(t *testing.T) {
+	h := newHotel(t, 2)
+	must(t, db.WithOrg(ctx, h.w.Pool, h.w.OrgA, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `update property set currency = 'VND' where id = $1`, h.w.A1)
+		return err
+	}))
+	res := h.book("2026-11-23", "2026-11-24")
+	h.assign(res, "101")
+	h.run()
+	got := h.of(h.desk, "unpaid_arrival")
+	if len(got) != 1 || !strings.Contains(got[0].Reason.Text, "10000 VND") || strings.Contains(got[0].Reason.Text, ".00") {
+		t.Fatalf("%+v", got)
+	}
+}
+
+func TestTheNightlyRunKeepsInventoryRowsAheadOfTheCalendar(t *testing.T) {
+	h := newHotel(t, 2)
+	count := func(d time.Time) (n int) {
+		must(t, db.WithOrg(ctx, h.w.Pool, h.w.OrgA, func(tx pgx.Tx) error {
+			return tx.QueryRow(ctx, `select count(*) from inventory where room_type_id = $1 and date = $2`, h.rt, d).Scan(&n)
+		}))
+		return
+	}
+	h.w.Advance(401 * 24 * time.Hour)
+	far := h.w.Now.AddDate(0, 0, 300).Truncate(24 * time.Hour)
+	if count(far) != 0 {
+		t.Fatal("the rows already reach that far")
+	}
+	h.run()
+	if count(far) != 1 {
+		t.Fatal("the run did not add inventory rows for the coming year")
+	}
+}

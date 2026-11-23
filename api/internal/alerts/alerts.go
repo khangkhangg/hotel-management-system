@@ -20,6 +20,7 @@ import (
 	"hotelpms/api/internal/db"
 	"hotelpms/api/internal/ids"
 	"hotelpms/api/internal/notify"
+	"hotelpms/api/internal/rooms"
 )
 
 // Action is a suggested fix: what the button does, and the changes it will make, so the person can check first.
@@ -150,6 +151,30 @@ func RunProperty(ctx context.Context, tx pgx.Tx, orgID, propertyID uuid.UUID, no
 	}
 	local := now.In(loc)
 	base := scope{orgID: orgID, propertyID: propertyID, now: now, loc: loc, today: today, hour: float64(local.Hour()) + float64(local.Minute())/60, currency: currency}
+
+	// Inventory is kept 400 days ahead of today. Without this, nights past the last room added would read as sold out.
+	types, err := tx.Query(ctx, `select id from room_type where property_id = $1`, propertyID)
+	if err != nil {
+		return err
+	}
+	var typeIDs []uuid.UUID
+	for types.Next() {
+		var id uuid.UUID
+		if err := types.Scan(&id); err != nil {
+			types.Close()
+			return err
+		}
+		typeIDs = append(typeIDs, id)
+	}
+	types.Close()
+	if err := types.Err(); err != nil {
+		return err
+	}
+	for _, id := range typeIDs {
+		if err := rooms.EnsureInventory(ctx, tx, orgID, id, today); err != nil {
+			return err
+		}
+	}
 
 	// Snoozed alerts come back once their time is up and the problem is still there.
 	if _, err := tx.Exec(ctx, `update alert set status = 'open', snoozed_until = null where property_id = $1 and status = 'snoozed' and snoozed_until <= $2`, propertyID, now); err != nil {

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { api, errorText } from '#lib/api.ts';
 	import { formatDay } from './dates.ts';
-	import { formatMoney } from './money.ts';
+	import { formatMoney, parseMoney } from './money.ts';
 	import { t } from '#lib/i18n.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
@@ -70,7 +70,11 @@
 	async function takePayment(event: SubmitEvent) {
 		event.preventDefault();
 		message = ok = '';
-		const cents = Math.round(parseFloat(amount.replace(',', '.')) * 100);
+		const cents = parseMoney(amount, res?.currency ?? 'USD');
+		if (cents === null) {
+			message = t('panel.badAmount');
+			return;
+		}
 		try {
 			await api.post(`/api/folios/${folio!.folioId}/payments`, { method, amount: cents, note });
 			amount = note = '';

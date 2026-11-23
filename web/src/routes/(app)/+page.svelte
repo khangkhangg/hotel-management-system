@@ -10,7 +10,7 @@
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 	import StatTile from '#lib/ui/StatTile.svelte';
 
-	const today = new Date().toISOString().slice(0, 10);
+	const today = session.today;
 	let data = $state<CalendarData | null>(null);
 	let message = $state('');
 

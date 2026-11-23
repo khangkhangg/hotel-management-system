@@ -218,3 +218,15 @@ func TestTicketInputIsChecked(t *testing.T) {
 	other.Do("PATCH", "/api/rooms/"+room+"/status", &h.w.B1, `{"status":"dirty"}`).Want(t, 404)
 	_ = time.Now
 }
+
+func TestARoomUnderABlockingTicketIsNeverAssigned(t *testing.T) {
+	h := newHotel(t, 2)
+	h.keeper.Do("POST", "/api/maintenance-tickets", &h.prop, fmt.Sprintf(`{"roomId":%q,"description":"Ceiling leak","blocksFrom":"2026-12-10","blocksTo":"2026-12-13"}`, h.roomID("101"))).Want(t, 201)
+	res := h.book("2026-12-11", "2026-12-12")
+	h.desk.Do("POST", "/api/reservations/"+res+"/assign", &h.prop, fmt.Sprintf(`{"roomId":%q}`, h.roomID("101"))).Want(t, 409, "room_not_ready")
+	h.desk.Do("POST", "/api/reservations/"+res+"/assign", &h.prop, fmt.Sprintf(`{"roomId":%q,"force":true,"reason":"try"}`, h.roomID("101"))).Want(t, 409, "room_not_ready")
+	h.desk.Do("POST", "/api/reservations/"+res+"/assign", &h.prop, fmt.Sprintf(`{"roomId":%q}`, h.roomID("102"))).Want(t, 204)
+	// Nights outside the block are fine.
+	later := h.book("2026-12-14", "2026-12-15")
+	h.desk.Do("POST", "/api/reservations/"+later+"/assign", &h.prop, fmt.Sprintf(`{"roomId":%q}`, h.roomID("101"))).Want(t, 204)
+}

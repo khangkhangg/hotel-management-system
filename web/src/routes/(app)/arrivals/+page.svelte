@@ -7,12 +7,13 @@
 	import ReservationPanel from '#lib/booking/ReservationPanel.svelte';
 	import type { CalendarData, Stay } from '#lib/booking/types.ts';
 	import { t } from '#lib/i18n.ts';
+	import { session } from '#lib/session.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import AttentionPanel from '#lib/alerts/AttentionPanel.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 	import StatusBadge from '#lib/ui/StatusBadge.svelte';
 
-	const today = new Date().toISOString().slice(0, 10);
+	const today = session.today;
 	let data = $state<CalendarData>({ rooms: [], stays: [] });
 	let loaded = $state(false);
 	let message = $state('');

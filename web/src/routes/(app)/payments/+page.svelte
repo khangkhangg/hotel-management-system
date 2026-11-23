@@ -11,7 +11,7 @@
 	type Pay = { id: string; reservationId: string; code: string; guestName: string; method: string; amount: number; status: string; currency: string; createdAt: string };
 	type Waiting = { id: string; reservationId: string; code: string; guestName: string; amount: number; reason: string; currency: string };
 
-	const today = new Date().toISOString().slice(0, 10);
+	const today = session.today;
 	let data = $state<{ payments: Pay[]; pendingRefunds: Waiting[]; totals: Record<string, number> }>({ payments: [], pendingRefunds: [], totals: {} });
 	let loaded = $state(false);
 	let message = $state('');

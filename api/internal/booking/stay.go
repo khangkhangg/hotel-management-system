@@ -58,8 +58,9 @@ func Assign(ctx context.Context, tx pgx.Tx, propertyID, id, roomID uuid.UUID, re
 		return ErrBadStatus
 	}
 	var rrID, typeID uuid.UUID
-	q := `select id, room_type_id from reservation_room where reservation_id = $1 and active and ($2::uuid is null or id = $2) order by room_id is not null, lower(stay), id limit 1`
-	if err := tx.QueryRow(ctx, q, id, reservationRoom).Scan(&rrID, &typeID); err != nil {
+	var from, to time.Time
+	q := `select id, room_type_id, lower(stay), upper(stay) from reservation_room where reservation_id = $1 and active and ($2::uuid is null or id = $2) order by room_id is not null, lower(stay), id limit 1`
+	if err := tx.QueryRow(ctx, q, id, reservationRoom).Scan(&rrID, &typeID, &from, &to); err != nil {
 		return ErrNotFound
 	}
 	var roomType uuid.UUID
@@ -69,6 +70,14 @@ func Assign(ctx context.Context, tx pgx.Tx, propertyID, id, roomID uuid.UUID, re
 	}
 	if roomType != typeID {
 		return ErrWrongType
+	}
+	// A maintenance ticket that takes the room out of sale for any of these nights stops the assignment, with no override.
+	var blocked bool
+	if err := tx.QueryRow(ctx, `select exists (select 1 from maintenance_ticket t where t.room_id = $1 and t.status <> 'done' and t.blocks_from is not null and t.blocks_from < $3 and t.blocks_to > $2)`, roomID, from, to).Scan(&blocked); err != nil {
+		return err
+	}
+	if blocked {
+		return ErrRoomNotReady
 	}
 	switch {
 	case roomStatus == "out_of_order":

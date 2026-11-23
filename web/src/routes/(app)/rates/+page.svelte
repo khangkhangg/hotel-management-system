@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { api, errorText } from '#lib/api.ts';
 	import { addDays, formatDay, rangeDays, weekday } from '#lib/booking/dates.ts';
-	import { formatMoney } from '#lib/booking/money.ts';
+	import { formatMoney, parseMoney } from '#lib/booking/money.ts';
 	import type { RatePlan, RoomType } from '#lib/booking/types.ts';
 	import { t } from '#lib/i18n.ts';
+	import { session } from '#lib/session.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import Checkbox from '#lib/ui/Checkbox.svelte';
 	import Dialog from '#lib/ui/Dialog.svelte';
@@ -13,7 +14,7 @@
 
 	type Rate = { date: string; price: number; minNights: number; closed: boolean; closedToArrival: boolean; closedToDeparture: boolean; suspicious: boolean };
 
-	const today = new Date().toISOString().slice(0, 10);
+	const today = session.today;
 	const DAYS = 30;
 	let types = $state<RoomType[]>([]);
 	let plans = $state<RatePlan[]>([]);
@@ -29,7 +30,7 @@
 	let closed = $state(false);
 	let closedToArrival = $state(false);
 	let closedToDeparture = $state(false);
-	let currency = $state('USD');
+	const currency = $derived(session.currency);
 
 	const days = rangeDays(today, DAYS);
 	const byDate = $derived(Object.fromEntries(rates.map((r) => [r.date, r])));
@@ -58,12 +59,17 @@
 	async function save(event: SubmitEvent) {
 		event.preventDefault();
 		message = ok = '';
+		const cents = parseMoney(price, currency);
+		if (cents === null) {
+			message = t('panel.badAmount');
+			return;
+		}
 		try {
 			const r = await api.put<{ suspicious: string[] }>('/api/rates', {
 				ratePlanId: plan,
 				from,
 				to,
-				price: Math.round(parseFloat(price.replace(',', '.')) * 100),
+				price: cents,
 				minNights: +minNights || 1,
 				closed,
 				closedToArrival,
