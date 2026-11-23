@@ -1,6 +1,9 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
+// A page that is still fading in fails the contrast check, so the pages here do not animate.
+test.use({ reducedMotion: 'reduce' });
+
 test('a manager reads price suggestions with their reasons, sets limits and keeps competitor prices', async ({ page }) => {
 	await page.request.get('/api/test/login?email=daniel@hotel.com');
 	await page.goto('/pricing');

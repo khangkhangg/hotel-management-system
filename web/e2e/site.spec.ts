@@ -3,6 +3,9 @@ import { expect, test } from '@playwright/test';
 
 const png = { name: 'logo.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64') };
 
+// A page that is still fading in fails the contrast check, so the pages here do not animate.
+test.use({ reducedMotion: 'reduce' });
+
 test.describe.configure({ mode: 'serial' });
 
 test('the owner brands the booking page and fills in its content, and a guest sees it', async ({ page }) => {
