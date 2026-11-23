@@ -2,6 +2,7 @@ package channels_test
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -161,4 +162,93 @@ func TestTheBackgroundRunSyncsEveryEnabledConnectionAndSkipsTheOthers(t *testing
 	if n != 0 || len(h.fake.Pushed) != 0 {
 		t.Fatalf("a switched-off connection was synced: %d, %d", n, len(h.fake.Pushed))
 	}
+}
+
+func TestTheSetupListsProvidersAndTheRecommendedOneComesFirst(t *testing.T) {
+	h := newHotel(t, 1)
+	got := h.manager.Do("GET", "/api/channel/providers", &h.w.A1, "").Want(t, 200).Body
+	var ps []struct {
+		ID, Mode, Name string
+		Recommended    bool
+		Fields         []string
+	}
+	testkit.Must(t, json.Unmarshal([]byte(got), &ps))
+	if len(ps) < 5 || ps[0].ID != "channex" || !ps[0].Recommended || ps[0].Mode != "channel_manager" {
+		t.Fatalf("%+v", ps)
+	}
+	seen := map[string]bool{}
+	for _, p := range ps {
+		seen[p.ID] = true
+		if p.ID == "fake" {
+			t.Fatal("the test provider is offered to owners")
+		}
+		if len(p.Fields) == 0 {
+			t.Errorf("%s names no fields to fill in", p.ID)
+		}
+	}
+	for _, id := range []string{"channex", "cm_generic", "agoda", "booking_com", "expedia"} {
+		if !seen[id] {
+			t.Errorf("%s is missing", id)
+		}
+	}
+	h.desk.Do("GET", "/api/channel/providers", &h.w.A1, "").Want(t, 403)
+}
+
+func TestTestingTheConnectionSaysWhyItFailsAndNeedsNoSave(t *testing.T) {
+	h := newHotel(t, 1)
+	h.connect(t, "channel_manager", "fake", false)
+	h.manager.Do("POST", "/api/channel/test", &h.w.A1, "").Want(t, 200, `"ok":true`)
+	h.fake.TestErr = errors.New("the key was refused")
+	h.manager.Do("POST", "/api/channel/test", &h.w.A1, "").Want(t, 200, `"ok":false`, "the key was refused")
+	h.desk.Do("POST", "/api/channel/test", &h.w.A1, "").Want(t, 403)
+}
+
+func TestTheOtherSidesRoomsComeBackWithSuggestedMatches(t *testing.T) {
+	h := newHotel(t, 1)
+	h.connect(t, "channel_manager", "fake", false)
+	h.fake.Remotes = []channels.RemoteRate{{RoomID: "RT9", RoomName: "Deluxe Double", RateID: "RP9", RateName: "Flexible rate", Occupancy: 2}, {RoomID: "RT8", RoomName: "Penthouse", RateID: "RP8", RateName: "Best"}}
+	got := h.manager.Do("GET", "/api/channel/remote", &h.w.A1, "").Want(t, 200, "Penthouse").Body
+	var out struct {
+		Remote      []channels.RemoteRate
+		Suggestions []struct{ PlanID, RoomID, RateID string }
+	}
+	testkit.Must(t, json.Unmarshal([]byte(got), &out))
+	if len(out.Suggestions) != 1 || out.Suggestions[0].PlanID != h.rp || out.Suggestions[0].RoomID != "RT9" || out.Suggestions[0].RateID != "RP9" {
+		t.Fatalf("%s", got)
+	}
+}
+
+func TestBookingsAreAcknowledgedOnlyOnceKeptAndProblemsGoToStaff(t *testing.T) {
+	h := newHotel(t, 1)
+	h.connect(t, "channel_manager", "fake", true)
+	h.fake.Inbox = []channels.Booking{
+		{ExternalID: "A", AckID: "rev-A", Status: "new", GuestName: "One", Arrival: "2026-12-10", Departure: "2026-12-12", ExternalRoomID: "R1", ExternalRateID: "P1", Adults: 2},
+		{ExternalID: "B", AckID: "rev-B", Status: "new", GuestName: "Two", Arrival: "2026-12-10", Departure: "2026-12-12", ExternalRoomID: "R1", ExternalRateID: "P1", Adults: 2}, // sold out
+		{ExternalID: "C", AckID: "rev-C", Status: "new", GuestName: "Three", Arrival: "2026-12-20", Departure: "2026-12-21", Problem: "the booking has 2 rooms"},
+	}
+	h.manager.Do("POST", "/api/channel/sync", &h.w.A1, "").Want(t, 200, `"pulled":1`)
+	if len(h.fake.Acked) != 1 || h.fake.Acked[0] != "rev-A" {
+		t.Fatalf("acked %v: a booking that was not kept must come back", h.fake.Acked)
+	}
+	if log := h.manager.Do("GET", "/api/channel/log", &h.w.A1, "").Want(t, 200).Body; !strings.Contains(log, "2 rooms") {
+		t.Fatalf("the problem is not in the log: %s", log)
+	}
+}
+
+func TestAModifiedBookingMovesTheStay(t *testing.T) {
+	h := newHotel(t, 1)
+	h.connect(t, "channel_manager", "fake", true)
+	b := channels.Booking{ExternalID: "M1", Status: "new", GuestName: "Kim", Arrival: "2026-12-10", Departure: "2026-12-12", ExternalRoomID: "R1", ExternalRateID: "P1", Adults: 2}
+	h.fake.Inbox = []channels.Booking{b}
+	h.manager.Do("POST", "/api/channel/sync", &h.w.A1, "").Want(t, 200, `"pulled":1`)
+	b.Status, b.Arrival, b.Departure = "modified", "2026-12-14", "2026-12-16"
+	h.fake.Inbox = []channels.Booking{b}
+	h.manager.Do("POST", "/api/channel/sync", &h.w.A1, "").Want(t, 200, `"pulled":1`)
+	if got := h.row(t, `select sold::text from inventory where date = '2026-12-10'`); got != "0" {
+		t.Fatalf("the old nights are still held: %s", got)
+	}
+	if got := h.row(t, `select sold::text from inventory where date = '2026-12-14'`); got != "1" {
+		t.Fatalf("the new nights are not held: %s", got)
+	}
+	h.manager.Do("POST", "/api/channel/sync", &h.w.A1, "").Want(t, 200, `"pulled":0`) // the same change again changes nothing
 }

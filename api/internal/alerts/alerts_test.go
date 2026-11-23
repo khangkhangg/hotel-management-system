@@ -578,3 +578,34 @@ func TestPaidLateAlertsAManagerUntilTheMoneyIsGivenBack(t *testing.T) {
 		t.Fatal("the alert stayed after the money went back")
 	}
 }
+
+func TestAChannelThatStopsSyncingAlertsAManagerUntilItWorksAgain(t *testing.T) {
+	h := newHotel(t, 1)
+	exec := func(q string, args ...any) {
+		t.Helper()
+		must(t, db.WithOrg(ctx, h.w.Pool, h.w.OrgA, func(tx pgx.Tx) error { _, err := tx.Exec(ctx, q, args...); return err }))
+	}
+	exec(`insert into channel_connection (id, organization_id, property_id, mode, provider, enabled, created_at)
+		values ('00000000-0000-4000-8000-000000000001', $1, $2, 'channel_manager', 'channex', true, $3)`, h.w.OrgA, h.w.A1, h.w.Now.Add(-5*time.Hour))
+	h.run()
+	if got := h.kinds(h.mgr); len(got) != 1 || got[0] != "channel_trouble" {
+		t.Fatalf("an enabled channel that never synced: %v", got)
+	}
+	exec(`insert into sync_log (id, organization_id, property_id, connection_id, direction, status, message, created_at)
+		values (gen_random_uuid(), $1, $2, '00000000-0000-4000-8000-000000000001', 'push', 'ok', 'Sent 60 nights.', $3)`, h.w.OrgA, h.w.A1, h.w.Now.Add(-time.Minute))
+	h.run()
+	if len(h.of(h.mgr, "channel_trouble")) != 0 {
+		t.Fatal("the alert stayed after a good sync")
+	}
+	exec(`insert into sync_log (id, organization_id, property_id, connection_id, direction, status, message, created_at)
+		values (gen_random_uuid(), $1, $2, '00000000-0000-4000-8000-000000000001', 'push', 'error', 'refused', $3)`, h.w.OrgA, h.w.A1, h.w.Now)
+	h.run()
+	if len(h.of(h.mgr, "channel_trouble")) != 1 {
+		t.Fatal("a failed sync did not alert")
+	}
+	exec(`update channel_connection set enabled = false`)
+	h.run()
+	if len(h.of(h.mgr, "channel_trouble")) != 0 {
+		t.Fatal("a switched-off channel alerts")
+	}
+}

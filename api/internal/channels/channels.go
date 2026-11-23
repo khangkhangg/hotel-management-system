@@ -31,7 +31,7 @@ const (
 
 // modes says which providers each way of connecting may use.
 var modes = map[string][]string{
-	"channel_manager": {"cm_generic", "fake"},
+	"channel_manager": {"channex", "cm_generic", "fake"},
 	"direct":          {"agoda", "booking_com", "expedia", "fake"},
 }
 
@@ -50,6 +50,9 @@ func Mount(factory Factory) httpx.Mount {
 		mux.HandleFunc("/api/channel", httpx.Methods(map[string]http.HandlerFunc{http.MethodGet: wrap(h.get), http.MethodPut: wrap(h.put)}))
 		mux.HandleFunc("/api/channel/map", httpx.Methods(map[string]http.HandlerFunc{http.MethodPut: wrap(h.putMap)}))
 		mux.HandleFunc("/api/channel/sync", httpx.Methods(map[string]http.HandlerFunc{http.MethodPost: wrap(h.syncNow)}))
+		mux.HandleFunc("/api/channel/providers", httpx.Methods(map[string]http.HandlerFunc{http.MethodGet: wrap(h.providers)}))
+		mux.HandleFunc("/api/channel/test", httpx.Methods(map[string]http.HandlerFunc{http.MethodPost: wrap(h.test)}))
+		mux.HandleFunc("/api/channel/remote", httpx.Methods(map[string]http.HandlerFunc{http.MethodGet: wrap(h.remote)}))
 		mux.HandleFunc("/api/channel/log", httpx.Methods(map[string]http.HandlerFunc{http.MethodGet: wrap(h.log)}))
 	}
 }
@@ -346,14 +349,25 @@ func Sync(ctx context.Context, pool *pgxpool.Pool, factory Factory, org, prop uu
 	if pullErr != nil {
 		notes = append(notes, logLine{"pull", "error", "Getting bookings failed: " + pullErr.Error()})
 	}
+	var kept []string
 	for _, b := range bookings {
 		made, err := apply(ctx, pool, org, prop, &l, b, now)
 		switch {
 		case err != nil:
-			notes = append(notes, logLine{"pull", "error", fmt.Sprintf("Booking %s could not be kept: %s. Handle it by hand.", b.ExternalID, reason(err))})
+			// Not acknowledged, so a channel that hands a booking out until it is saved will hand this one out again.
+			notes = append(notes, logLine{"pull", "error", fmt.Sprintf("Booking %s could not be kept: %s. Handle it by hand.", b.ExternalID, reason(err, b))})
+			continue
 		case made:
 			res.Pulled++
 			notes = append(notes, logLine{"pull", "ok", fmt.Sprintf("Booking %s (%s) saved.", b.ExternalID, b.Status)})
+		}
+		if b.AckID != "" {
+			kept = append(kept, b.AckID)
+		}
+	}
+	if ak, ok := ad.(Acker); ok && len(kept) > 0 {
+		if err := ak.Ack(ctx, kept); err != nil {
+			notes = append(notes, logLine{"pull", "error", "Telling the channel which bookings were saved failed: " + err.Error()})
 		}
 	}
 	err = db.WithOrg(ctx, pool, org, func(tx pgx.Tx) error {
@@ -370,8 +384,10 @@ func Sync(ctx context.Context, pool *pgxpool.Pool, factory Factory, org, prop uu
 
 type logLine struct{ direction, status, message string }
 
-func reason(err error) string {
+func reason(err error, b Booking) string {
 	switch {
+	case b.Problem != "":
+		return b.Problem
 	case errors.Is(err, booking.ErrSoldOut):
 		return "the room is already sold for those nights"
 	case errors.Is(err, errNotMapped):
@@ -387,11 +403,22 @@ func reason(err error) string {
 
 var errNotMapped = errors.New("channels: room not mapped")
 
-func load(ctx context.Context, tx pgx.Tx, org, prop uuid.UUID, now time.Time, l *loaded) error {
+// loadConnection reads the property's connection. With needOn it also insists that the connection is switched on.
+func loadConnection(ctx context.Context, tx pgx.Tx, prop uuid.UUID, l *loaded, needOn bool) error {
 	var enabled bool
 	if err := tx.QueryRow(ctx, `select id, mode, provider, external_hotel_id, base_url, secret_setting, enabled from channel_connection where property_id = $1`, prop).
-		Scan(&l.id, &l.conn.Mode, &l.conn.Provider, &l.conn.ExternalHotelID, &l.conn.BaseURL, &l.conn.SecretSetting, &enabled); err != nil || !enabled {
+		Scan(&l.id, &l.conn.Mode, &l.conn.Provider, &l.conn.ExternalHotelID, &l.conn.BaseURL, &l.conn.SecretSetting, &enabled); err != nil {
 		return ErrOff
+	}
+	if needOn && !enabled {
+		return ErrOff
+	}
+	return nil
+}
+
+func load(ctx context.Context, tx pgx.Tx, org, prop uuid.UUID, now time.Time, l *loaded) error {
+	if err := loadConnection(ctx, tx, prop, l, true); err != nil {
+		return err
 	}
 	today, currency, err := booking.HotelToday(ctx, tx, org, prop, now)
 	if err != nil {
@@ -450,10 +477,16 @@ func apply(ctx context.Context, pool *pgxpool.Pool, org, prop uuid.UUID, l *load
 	if b.ExternalID == "" || len(b.ExternalID) > 100 {
 		return false, booking.ErrBad
 	}
+	if b.Problem != "" {
+		return false, errProblem
+	}
 	err = db.WithOrg(ctx, pool, org, func(tx pgx.Tx) error {
 		var id uuid.UUID
-		var status string
-		e := tx.QueryRow(ctx, `select id, status from reservation where property_id = $1 and source_channel = $2 and channel_booking_ref = $3 for update`, prop, l.conn.Provider, b.ExternalID).Scan(&id, &status)
+		var status, from, to string
+		e := tx.QueryRow(ctx, `select r.id, r.status, coalesce(min(lower(x.stay))::text, ''), coalesce(max(upper(x.stay))::text, '')
+			from reservation r left join reservation_room x on x.reservation_id = r.id
+			where r.property_id = $1 and r.source_channel = $2 and r.channel_booking_ref = $3 group by r.id order by r.created_at desc limit 1`,
+			prop, l.conn.Provider, b.ExternalID).Scan(&id, &status, &from, &to)
 		exists := e == nil
 		if e != nil && !errors.Is(e, pgx.ErrNoRows) {
 			return e
@@ -468,8 +501,16 @@ func apply(ctx context.Context, pool *pgxpool.Pool, org, prop uuid.UUID, l *load
 			}
 			changed = true
 			return nil
-		case exists:
-			return nil // a change to a saved booking is left for staff: the log shows it once a diff is built
+		case exists && b.Status != "modified":
+			return nil // a booking already saved, or one that was cancelled and must not come back
+		case exists && status != "cancelled" && from == b.Arrival && to == b.Departure:
+			return nil // a modification that is already in
+		case exists && status != "cancelled":
+			// A modification moves the stay: free the old nights, then take the new ones. If the new ones are
+			// taken, the whole step rolls back and the old stay stays.
+			if err := booking.Cancel(ctx, tx, org, prop, id, now); err != nil {
+				return err
+			}
 		}
 		m, ok := l.mapFor(b)
 		if !ok {
@@ -491,6 +532,8 @@ func apply(ctx context.Context, pool *pgxpool.Pool, org, prop uuid.UUID, l *load
 	})
 	return changed, err
 }
+
+var errProblem = errors.New("channels: the booking needs staff")
 
 // RunAll syncs every enabled connection of every organization and says how many it reached. A connection that fails
 // is written to its own log and does not stop the others.

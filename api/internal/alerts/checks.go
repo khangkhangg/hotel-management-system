@@ -25,6 +25,7 @@ var registry = []check{
 	{kind: "returning_guest", role: access.FrontDesk, find: returningGuest},
 	{kind: "refund_waiting", role: access.Manager, find: refundWaiting},
 	{kind: "paid_late", role: access.Manager, find: paidLate},
+	{kind: "channel_trouble", role: access.Manager, defaults: map[string]float64{"staleHours": 3}, find: channelTrouble},
 	{kind: "tag_not_answered", role: access.FrontDesk, defaults: map[string]float64{"hours": 4}, find: tagNotAnswered},
 }
 
@@ -447,6 +448,39 @@ func paidLate(ctx context.Context, tx pgx.Tx, sc scope) ([]Finding, error) {
 		out = append(out, Finding{SubjectType: "reservation", Subject: id, Severity: "warning", Text: text,
 			Facts:  map[string]any{"held": held, "currency": cur, "status": status},
 			Action: openAction("Open the booking", "/calendar")})
+	}
+	return out, rows.Err()
+}
+
+// channelTrouble finds a switched-on channel connection whose last send failed, or that has not sent anything
+// for a few hours. Rooms and prices on the booking sites are then out of date, which is how overbookings start.
+func channelTrouble(ctx context.Context, tx pgx.Tx, sc scope) ([]Finding, error) {
+	rows, err := tx.Query(ctx, `select c.id, c.provider,
+		coalesce((select max(s.created_at) from sync_log s where s.connection_id = c.id and s.direction = 'push' and s.status = 'ok'), c.created_at),
+		coalesce((select s.status from sync_log s where s.connection_id = c.id and s.direction = 'push' order by s.created_at desc, s.id desc limit 1), '')
+		from channel_connection c where c.property_id = $1 and c.enabled`, sc.propertyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Finding
+	for rows.Next() {
+		var id uuid.UUID
+		var provider, last string
+		var lastOK time.Time
+		if err := rows.Scan(&id, &provider, &lastOK, &last); err != nil {
+			return nil, err
+		}
+		stale := sc.now.Sub(lastOK) > time.Duration(sc.th["staleHours"])*time.Hour
+		if last != "error" && !stale {
+			continue
+		}
+		text := "The last send of rooms and prices to your booking sites failed. Their rooms and prices may be out of date."
+		if last != "error" {
+			text = fmt.Sprintf("Nothing has been sent to your booking sites for %d hours. Their rooms and prices may be out of date.", int(sc.now.Sub(lastOK).Hours()))
+		}
+		out = append(out, Finding{SubjectType: "channel", Subject: id, Severity: "warning", Text: text,
+			Facts: map[string]any{"provider": provider}, Action: openAction("Open the sync log", "/sync-log")})
 	}
 	return out, rows.Err()
 }

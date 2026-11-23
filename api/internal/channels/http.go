@@ -47,13 +47,19 @@ func GuardedClient() *http.Client {
 func Real(getenv func(string) string) Factory {
 	return func(c Connection) (Adapter, error) {
 		switch c.Provider {
-		case "cm_generic", "agoda", "booking_com", "expedia":
+		case "cm_generic", "channex", "agoda", "booking_com", "expedia":
 		default:
 			return nil, ErrUnavailable
 		}
 		secret := getenv(c.SecretSetting)
 		if c.SecretSetting == "" || secret == "" {
 			return nil, errors.New("channels: the secret setting named for this connection is not set on the server")
+		}
+		if c.Provider == "channex" {
+			if c.ExternalHotelID == "" || (c.BaseURL != "" && !validBaseURL(c.BaseURL)) {
+				return nil, errors.New("channels: the Channex property id is needed, and any address must be an https name")
+			}
+			return NewChannex(c.BaseURL, c.ExternalHotelID, secret, GuardedClient()), nil
 		}
 		if c.BaseURL == "" || !validBaseURL(c.BaseURL) || c.ExternalHotelID == "" {
 			return nil, errors.New("channels: the address and the hotel code are needed")
