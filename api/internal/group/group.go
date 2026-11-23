@@ -42,8 +42,9 @@ func (h *handler) get(w http.ResponseWriter, r *http.Request) {
 	// The web app names the property it is on, so the role at that property is not enough:
 	// only a membership that covers the whole organization may see every hotel.
 	var wide bool
-	if err := db.WithOrg(r.Context(), h.Pool, a.OrgID, func(tx pgx.Tx) error {
-		return tx.QueryRow(r.Context(), `select exists (select 1 from membership where user_id = $1 and organization_id = $2 and status = 'active' and property_id is null)`, a.UserID, a.OrgID).Scan(&wide)
+	if err := db.WithOrg(r.Context(), h.Pool, a.OrgID, func(tx pgx.Tx) (e error) {
+		wide, e = access.OrgWide(r.Context(), tx, a)
+		return
 	}); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "internal", "Something went wrong.")
 		return

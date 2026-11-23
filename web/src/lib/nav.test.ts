@@ -53,12 +53,12 @@ describe('allowed', () => {
 
 describe('more screens', () => {
 	test('owners and managers reach the rest of the hotel screens from the overview, outside the five-item menu', () => {
-		expect(moreFor('manager').map((i) => i.label)).toEqual(['Arrivals', 'Guests', 'Payments', 'Issues', 'Rates', 'Rate plans', 'Extras', 'Reports']);
-		expect(moreFor('owner').map((i) => i.label)).toEqual(['All properties', 'Reports', 'Booking site', 'Arrivals', 'Guests', 'Rooms', 'Issues', 'Rates', 'Rate plans', 'Extras']);
+		expect(moreFor('manager').map((i) => i.label)).toEqual(['Arrivals', 'Guests', 'Payments', 'Issues', 'Rates', 'Rate plans', 'Extras', 'Reports', 'Chain plans']);
+		expect(moreFor('owner').map((i) => i.label)).toEqual(['All properties', 'Reports', 'Chain plans', 'Booking site', 'Arrivals', 'Guests', 'Rooms', 'Issues', 'Rates', 'Rate plans', 'Extras']);
 		expect(allowed('manager', '/rates')).toBe(true);
 		expect(allowed('owner', '/arrivals')).toBe(true);
 		expect(moreFor('front_desk')).toEqual([]);
-		expect(moreFor('revenue').map((i) => i.label)).toEqual([]);
+		expect(moreFor('revenue').map((i) => i.label)).toEqual(['Chain plans']);
 	});
 
 	test('a role with no extra screens is still refused the others', () => {
