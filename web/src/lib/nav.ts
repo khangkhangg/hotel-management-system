@@ -39,6 +39,7 @@ const all = {
 	reviewQueue: item('risk', 'Review queue', 'alert', '/risk'),
 	promoCodes: item('promo-codes', 'Promo codes', 'tag', '/promo-codes'),
 	pricing: item('pricing', 'Price suggestions', 'chart', '/pricing'),
+	reviews: item('reviews', 'Reviews', 'chat', '/reviews'),
 	branding: item('branding', 'Branding', 'tag', '/branding'),
 	siteContent: item('site-content', 'Site content', 'file', '/site-content'),
 	lost: item('lost-and-found', 'Lost and found', 'box', '/lost-and-found')
@@ -54,9 +55,9 @@ const menus: Record<Role, NavItem[]> = {
 
 // Screens a role may open that do not fit the five-item menu. The overview links to them.
 const more: Record<Role, NavItem[]> = {
-	owner: [all.group, all.reports, all.chainPlans, all.channels, all.bookingSite, all.siteContent, all.branding, all.yieldRules, all.reviewQueue, all.promoCodes, all.pricing, all.arrivals, all.guests, all.rooms, all.issues, all.rates, all.ratePlans, all.extras],
-	manager: [all.arrivals, all.guests, all.payments, all.issues, all.rates, all.ratePlans, all.extras, all.reports, all.chainPlans, all.channels, all.yieldRules, all.reviewQueue, all.promoCodes, all.pricing],
-	front_desk: [],
+	owner: [all.group, all.reports, all.chainPlans, all.channels, all.bookingSite, all.siteContent, all.branding, all.yieldRules, all.reviewQueue, all.promoCodes, all.pricing, all.reviews, all.payouts, all.lost, all.messages, all.arrivals, all.guests, all.rooms, all.issues, all.rates, all.ratePlans, all.extras],
+	manager: [all.arrivals, all.guests, all.payments, all.issues, all.rates, all.ratePlans, all.extras, all.reports, all.chainPlans, all.channels, all.yieldRules, all.reviewQueue, all.promoCodes, all.pricing, all.reviews, all.payouts, all.lost, all.messages],
+	front_desk: [all.lost],
 	revenue: [all.chainPlans, all.yieldRules, all.promoCodes, all.pricing],
 	housekeeping: []
 };
@@ -74,14 +75,11 @@ const matches = (href: string, path: string) => (href === '/' ? path === '/' : p
 export const allowed = (role: Role, path: string): boolean => [...menus[role], ...more[role]].some((i) => matches(i.href, path));
 
 /** Screens that exist in this milestone. The rest open a placeholder. */
-const built = ['/', '/staff', '/activity', '/calendar', '/arrivals', '/guests', '/payments', '/rates', '/rate-plans', '/rooms', '/booking-site', '/issues', '/extras', '/group', '/reports', '/chain-plans', '/channels', '/sync-log', '/branding', '/site-content', '/yield', '/risk', '/promo-codes', '/pricing'];
+const built = ['/', '/staff', '/activity', '/calendar', '/arrivals', '/guests', '/payments', '/rates', '/rate-plans', '/rooms', '/booking-site', '/issues', '/extras', '/group', '/reports', '/chain-plans', '/channels', '/sync-log', '/branding', '/site-content', '/yield', '/risk', '/promo-codes', '/pricing', '/messages', '/reviews', '/lost-and-found', '/payouts'];
 export const isBuilt = (path: string): boolean => built.some((href) => matches(href, path));
 
-const milestones: [string[], string][] = [
-	[['/messages'], 'Milestone 3: Guest booking'],
-	[['/lost-and-found'], 'Milestone 5: Extras'],
-	[['/payouts'], 'Milestone 6: Reports and chains']
-];
+// Every screen in the menus is built. A screen added to a menu before it exists is listed here with the milestone that builds it.
+const milestones: [string[], string][] = [];
 
 /** The milestone that builds a screen, for its placeholder. */
 export const milestoneFor = (path: string): string => milestones.find(([hrefs]) => hrefs.some((h) => matches(h, path)))?.[1] ?? 'a later milestone';

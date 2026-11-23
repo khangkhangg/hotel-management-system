@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { allowed, homeFor, isBuilt, itemsFor, milestoneFor, moreFor, type Role } from './nav.ts';
+import { allowed, homeFor, isBuilt, itemsFor, milestoneFor, roles, moreFor, type Role } from './nav.ts';
 
 const labels = (role: Role) => itemsFor(role).map((i) => i.label);
 
@@ -53,11 +53,11 @@ describe('allowed', () => {
 
 describe('more screens', () => {
 	test('owners and managers reach the rest of the hotel screens from the overview, outside the five-item menu', () => {
-		expect(moreFor('manager').map((i) => i.label)).toEqual(['Arrivals', 'Guests', 'Payments', 'Issues', 'Rates', 'Rate plans', 'Extras', 'Reports', 'Chain plans', 'Channels', 'Yield rules', 'Review queue', 'Promo codes', 'Price suggestions']);
-		expect(moreFor('owner').map((i) => i.label)).toEqual(['All properties', 'Reports', 'Chain plans', 'Channels', 'Booking site', 'Site content', 'Branding', 'Yield rules', 'Review queue', 'Promo codes', 'Price suggestions', 'Arrivals', 'Guests', 'Rooms', 'Issues', 'Rates', 'Rate plans', 'Extras']);
+		expect(moreFor('manager').map((i) => i.label)).toEqual(['Arrivals', 'Guests', 'Payments', 'Issues', 'Rates', 'Rate plans', 'Extras', 'Reports', 'Chain plans', 'Channels', 'Yield rules', 'Review queue', 'Promo codes', 'Price suggestions', 'Reviews', 'Payouts', 'Lost and found', 'Messages']);
+		expect(moreFor('owner').map((i) => i.label)).toEqual(['All properties', 'Reports', 'Chain plans', 'Channels', 'Booking site', 'Site content', 'Branding', 'Yield rules', 'Review queue', 'Promo codes', 'Price suggestions', 'Reviews', 'Payouts', 'Lost and found', 'Messages', 'Arrivals', 'Guests', 'Rooms', 'Issues', 'Rates', 'Rate plans', 'Extras']);
 		expect(allowed('manager', '/rates')).toBe(true);
 		expect(allowed('owner', '/arrivals')).toBe(true);
-		expect(moreFor('front_desk')).toEqual([]);
+		expect(moreFor('front_desk').map((i) => i.label)).toEqual(['Lost and found']);
 		expect(moreFor('revenue').map((i) => i.label)).toEqual(['Chain plans', 'Yield rules', 'Promo codes', 'Price suggestions']);
 	});
 
@@ -82,15 +82,13 @@ describe('home and milestones', () => {
 		expect(homeFor('housekeeping')).toBe('/rooms');
 	});
 
-	test('the screens of milestones 1 and 2 are built, the rest are not', () => {
-		for (const p of ['/', '/staff', '/activity', '/calendar', '/arrivals', '/guests', '/payments', '/rates', '/rate-plans', '/rooms', '/issues', '/reports', '/extras', '/group']) expect(isBuilt(p), p).toBe(true);
-		expect(isBuilt('/messages')).toBe(false);
-		expect(isBuilt('/payouts')).toBe(false);
+	test('every screen in every menu is built', () => {
+		for (const role of roles) {
+			for (const i of [...itemsFor(role), ...moreFor(role)]) expect(isBuilt(i.href), `${role}: ${i.href}`).toBe(true);
+		}
 	});
 
-	test('a screen that is not built names the milestone that builds it', () => {
-		for (const href of ['/messages', '/lost-and-found', '/payouts']) {
-			expect(milestoneFor(href), href).toMatch(/^Milestone \d/);
-		}
+	test('a screen that is not built still names the milestone that builds it', () => {
+		expect(milestoneFor('/somewhere-new')).toBe('a later milestone');
 	});
 });
