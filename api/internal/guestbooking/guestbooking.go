@@ -13,7 +13,6 @@ import (
 	netmail "net/mail"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,6 +29,7 @@ import (
 	"hotelpms/api/internal/ids"
 	"hotelpms/api/internal/mail"
 	"hotelpms/api/internal/payments"
+	"hotelpms/api/internal/ratelimit"
 )
 
 // CardHold is how long a room waits for a card payment (spec 05).
@@ -47,34 +47,6 @@ type handler struct {
 	httpx.Deps
 	card    payments.Provider // nil when no card provider is configured
 	cardOrg uuid.UUID         // the one organization whose Stripe account the keys belong to
-	limits  limiter
-}
-
-// limiter counts requests per key in a sliding window, in memory.
-// shortcut: per server process, so several servers each allow the full count; move to the database when there is more than one.
-type limiter struct {
-	mu   sync.Mutex
-	hits map[string][]time.Time
-}
-
-func (l *limiter) allow(key string, now time.Time, max int, window time.Duration) bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if l.hits == nil {
-		l.hits = map[string][]time.Time{}
-	}
-	keep := l.hits[key][:0]
-	for _, t := range l.hits[key] {
-		if now.Sub(t) < window {
-			keep = append(keep, t)
-		}
-	}
-	if len(keep) >= max {
-		l.hits[key] = keep
-		return false
-	}
-	l.hits[key] = append(keep, now)
-	return true
 }
 
 func (h *handler) throttled(w http.ResponseWriter, r *http.Request, what string, max int, window time.Duration) bool {
@@ -82,7 +54,7 @@ func (h *handler) throttled(w http.ResponseWriter, r *http.Request, what string,
 	if err != nil {
 		ip = r.RemoteAddr
 	}
-	if h.limits.allow(what+":"+ip, h.Clock(), max, window) {
+	if ratelimit.Allow(r.Context(), h.Pool, what+":"+ip, h.Clock(), max, window) {
 		return false
 	}
 	httpx.Error(w, http.StatusTooManyRequests, "slow_down", "Too many requests. Wait a few minutes and try again.")
