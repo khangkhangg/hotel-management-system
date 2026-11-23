@@ -208,3 +208,12 @@ func preferencesOf(ctx context.Context, tx pgx.Tx, user uuid.UUID) (Preferences,
 	}
 	return p, err
 }
+
+// ResolveSystem closes every open notification with the key because the cause went away on its own.
+func ResolveSystem(ctx context.Context, tx pgx.Tx, orgID uuid.UUID, key string) error {
+	if _, err := tx.Exec(ctx, `select pg_notify('notifications', user_id::text) from notification where organization_id = $1 and key = $2 and resolved_at is null`, orgID, key); err != nil {
+		return err
+	}
+	_, err := tx.Exec(ctx, `update notification set resolved_at = now(), updated_at = now() where organization_id = $1 and key = $2 and resolved_at is null`, orgID, key)
+	return err
+}

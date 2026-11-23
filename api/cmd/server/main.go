@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"hotelpms/api/internal/activity"
+	"hotelpms/api/internal/alerts"
 	"hotelpms/api/internal/app"
 	"hotelpms/api/internal/config"
 	"hotelpms/api/internal/db"
@@ -79,6 +80,7 @@ func main() {
 		TrustedProxies: cfg.TrustedProxies, Passwords: password.NewRangeChecker(&http.Client{Timeout: 5 * time.Second})}
 
 	go notify.RunSweeper(ctx, pool, sender, 30*time.Second)
+	go alerts.RunSweeper(ctx, pool, time.Minute)
 	go activity.RunNightly(ctx, pool)
 	go purgeSessions(ctx, pool)
 

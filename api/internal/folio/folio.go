@@ -268,3 +268,16 @@ func refreshPayment(ctx context.Context, tx pgx.Tx, paymentID uuid.UUID) error {
 		   else 'partly_refunded' end where p.id = $1`, paymentID)
 	return err
 }
+
+// Balance is what the guest still owes on a reservation: lines minus payments plus refunds that are done.
+func Balance(ctx context.Context, tx pgx.Tx, orgID, propertyID, reservationID uuid.UUID, now time.Time) (balance int64, currency string, err error) {
+	id, currency, err := Ensure(ctx, tx, orgID, propertyID, reservationID, now)
+	if err != nil {
+		return 0, "", err
+	}
+	err = tx.QueryRow(ctx,
+		`select coalesce((select sum(quantity * unit_price) from folio_line where folio_id = $1), 0)
+		      - coalesce((select sum(amount) from payment where folio_id = $1), 0)
+		      + coalesce((select sum(r.amount) from refund r join payment p on p.id = r.payment_id where p.folio_id = $1 and r.status = 'done'), 0)`, id).Scan(&balance)
+	return balance, currency, err
+}
