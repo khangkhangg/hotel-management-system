@@ -288,7 +288,7 @@ func (h *handler) get(w http.ResponseWriter, r *http.Request) {
 		}
 		defer rows.Close()
 		for rows.Next() {
-			var x roomOut
+			x := roomOut{Nights: []night{}}
 			if err := rows.Scan(&x.ID, &x.RoomTypeID, &x.RoomTypeName, &x.RoomID, &x.RoomNumber, &x.RatePlanID, &x.From, &x.To, &x.Adults, &x.Children); err != nil {
 				return err
 			}

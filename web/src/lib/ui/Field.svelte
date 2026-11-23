@@ -5,7 +5,7 @@
 		value?: string;
 		placeholder?: string;
 		autocomplete?: AutoFill;
-		inputmode?: 'numeric' | 'text' | 'email' | 'tel' | 'search';
+		inputmode?: 'numeric' | 'decimal' | 'text' | 'email' | 'tel' | 'search';
 		error?: string;
 	};
 	let { label, type = 'text', value = $bindable(''), placeholder, autocomplete, inputmode, error }: Props = $props();

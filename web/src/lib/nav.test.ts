@@ -5,8 +5,8 @@ const labels = (role: Role) => itemsFor(role).map((i) => i.label);
 
 describe('menus', () => {
 	test('each role gets exactly its menu', () => {
-		expect(labels('owner')).toEqual(['Overview', 'Reports', 'Payouts', 'Staff', 'Activity']);
-		expect(labels('manager')).toEqual(['Overview', 'Staff', 'Activity']);
+		expect(labels('owner')).toEqual(['Overview', 'Calendar', 'Payments', 'Staff', 'Activity']);
+		expect(labels('manager')).toEqual(['Overview', 'Calendar', 'Rooms', 'Staff', 'Activity']);
 		expect(labels('front_desk')).toEqual(['Calendar', 'Messages', 'Arrivals', 'Guests', 'Payments']);
 		expect(labels('revenue')).toEqual(['Rates', 'Rate plans', 'Channels', 'Sync log']);
 		expect(labels('housekeeping')).toEqual(['Rooms', 'Issues', 'Lost and found']);
@@ -58,15 +58,14 @@ describe('home and milestones', () => {
 		expect(homeFor('housekeeping')).toBe('/rooms');
 	});
 
-	test('only the overview, staff and activity are built in this milestone', () => {
-		expect(isBuilt('/')).toBe(true);
-		expect(isBuilt('/staff')).toBe(true);
-		expect(isBuilt('/activity')).toBe(true);
-		expect(isBuilt('/rates')).toBe(false);
+	test('the screens of milestones 1 and 2 are built, the rest are not', () => {
+		for (const p of ['/', '/staff', '/activity', '/calendar', '/arrivals', '/guests', '/payments', '/rates', '/rate-plans', '/rooms', '/issues']) expect(isBuilt(p), p).toBe(true);
+		expect(isBuilt('/channels')).toBe(false);
+		expect(isBuilt('/reports')).toBe(false);
 	});
 
 	test('a screen that is not built names the milestone that builds it', () => {
-		for (const href of ['/reports', '/calendar', '/rates', '/rooms', '/channels', '/lost-and-found']) {
+		for (const href of ['/reports', '/messages', '/channels', '/sync-log', '/lost-and-found', '/payouts']) {
 			expect(milestoneFor(href), href).toMatch(/^Milestone \d/);
 		}
 	});

@@ -2,9 +2,9 @@
 	import type { Snippet } from 'svelte';
 	import Button from './Button.svelte';
 
-	type Props = { title: string; open?: boolean; onclose?: () => void; children: Snippet; actions?: Snippet };
+	type Props = { title: string; open?: boolean; wide?: boolean; onclose?: () => void; children: Snippet; actions?: Snippet };
 
-	let { title, open = $bindable(false), onclose, children, actions }: Props = $props();
+	let { title, open = $bindable(false), wide = false, onclose, children, actions }: Props = $props();
 	let dialog = $state<HTMLDialogElement>();
 	const titleId = $props.id();
 
@@ -27,7 +27,7 @@
 	}
 </script>
 
-<dialog bind:this={dialog} aria-labelledby={titleId} onclose={close} oncancel={close}>
+<dialog bind:this={dialog} class:wide aria-labelledby={titleId} onclose={close} oncancel={close}>
 	<header>
 		<h2 id={titleId}>{title}</h2>
 		<Button variant="quiet" icon="close" iconOnly onclick={close}>Close</Button>
@@ -46,6 +46,11 @@
 		background: var(--color-surface);
 		color: var(--color-text);
 		box-shadow: var(--shadow-float);
+	}
+	dialog.wide {
+		inline-size: min(var(--drawer-width), calc(100% - 2 * var(--space-4)));
+		max-block-size: calc(100dvh - 2 * var(--space-4));
+		overflow-y: auto;
 	}
 	dialog::backdrop {
 		background: var(--color-ink);

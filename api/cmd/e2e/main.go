@@ -49,6 +49,7 @@ func main() {
 	}
 	defer cleanup()
 	org, property := seed(ctx, pool)
+	seedHotel(ctx, pool, org, property)
 	sender := mail.NewFake()
 	hub, err := notify.NewHub(pool)
 	if err != nil {

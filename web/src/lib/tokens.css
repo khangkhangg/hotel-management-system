@@ -94,6 +94,11 @@
 	--size-hidden: 1px;
 	--size-checkbox: 1.25rem;
 	--form-width: 26rem;
+	--calendar-room-col: 7rem;
+	--calendar-day-col: 4.5rem;
+	--calendar-row-height: 2.75rem;
+	--drawer-width: 34rem;
+	--field-min: 10rem;
 	--dot-size: 8px;
 	--bar-height: 4px;
 	--meter-height: 8px;

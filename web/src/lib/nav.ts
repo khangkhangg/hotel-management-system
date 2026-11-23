@@ -35,8 +35,8 @@ const all = {
 };
 
 const menus: Record<Role, NavItem[]> = {
-	owner: [all.overview, all.reports, all.payouts, all.staff, all.activity],
-	manager: [all.overview, all.staff, all.activity],
+	owner: [all.overview, all.calendar, all.payments, all.staff, all.activity],
+	manager: [all.overview, all.calendar, all.rooms, all.staff, all.activity],
 	front_desk: [all.calendar, all.messages, all.arrivals, all.guests, all.payments],
 	revenue: [all.rates, all.ratePlans, all.channels, all.syncLog],
 	housekeeping: [all.rooms, all.issues, all.lost]
@@ -54,13 +54,13 @@ const matches = (href: string, path: string) => (href === '/' ? path === '/' : p
 export const allowed = (role: Role, path: string): boolean => menus[role].some((i) => matches(i.href, path));
 
 /** Screens that exist in this milestone. The rest open a placeholder. */
-const built = ['/', '/staff', '/activity'];
+const built = ['/', '/staff', '/activity', '/calendar', '/arrivals', '/guests', '/payments', '/rates', '/rate-plans', '/rooms', '/issues'];
 export const isBuilt = (path: string): boolean => built.some((href) => matches(href, path));
 
 const milestones: [string[], string][] = [
-	[['/calendar', '/arrivals', '/guests', '/payments', '/rates', '/rate-plans', '/rooms', '/issues', '/lost-and-found'], 'Milestone 2: Core PMS'],
 	[['/messages'], 'Milestone 3: Guest booking'],
 	[['/channels', '/sync-log'], 'Milestone 4: Channel sync'],
+	[['/lost-and-found'], 'Milestone 5: Extras'],
 	[['/reports', '/payouts'], 'Milestone 6: Reports and chains']
 ];
 

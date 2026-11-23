@@ -1,0 +1,78 @@
+export type Room = { id: string; number: string; floor: number; status: string; roomTypeId: string; roomTypeName: string };
+export type Stay = {
+	id: string;
+	reservationId: string;
+	code: string;
+	status: 'pending' | 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled' | 'no_show';
+	guestName: string;
+	roomId: string | null;
+	roomTypeId: string;
+	roomTypeName: string;
+	from: string;
+	to: string;
+	adults: number;
+	children: number;
+	total: number;
+	currency: string;
+	source: string;
+};
+export type CalendarData = { rooms: Room[]; stays: Stay[] };
+export type RoomType = { id: string; name: string; baseGuests: number; maxGuests: number; rooms: number };
+export type RatePlan = { id: string; roomTypeId: string; name: string; lateCancelPenalty: string; mealPlan: string };
+
+export type Night = { date: string; price: number };
+export type ReservationRoom = {
+	id: string;
+	roomTypeId: string;
+	roomTypeName: string;
+	roomId: string | null;
+	roomNumber: string | null;
+	ratePlanId: string;
+	from: string;
+	to: string;
+	adults: number;
+	children: number;
+	nights: Night[];
+};
+export type Guest = { id: string; name: string; email?: string; phone?: string; country?: string; notes?: string };
+export type Reservation = {
+	id: string;
+	code: string;
+	status: Stay['status'];
+	total: number;
+	currency: string;
+	source: string;
+	createdAt: string;
+	guest: Guest;
+	rooms: ReservationRoom[];
+};
+export type FolioLine = { id: string; kind: string; description: string; quantity: number; unitPrice: number; amount: number };
+export type Refund = { id: string; amount: number; reason: string; status: 'pending' | 'done' | 'rejected' };
+export type Payment = { id: string; method: string; amount: number; note: string; status: string; createdAt: string; refunds: Refund[] };
+export type Folio = { folioId: string; currency: string; lines: FolioLine[]; payments: Payment[]; total: number; paid: number; refunded: number; balance: number };
+export type ThreadItem = {
+	type: 'note' | 'event';
+	id?: string;
+	at: string;
+	author: string;
+	authorRole?: string;
+	body?: string;
+	removed?: boolean;
+	removedBy?: string;
+	pinned?: boolean;
+	edited?: boolean;
+	mine?: boolean;
+	mentions?: { name: string; role: string; done: boolean }[];
+	action?: string;
+	label?: string;
+};
+export type Thread = { pinned: ThreadItem[]; items: ThreadItem[] };
+export type Colleague = { id: string; name: string; role: string };
+export type Alert = {
+	id: string;
+	checkKind: string;
+	severity: 'urgent' | 'warning' | 'info';
+	reason: { text: string };
+	action: { kind: string; label: string; changes?: string[]; params?: Record<string, unknown> } | null;
+	targetRole: string;
+};
