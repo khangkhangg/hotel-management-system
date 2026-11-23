@@ -41,6 +41,7 @@ func (h *handler) mountManage(mux *http.ServeMux) {
 	mux.HandleFunc("/api/manage/{token}/cancel", httpx.Methods(map[string]http.HandlerFunc{http.MethodPost: h.cancel}))
 	mux.HandleFunc("/api/manage/{token}/review", httpx.Methods(map[string]http.HandlerFunc{http.MethodGet: h.withToken(h.reviewState), http.MethodPost: h.withToken(h.postReview)}))
 	h.mountReviews(mux)
+	h.mountChat(mux)
 }
 
 // requestLink emails a manage link when the code and email match. It always answers 204, so it cannot be used to find out which codes exist.
