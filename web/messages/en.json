@@ -530,5 +530,9 @@
 	"risk.decline": "Decline and cancel",
 	"risk.declineNote": "Declining cancels the booking and frees the room. If the guest already paid, refund the payment on the booking.",
 	"risk.approved": "Booking {code} is approved.",
-	"risk.declined": "Booking {code} is cancelled."
+	"risk.declined": "Booking {code} is cancelled.",
+	"cancelRisk.low": "Low cancel risk",
+	"cancelRisk.medium": "Medium cancel risk",
+	"cancelRisk.high": "High cancel risk",
+	"cancelRisk.note": "A rule of thumb from the booking and the guest history, not a promise."
 }

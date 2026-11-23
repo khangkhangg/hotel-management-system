@@ -9,6 +9,7 @@
 	import Field from '#lib/ui/Field.svelte';
 	import Select from '#lib/ui/Select.svelte';
 	import StatusBadge from '#lib/ui/StatusBadge.svelte';
+	import CancelRisk from './CancelRisk.svelte';
 	import Thread from './Thread.svelte';
 	import type { Folio, Reservation, Room } from './types.ts';
 
@@ -150,6 +151,7 @@
 					{/if}
 				</div>
 			{/each}
+			{#if (res.status === 'confirmed' || res.status === 'pending') && id}<CancelRisk {id} />{/if}
 			<p class="actions">
 				{#if res.status === 'confirmed'}
 					<Button onclick={() => run('check-in', undefined, t('panel.checkedIn'))}>{t('panel.checkIn')}</Button>
