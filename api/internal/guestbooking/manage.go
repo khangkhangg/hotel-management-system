@@ -39,6 +39,8 @@ func (h *handler) mountManage(mux *http.ServeMux) {
 	mux.HandleFunc("/api/manage/{token}", httpx.Methods(map[string]http.HandlerFunc{http.MethodGet: h.withToken(h.view)}))
 	mux.HandleFunc("/api/manage/{token}/resend", httpx.Methods(map[string]http.HandlerFunc{http.MethodPost: h.withToken(h.resend)}))
 	mux.HandleFunc("/api/manage/{token}/cancel", httpx.Methods(map[string]http.HandlerFunc{http.MethodPost: h.cancel}))
+	mux.HandleFunc("/api/manage/{token}/review", httpx.Methods(map[string]http.HandlerFunc{http.MethodGet: h.withToken(h.reviewState), http.MethodPost: h.withToken(h.postReview)}))
+	h.mountReviews(mux)
 }
 
 // requestLink emails a manage link when the code and email match. It always answers 204, so it cannot be used to find out which codes exist.
@@ -133,6 +135,7 @@ func (h *handler) withToken(f func(http.ResponseWriter, *http.Request, pgx.Tx, b
 		case errors.Is(err, pgx.ErrNoRows):
 			notValid(w)
 		case errors.Is(err, errRollbackPreview), err == nil:
+		case reviewError(w, err):
 		default:
 			httpx.InternalError(w, err)
 		}
@@ -289,7 +292,6 @@ func (h *handler) cancel(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		notValid(w)
-		return
 	case errors.Is(err, booking.ErrCannotCancel), errors.Is(err, booking.ErrAlreadyCancelled):
 		httpx.Error(w, http.StatusConflict, "cannot_cancel", "This booking can no longer be cancelled here. Contact the hotel.")
 		return

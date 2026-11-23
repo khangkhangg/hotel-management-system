@@ -259,6 +259,7 @@ func (h *handler) info(w http.ResponseWriter, r *http.Request) {
 		RatePlans     []ratePlan         `json:"ratePlans"`
 		Extras        []extraOut         `json:"extras"`
 		Site          siteprofile.Public `json:"site"`
+		Reviews       reviewsOut         `json:"reviews"`
 	}{RoomTypes: []roomType{}, RatePlans: []ratePlan{}, Extras: []extraOut{}}
 	err := db.WithOrg(r.Context(), h.Pool, org, func(tx pgx.Tx) error {
 		ctx := r.Context()
@@ -267,6 +268,9 @@ func (h *handler) info(w http.ResponseWriter, r *http.Request) {
 		}
 		var err error
 		if out.Site, err = siteprofile.LoadPublic(ctx, tx, prop); err != nil {
+			return err
+		}
+		if out.Reviews, err = loadReviews(ctx, tx, prop); err != nil {
 			return err
 		}
 		if out.Payments, err = h.offered(ctx, tx, org, prop); err != nil {
