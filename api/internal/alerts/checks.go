@@ -24,6 +24,7 @@ var registry = []check{
 	{kind: "repeat_issue", role: access.Manager, defaults: map[string]float64{"tickets": 3, "days": 30}, find: repeatIssue},
 	{kind: "returning_guest", role: access.FrontDesk, find: returningGuest},
 	{kind: "refund_waiting", role: access.Manager, find: refundWaiting},
+	{kind: "tag_not_answered", role: access.FrontDesk, defaults: map[string]float64{"hours": 4}, find: tagNotAnswered},
 }
 
 // Kinds names every check, for the settings screen.
@@ -376,6 +377,34 @@ func refundWaiting(ctx context.Context, tx pgx.Tx, sc scope) ([]Finding, error) 
 		out = append(out, Finding{SubjectType: "refund", Subject: id, Severity: "warning",
 			Text: fmt.Sprintf("A refund of %s waits for approval: %s.", money(amount, cur), reason), Facts: map[string]any{"amount": amount, "currency": cur},
 			Action: openAction("Review the refund", "/payments")})
+	}
+	return out, rows.Err()
+}
+
+// tagNotAnswered reminds the author of a note whose tag nobody has answered. It goes to the author's role.
+func tagNotAnswered(ctx context.Context, tx pgx.Tx, sc scope) ([]Finding, error) {
+	rows, err := tx.Query(ctx,
+		`select n.id, u.name, left(n.body, 60), coalesce((select m.role from membership m where m.user_id = n.author_id and m.organization_id = n.organization_id and (m.property_id = n.property_id or m.property_id is null) limit 1), 'front_desk'),
+		        (select count(*) from note_mention x where x.note_id = n.id and x.done_at is null)
+		 from note n join app_user u on u.id = n.author_id
+		 where n.property_id = $1 and n.removed_at is null and n.created_at <= $2
+		   and exists (select 1 from note_mention x where x.note_id = n.id and x.done_at is null)
+		 order by n.created_at`, sc.propertyID, sc.now.Add(-time.Duration(sc.th["hours"])*time.Hour))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Finding
+	for rows.Next() {
+		var id uuid.UUID
+		var author, snippet, role string
+		var open int
+		if err := rows.Scan(&id, &author, &snippet, &role, &open); err != nil {
+			return nil, err
+		}
+		out = append(out, Finding{SubjectType: "note", Subject: id, Severity: "info", Role: access.Role(role),
+			Text:  fmt.Sprintf("%d tag(s) from %s's note have no answer after %d hours: %q", open, author, int(sc.th["hours"]), snippet),
+			Facts: map[string]any{"open": open}, Action: openAction("Open the booking", "/calendar")})
 	}
 	return out, rows.Err()
 }

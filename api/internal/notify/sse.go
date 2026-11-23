@@ -23,6 +23,7 @@ import (
 type Hub struct {
 	mu     sync.Mutex
 	subs   map[uuid.UUID]map[chan struct{}]struct{}
+	topics map[string]map[chan struct{}]struct{} // streams about one thing, such as the notes of one booking
 	cancel context.CancelFunc
 	done   chan struct{}
 }
@@ -35,7 +36,7 @@ func NewHub(pool *pgxpool.Pool) (*Hub, error) {
 		cancel()
 		return nil, err
 	}
-	h := &Hub{subs: map[uuid.UUID]map[chan struct{}]struct{}{}, cancel: cancel, done: make(chan struct{})}
+	h := &Hub{subs: map[uuid.UUID]map[chan struct{}]struct{}{}, topics: map[string]map[chan struct{}]struct{}{}, cancel: cancel, done: make(chan struct{})}
 	go h.run(ctx, pool, conn)
 	return h, nil
 }
@@ -47,7 +48,7 @@ func listen(ctx context.Context, pool *pgxpool.Pool) (*pgx.Conn, error) {
 		return nil, err
 	}
 	conn := pc.Hijack()
-	if _, err := conn.Exec(ctx, `listen notifications`); err != nil {
+	if _, err := conn.Exec(ctx, `listen notifications; listen notes`); err != nil {
 		_ = conn.Close(ctx)
 		return nil, err
 	}
@@ -59,7 +60,9 @@ func (h *Hub) run(ctx context.Context, pool *pgxpool.Pool, conn *pgx.Conn) {
 	for {
 		n, err := conn.WaitForNotification(ctx)
 		if err == nil {
-			if id, perr := uuid.Parse(n.Payload); perr == nil {
+			if n.Channel == "notes" {
+				h.pokeTopic("notes:" + n.Payload)
+			} else if id, perr := uuid.Parse(n.Payload); perr == nil {
 				h.poke(id)
 			}
 			continue
@@ -121,6 +124,11 @@ func (h *Hub) poke(user uuid.UUID) {
 func (h *Hub) pokeAll() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	for _, set := range h.topics {
+		for ch := range set {
+			wake(ch)
+		}
+	}
 	for _, set := range h.subs {
 		for ch := range set {
 			wake(ch)
@@ -177,4 +185,31 @@ func (h *handler) alive(ctx context.Context, id string) bool {
 		return err
 	})
 	return err == nil
+}
+
+// SubscribeTopic wakes the returned channel whenever something is announced on the topic, such as "notes:" and a booking's ID.
+func (h *Hub) SubscribeTopic(topic string) (wake <-chan struct{}, unsubscribe func()) {
+	ch := make(chan struct{}, 1)
+	h.mu.Lock()
+	if h.topics[topic] == nil {
+		h.topics[topic] = map[chan struct{}]struct{}{}
+	}
+	h.topics[topic][ch] = struct{}{}
+	h.mu.Unlock()
+	return ch, func() {
+		h.mu.Lock()
+		delete(h.topics[topic], ch)
+		if len(h.topics[topic]) == 0 {
+			delete(h.topics, topic)
+		}
+		h.mu.Unlock()
+	}
+}
+
+func (h *Hub) pokeTopic(topic string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for ch := range h.topics[topic] {
+		wake(ch)
+	}
 }

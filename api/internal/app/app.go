@@ -11,6 +11,7 @@ import (
 	"hotelpms/api/internal/folio"
 	"hotelpms/api/internal/housekeeping"
 	"hotelpms/api/internal/httpx"
+	"hotelpms/api/internal/notes"
 	"hotelpms/api/internal/notify"
 	"hotelpms/api/internal/rooms"
 	"hotelpms/api/internal/signin"
@@ -19,7 +20,7 @@ import (
 
 // NewHandler mounts every area of the API. google is nil when Google sign-in is not configured.
 func NewHandler(d httpx.Deps, hub *notify.Hub, google httpx.Mount) http.Handler {
-	mounts := []httpx.Mount{signin.Mount, access.Mount, staff.Mount, activity.Mount, notify.Mount(hub), rooms.Mount, booking.Mount, folio.Mount, housekeeping.Mount, alerts.Mount}
+	mounts := []httpx.Mount{signin.Mount, access.Mount, staff.Mount, activity.Mount, notify.Mount(hub), rooms.Mount, booking.Mount, folio.Mount, housekeeping.Mount, alerts.Mount, notes.Mount(hub)}
 	if google != nil {
 		mounts = append(mounts, google)
 	}

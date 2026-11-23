@@ -50,6 +50,12 @@ func Must(t *testing.T, err error) {
 // New starts a server with the given routes. The clock is fixed at noon UTC on 2026-11-23 until moved with Advance.
 func New(t *testing.T, mounts ...httpx.Mount) *World {
 	t.Helper()
+	return NewWith(t, func(*World) []httpx.Mount { return mounts })
+}
+
+// NewWith is New for routes that need the database first, such as the ones that use the notification hub.
+func NewWith(t *testing.T, build func(w *World) []httpx.Mount) *World {
+	t.Helper()
 	w := &World{T: t, Pool: testdb.New(t), Mail: mail.NewFake(), Now: time.Date(2026, 11, 23, 12, 0, 0, 0, time.UTC)}
 	mk := func(name string, slugs ...string) (org uuid.UUID, props []uuid.UUID) {
 		Must(t, db.WithoutOrg(Ctx, w.Pool, func(tx pgx.Tx) (e error) { org, e = tenant.CreateOrganization(Ctx, tx, name); return }))
@@ -69,7 +75,7 @@ func New(t *testing.T, mounts ...httpx.Mount) *World {
 	w.OrgA, a = mk("A", "a1", "a2")
 	w.OrgB, b = mk("B", "b1")
 	w.A1, w.A2, w.B1 = a[0], a[1], b[0]
-	w.Srv = httptest.NewServer(httpx.NewRouter(httpx.Deps{Pool: w.Pool, Mail: w.Mail, Now: func() time.Time { return w.Now }, Background: func(f func()) { f() }}, mounts...))
+	w.Srv = httptest.NewServer(httpx.NewRouter(httpx.Deps{Pool: w.Pool, Mail: w.Mail, Now: func() time.Time { return w.Now }, Background: func(f func()) { f() }}, build(w)...))
 	t.Cleanup(w.Srv.Close)
 	return w
 }

@@ -38,6 +38,7 @@ type Finding struct {
 	Text        string
 	Facts       map[string]any
 	Action      *Action
+	Role        access.Role // who it is for, when the check cannot say in advance (the author of a tag, for instance)
 }
 
 // Reason is stored with the alert: the sentence and the numbers behind it.
@@ -179,6 +180,10 @@ func RunProperty(ctx context.Context, tx pgx.Tx, orgID, propertyID uuid.UUID, no
 func reconcile(ctx context.Context, tx pgx.Tx, sc scope, c check, found []Finding) error {
 	still := map[uuid.UUID]bool{}
 	for _, f := range found {
+		role := c.role
+		if f.Role != "" {
+			role = f.Role
+		}
 		still[f.Subject] = true
 		reason, _ := json.Marshal(Reason{Text: f.Text, Facts: f.Facts})
 		var action []byte
@@ -207,7 +212,7 @@ func reconcile(ctx context.Context, tx pgx.Tx, sc scope, c check, found []Findin
 		if _, err := tx.Exec(ctx,
 			`insert into alert (id, organization_id, property_id, check_kind, subject_type, subject_id, severity, reason, suggested_action, target_role, opened_at)
 			 values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-			id, sc.orgID, sc.propertyID, c.kind, f.SubjectType, f.Subject, f.Severity, reason, nullJSON(action), string(c.role), sc.now); err != nil {
+			id, sc.orgID, sc.propertyID, c.kind, f.SubjectType, f.Subject, f.Severity, reason, nullJSON(action), string(role), sc.now); err != nil {
 			return err
 		}
 		level := notify.ActionNeeded
@@ -217,7 +222,7 @@ func reconcile(ctx context.Context, tx pgx.Tx, sc scope, c check, found []Findin
 		case "info":
 			level = notify.Info
 		}
-		if err := notify.Send(ctx, tx, notify.Input{OrgID: sc.orgID, PropertyID: sc.propertyID, ToRole: c.role, Level: level, Key: "alert:" + id.String(), Title: f.Text, ActionURL: "/", Now: sc.now}); err != nil {
+		if err := notify.Send(ctx, tx, notify.Input{OrgID: sc.orgID, PropertyID: sc.propertyID, ToRole: role, Level: level, Key: "alert:" + id.String(), Title: f.Text, ActionURL: "/", Now: sc.now}); err != nil {
 			return err
 		}
 		if err := audit.RecordSystem(ctx, tx, sc.orgID, "alerts", audit.Entry{Action: "alert.opened", TargetType: "alert", TargetID: id, TargetLabel: c.kind, After: map[string]any{"text": f.Text}}); err != nil {
