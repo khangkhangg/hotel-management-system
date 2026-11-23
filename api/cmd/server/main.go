@@ -18,6 +18,7 @@ import (
 	"hotelpms/api/internal/activity"
 	"hotelpms/api/internal/alerts"
 	"hotelpms/api/internal/app"
+	"hotelpms/api/internal/channels"
 	"hotelpms/api/internal/config"
 	"hotelpms/api/internal/db"
 	"hotelpms/api/internal/guestbooking"
@@ -93,6 +94,7 @@ func main() {
 	go notify.RunSweeper(ctx, pool, sender, 30*time.Second)
 	go alerts.RunSweeper(ctx, pool, time.Minute)
 	go guestbooking.RunSweeper(ctx, pool, time.Minute)
+	go channels.RunSweeper(ctx, pool, channels.Real(os.Getenv), 15*time.Minute)
 	go activity.RunNightly(ctx, pool)
 	go purgeSessions(ctx, pool)
 
