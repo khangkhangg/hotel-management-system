@@ -76,7 +76,7 @@ func main() {
 		google = app.GoogleFor(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.BaseURL)
 	}
 	deps := httpx.Deps{Pool: pool, Mail: sender, Now: time.Now, CookieSecure: cfg.CookieSecure, BaseURL: cfg.BaseURL,
-		Passwords: password.NewRangeChecker(&http.Client{Timeout: 5 * time.Second})}
+		TrustedProxies: cfg.TrustedProxies, Passwords: password.NewRangeChecker(&http.Client{Timeout: 5 * time.Second})}
 
 	go notify.RunSweeper(ctx, pool, sender, 30*time.Second)
 	go activity.RunNightly(ctx, pool)

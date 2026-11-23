@@ -29,6 +29,7 @@ func Mount(mux *http.ServeMux, d httpx.Deps) {
 		return httpx.Methods(map[string]http.HandlerFunc{method: f})
 	}
 	mux.HandleFunc("/api/staff/invites", m(http.MethodPost, users(h.createInvite)))
+	mux.HandleFunc("/api/staff-invites/{id}", m(http.MethodDelete, users(h.revokeInvite)))
 	mux.HandleFunc("/api/staff", m(http.MethodGet, users(h.list)))
 	mux.HandleFunc("/api/staff/{id}", m(http.MethodPatch, users(h.patch)))
 	mux.HandleFunc("/api/staff/{id}/deactivate", m(http.MethodPost, users(h.setStatus("deactivated"))))

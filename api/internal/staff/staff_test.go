@@ -72,7 +72,7 @@ func newWorld(t *testing.T) *world {
 	w.orgA, a = mk("A", "a1", "a2")
 	w.orgB, b = mk("B", "b1")
 	w.a1, w.a2, w.b1 = a[0], a[1], b[0]
-	deps := httpx.Deps{Pool: w.pool, Mail: w.mail, Now: w.clock, BaseURL: "https://app.example.com", Passwords: w.breach}
+	deps := httpx.Deps{Pool: w.pool, Mail: w.mail, Now: w.clock, BaseURL: "https://app.example.com", Passwords: w.breach, Background: func(f func()) { f() }}
 	w.srv = httptest.NewServer(httpx.NewRouter(deps, staff.Mount, signin.Mount))
 	t.Cleanup(w.srv.Close)
 	return w

@@ -173,6 +173,39 @@ test('user in two organizations must pick one', async ({ page }) => {
 	await expect(page.getByText('Harbour house').first()).toBeVisible();
 });
 
+test('a person with no access sees why, not a blank page', async ({ page }) => {
+	await loginAs(page, 'nobody@hotel.com');
+	await page.goto('/');
+	await expect(page.getByText('Your account has no access. Ask your manager.')).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+});
+
+test('an invite can be cancelled', async ({ page }) => {
+	await loginAs(page, 'owner@hotel.com');
+	await page.goto('/staff');
+	await page.getByRole('button', { name: 'Invite user' }).click();
+	await page.getByLabel('Email').fill('typo@hotel.com');
+	await page.getByRole('button', { name: 'Send invite' }).click();
+	const row = page.getByRole('row', { name: /typo@hotel.com/ });
+	await expect(row).toContainText('Invited');
+	await row.getByRole('button', { name: 'Cancel invite' }).click();
+	await expect(page.getByRole('row', { name: /typo@hotel.com/ })).toHaveCount(0);
+});
+
+test('the organization list loads from the server when the browser has none', async ({ page }) => {
+	await page.goto('/sign-in');
+	await page.getByLabel('Email').fill('multi@hotel.com');
+	await page.getByLabel('Password').fill(password);
+	await page.getByRole('button', { name: 'Sign in' }).click();
+	await expect(page.getByRole('heading', { name: 'Enter the code we emailed you' })).toBeVisible();
+	await page.getByLabel('Code').fill((await (await page.request.get('/api/test/last-code?email=multi@hotel.com')).text()).trim());
+	await page.getByRole('button', { name: 'Continue' }).click();
+	await expect(page).toHaveURL('/sign-in/organization');
+	await page.evaluate(() => sessionStorage.clear());
+	await page.reload();
+	await expect(page.getByRole('button', { name: 'Second Hotel' })).toBeVisible();
+});
+
 test('reduced motion removes the screen animation', async ({ page }) => {
 	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await loginAs(page, 'owner@hotel.com');

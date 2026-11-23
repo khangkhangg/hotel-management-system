@@ -99,5 +99,10 @@
 	"activity.filter": "Show",
 	"activity.empty": "Nothing has happened yet. Changes to people and access appear here.",
 	"activity.system": "The system",
-	"activity.more": "Show more"
+	"activity.more": "Show more",
+	"common.retry": "Try again",
+	"staff.revoke": "Cancel invite",
+	"staff.done.revoke": "The invite to {email} is cancelled.",
+	"invite.hasAccount": "You already have an account. Accept the invite, then sign in as usual.",
+	"invite.accept": "Accept invite"
 }

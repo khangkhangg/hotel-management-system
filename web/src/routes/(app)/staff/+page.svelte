@@ -83,6 +83,17 @@
 		}
 	}
 
+	async function revoke(row: Row) {
+		message = '';
+		try {
+			await api.delete(`/api/staff-invites/${row.id}`);
+			message = t('staff.done.revoke', { email: row.email });
+			await load();
+		} catch (e) {
+			message = errorText(e);
+		}
+	}
+
 	function askDeactivate(row: Row) {
 		confirming = row;
 		confirmOpen = true;
@@ -127,7 +138,9 @@
 						<td>{row.status === 'invited' ? '' : formatWhen(row.lastSignInAt)}</td>
 						<td><StatusBadge tone={tones[row.status]}>{statusLabels[row.status]}</StatusBadge></td>
 						<td class="actions">
-							{#if row.status !== 'invited' && row.id !== you && (isOwner || row.role !== 'owner')}
+							{#if row.status === 'invited'}
+								<Button variant="quiet" onclick={() => revoke(row)}>{t('staff.revoke')}</Button>
+							{:else if row.id !== you && (isOwner || row.role !== 'owner')}
 								{#if row.status === 'active'}
 									<Button variant="quiet" onclick={() => act(row, 'reset-sign-in')}>{t('staff.resetSignIn')}</Button>
 									<Button variant="quiet" onclick={() => askDeactivate(row)}>{t('staff.deactivate')}</Button>

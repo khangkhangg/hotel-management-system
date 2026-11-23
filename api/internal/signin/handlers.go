@@ -40,6 +40,7 @@ func Mount(mux *http.ServeMux, d httpx.Deps) {
 	mux.HandleFunc("/api/sign-in/code", post(d.RequirePending(http.HandlerFunc(h.code))))
 	mux.HandleFunc("/api/sign-in/code/resend", post(d.RequirePending(http.HandlerFunc(h.resend))))
 	mux.HandleFunc("/api/sign-in/organization", post(d.RequireSession(http.HandlerFunc(h.chooseOrganization))))
+	mux.HandleFunc("/api/organizations", httpx.Methods(map[string]http.HandlerFunc{http.MethodGet: httpx.Wrap(d.RequireSession(http.HandlerFunc(h.listOrganizations)))}))
 	mux.HandleFunc("/api/sign-out", post(http.HandlerFunc(h.signOut)))
 	mux.HandleFunc("/api/sign-out/everywhere", post(d.RequireSession(http.HandlerFunc(h.signOutEverywhere))))
 	mux.HandleFunc("/api/me", httpx.Methods(map[string]http.HandlerFunc{http.MethodGet: httpx.Wrap(d.RequireSession(http.HandlerFunc(h.me)))}))
@@ -160,7 +161,14 @@ func (h *handler) code(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx, now, pending := r.Context(), h.Clock(), httpx.SessionFrom(r.Context())
-	switch err := otp.Verify(ctx, h.Pool, pending.UserID, strings.TrimSpace(in.Code), now); {
+	err := otp.Verify(ctx, h.Pool, pending.UserID, strings.TrimSpace(in.Code), now)
+	if errors.Is(err, otp.ErrWrong) || errors.Is(err, otp.ErrExpired) || errors.Is(err, otp.ErrCancelled) {
+		// Someone who knows the password is guessing codes: the owner needs to see that.
+		_ = db.WithoutOrg(ctx, h.Pool, func(tx pgx.Tx) error {
+			return audit.RecordForUser(ctx, tx, pending.UserID, audit.Entry{Action: "signin.failed", TargetType: "user", TargetID: pending.UserID, After: map[string]string{"step": "code"}})
+		})
+	}
+	switch {
 	case err == nil:
 	case errors.Is(err, otp.ErrWrong):
 		httpx.Error(w, http.StatusBadRequest, "code_wrong", "That code is not right. Check the email and try again.")
@@ -179,7 +187,7 @@ func (h *handler) code(w http.ResponseWriter, r *http.Request) {
 	var full session.Session
 	var user account.User
 	var deviceToken string
-	err := db.WithoutOrg(ctx, h.Pool, func(tx pgx.Tx) (e error) {
+	err = db.WithoutOrg(ctx, h.Pool, func(tx pgx.Tx) (e error) {
 		if user, e = account.ByID(ctx, tx, pending.UserID); e != nil {
 			return
 		}
@@ -429,4 +437,14 @@ func (h *handler) signOutEverywhere(w http.ResponseWriter, r *http.Request) {
 // recordSignIn notes in the organization a person has entered that they signed in.
 func recordSignIn(ctx context.Context, tx pgx.Tx, userID, orgID uuid.UUID) error {
 	return audit.RecordAtOrg(ctx, tx, userID, orgID, audit.Entry{Action: "signin.succeeded", TargetType: "user", TargetID: userID})
+}
+
+// listOrganizations names the organizations the signed-in person can enter, for the screen that asks which one.
+func (h *handler) listOrganizations(w http.ResponseWriter, r *http.Request) {
+	orgs, err := h.organizations(r, httpx.SessionFrom(r.Context()).UserID)
+	if err != nil {
+		httpx.InternalError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, orgs)
 }

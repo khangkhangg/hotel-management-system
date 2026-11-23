@@ -20,6 +20,7 @@ test('describes each action in a sentence that names the target', () => {
 	expect(describeEntry(entry({ action: 'user.joined', target: { type: 'user', id: 'u', label: 'Mai Pham' } }))).toBe('joined as Mai Pham');
 	expect(describeEntry(entry({ action: 'user.role_changed', target: { type: 'user', id: 'u', label: 'Mai Pham' } }))).toBe("changed Mai Pham's role");
 	expect(describeEntry(entry({ action: 'user.deactivated', target: { type: 'user', id: 'u', label: 'Mai Pham' } }))).toBe('deactivated Mai Pham');
+	expect(describeEntry(entry({ action: 'user.invite_revoked' }))).toBe('cancelled the invite to new@hotel.com');
 	expect(describeEntry(entry({ action: 'signin.succeeded' }))).toBe('signed in');
 	expect(describeEntry(entry({ action: 'view_as.changed' }))).toBe('switched the view');
 });

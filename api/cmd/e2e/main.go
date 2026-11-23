@@ -180,6 +180,15 @@ func seed(ctx context.Context, pool *pgxpool.Pool) (org, property uuid.UUID) {
 		must(db.WithOrg(ctx, pool, org, func(tx pgx.Tx) error { return tenant.AddMembership(ctx, tx, org, id, prop, p.role) }))
 	}
 
+	// A person whose access was taken away: signed in, but with no membership.
+	must(db.WithoutOrg(ctx, pool, func(tx pgx.Tx) error {
+		id, err := account.Create(ctx, tx, "nobody@hotel.com", "No Access")
+		if err != nil {
+			return err
+		}
+		return account.SetPassword(ctx, tx, id, hash)
+	}))
+
 	// One person who works in two organizations, so sign-in has to ask which one.
 	var second, secondProperty, multi uuid.UUID
 	must(db.WithoutOrg(ctx, pool, func(tx pgx.Tx) (e error) { second, e = tenant.CreateOrganization(ctx, tx, "Second Hotel"); return }))

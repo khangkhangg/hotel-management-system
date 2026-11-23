@@ -118,7 +118,7 @@ func findTarget(r *http.Request, tx pgx.Tx, a access.Actor) (target, error) {
 	}
 	err = tx.QueryRow(r.Context(),
 		`select m.id, m.user_id, m.role, m.status, u.name from membership m join app_user u on u.id = m.user_id
-		 where m.user_id = $1 and m.organization_id = $2 and m.property_id is not distinct from $3::uuid`, userID, a.OrgID, property).
+		 where m.user_id = $1 and m.organization_id = $2 and (m.property_id is not distinct from $3::uuid or m.property_id is null)`, userID, a.OrgID, property).
 		Scan(&t.membershipID, &t.userID, &t.role, &t.status, &t.name)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return t, errNoTarget

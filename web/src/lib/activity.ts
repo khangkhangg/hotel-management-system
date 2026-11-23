@@ -22,6 +22,7 @@ const phrases: Record<string, (e: Entry) => string> = {
 	'user.joined': (e) => `joined as ${e.target.label}`,
 	'user.role_changed': (e) => `changed ${e.target.label}'s role`,
 	'user.moved': (e) => `moved ${e.target.label} to another property`,
+	'user.invite_revoked': (e) => `cancelled the invite to ${e.target.label}`,
 	'user.deactivated': (e) => `deactivated ${e.target.label}`,
 	'user.reactivated': (e) => `reactivated ${e.target.label}`,
 	'user.signin_reset': (e) => `reset sign-in for ${e.target.label}`,
@@ -38,6 +39,7 @@ export const describeEntry = (e: Entry): string => phrases[e.action]?.(e) ?? `${
 export const actionOptions: { id: string; label: string }[] = [
 	{ id: '', label: 'All activity' },
 	{ id: 'user.invited', label: 'Invites' },
+	{ id: 'user.invite_revoked', label: 'Cancelled invites' },
 	{ id: 'user.joined', label: 'New people joined' },
 	{ id: 'user.role_changed', label: 'Role changes' },
 	{ id: 'user.deactivated', label: 'Deactivations' },

@@ -169,7 +169,7 @@ func insert(ctx context.Context, tx pgx.Tx, user uuid.UUID, in Input, due *time.
 	if _, err := tx.Exec(ctx,
 		`insert into notification (id, organization_id, property_id, user_id, level, key, title, body, action_url, created_at, updated_at, email_due_at, escalation)
 		 values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10, $11, $12)
-		 on conflict (user_id, key) where resolved_at is null `+conflict,
+		 on conflict (organization_id, property_id, user_id, key) where resolved_at is null `+conflict,
 		ids.New(), in.OrgID, in.PropertyID, user, string(in.Level), in.Key, in.Title, in.Body, in.ActionURL, in.Now, due, escalation); err != nil {
 		return err
 	}

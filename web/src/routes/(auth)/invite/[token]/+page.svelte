@@ -9,7 +9,7 @@
 	import Field from '#lib/ui/Field.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 
-	type Preview = { email: string; organizationName: string; propertyName: string; role: string };
+	type Preview = { email: string; organizationName: string; propertyName: string; role: string; hasAccount: boolean };
 	const token = page.params.token;
 
 	let invite = $state<Preview | null>(null);
@@ -54,11 +54,17 @@
 		note={t('invite.help', { role: invite.role.replace('_', ' '), email: invite.email })}
 	/>
 	<form class="stack" onsubmit={submit}>
+		{#if invite.hasAccount}
+			<p class="muted">{t('invite.hasAccount')}</p>
+			{#if message}<p class="notice danger" role="alert">{message}</p>{/if}
+			<Button type="submit" block disabled={busy}>{t('invite.accept')}</Button>
+		{:else}
 		{#if message}<p class="notice danger" role="alert">{message}</p>{/if}
 		<Field label={t('invite.name')} autocomplete="name" bind:value={name} />
 		<Field label={t('invite.password')} type="password" autocomplete="new-password" bind:value={password} />
 		<p class="muted">{t('invite.passwordHelp')}</p>
 		<Button type="submit" block disabled={busy}>{t('invite.button')}</Button>
+		{/if}
 	</form>
 {:else if message}
 	<p class="notice danger" role="alert">{message}</p>

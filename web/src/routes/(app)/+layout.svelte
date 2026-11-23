@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { onMount, type Snippet } from 'svelte';
 	import { MediaQuery } from 'svelte/reactivity';
-	import { onUnauthorized } from '#lib/api.ts';
+	import { api, ApiError, onUnauthorized, errorText } from '#lib/api.ts';
 	import { drafts, returnTo } from '#lib/draft.ts';
 	import { t } from '#lib/i18n.ts';
 	import { allowed, homeFor, itemsFor, roleLabels } from '#lib/nav.ts';
@@ -17,6 +17,7 @@
 	let { children }: { children: Snippet } = $props();
 
 	let ready = $state(false);
+	let loadError = $state('');
 	let collapsed = $state(false);
 	let overlayOpen = $state(false);
 	const desktop = new MediaQuery('(min-width: 1024px)');
@@ -41,7 +42,9 @@
 				collapsed = readSidebar() === 'collapsed';
 				ready = true;
 			})
-			.catch(() => {}); // a 401 was handled above; anything else leaves the loading state
+			.catch((e) => {
+				if (!(e instanceof ApiError && e.status === 401)) loadError = errorText(e); // a 401 was handled above
+			});
 		return () => onUnauthorized(null);
 	});
 
@@ -49,6 +52,12 @@
 	$effect(() => {
 		if (ready && role && path === '/' && !allowed(role, '/')) goto(homeFor(role), { replaceState: true });
 	});
+
+	async function signOut() {
+		await api.post('/api/sign-out').catch(() => {});
+		session.clear();
+		await goto('/sign-in');
+	}
 
 	const sidebarKey = () => `sidebar:${session.current?.user.id}`;
 	function readSidebar() {
@@ -72,7 +81,15 @@
 	}
 </script>
 
-{#if ready && role}
+{#if loadError}
+	<main class="failed">
+		<PageHeader title={loadError} />
+		<div class="actions">
+			<Button onclick={signOut}>{t('topbar.signOut')}</Button>
+			<Button variant="secondary" onclick={() => location.reload()}>{t('common.retry')}</Button>
+		</div>
+	</main>
+{:else if ready && role}
 	<div class="shell">
 		<Sidebar {items} {expanded} overlay={!desktop.current} hotel={session.current?.organization.name ?? ''} ontoggle={toggle} />
 		<div class="main">
@@ -100,6 +117,19 @@
 {/if}
 
 <style>
+	.failed {
+		display: flex;
+		flex-direction: column;
+		gap: var(--gap-group);
+		max-inline-size: var(--form-width);
+		margin: var(--space-8) auto;
+		padding-inline: var(--space-4);
+	}
+	.actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--gap-related);
+	}
 	.shell {
 		display: flex;
 		min-block-size: 100dvh;

@@ -167,6 +167,7 @@ func (h *handler) previewInvite(w http.ResponseWriter, r *http.Request) {
 		Email            string `json:"email"`
 		OrganizationName string `json:"organizationName"`
 		PropertyName     string `json:"propertyName"`
+		HasAccount       bool   `json:"hasAccount"` // they already have an account, so they sign in instead of choosing a password
 		Role             string `json:"role"`
 	}
 	err := db.WithInvite(ctx, h.Pool, hashOf(token), func(tx pgx.Tx) error {
@@ -175,6 +176,11 @@ func (h *handler) previewInvite(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		out.Email, out.Role = inv.Email, inv.Role
+		if _, e := account.ByEmail(ctx, tx, inv.Email); e == nil {
+			out.HasAccount = true
+		} else if !errors.Is(e, account.ErrNotFound) {
+			return e
+		}
 		if err := tx.QueryRow(ctx, `select name from organization where id = $1`, inv.Org).Scan(&out.OrganizationName); err != nil {
 			return err
 		}
@@ -308,4 +314,40 @@ func NewOwnerInvite(ctx context.Context, tx pgx.Tx, org uuid.UUID, email string,
 		 values ($1, $2, null, $3, 'owner', $4, null, $5, $6)`,
 		ids.New(), org, account.NormalizeEmail(email), hash, now, now.Add(inviteLifetime))
 	return token, err
+}
+
+// revokeInvite cancels an invite that nobody has used yet, so a mistyped address cannot join.
+// A manager can cancel invites at their own property; an owner can cancel any in the organization.
+func (h *handler) revokeInvite(w http.ResponseWriter, r *http.Request) {
+	ctx, a := r.Context(), access.ActorFrom(r.Context())
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		notFound(w)
+		return
+	}
+	var property *uuid.UUID
+	if a.Role != access.Owner {
+		property = &a.PropertyID
+	}
+	err = db.WithOrg(ctx, h.Pool, a.OrgID, func(tx pgx.Tx) error {
+		var email string
+		err := tx.QueryRow(ctx,
+			`delete from invite where id = $1 and organization_id = $2 and accepted_at is null and ($3::uuid is null or property_id = $3) returning email`,
+			id, a.OrgID, property).Scan(&email)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return errNoTarget
+		}
+		if err != nil {
+			return err
+		}
+		return audit.Record(ctx, tx, audit.Entry{Action: "user.invite_revoked", TargetType: "invite", TargetID: id, TargetLabel: email})
+	})
+	switch {
+	case errors.Is(err, errNoTarget):
+		notFound(w)
+	case err != nil:
+		httpx.InternalError(w, err)
+	default:
+		w.WriteHeader(http.StatusNoContent)
+	}
 }

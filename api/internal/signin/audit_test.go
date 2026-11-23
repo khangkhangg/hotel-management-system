@@ -85,3 +85,25 @@ func TestAWrongPasswordIsRecordedOnlyForARealAccount(t *testing.T) {
 		t.Fatalf("%v", got)
 	}
 }
+
+func TestAWrongEmailCodeIsRecorded(t *testing.T) {
+	a := newApp(t)
+	a.seedUser("mai@hotel.com", goodPassword, a.site(), "front_desk")
+	c := a.client()
+	c.signIn("mai@hotel.com", goodPassword).want(200, `"next":"code"`)
+	c.enterCode("000000", false).want(400, "code_wrong")
+	if got := a.actions(a.site().org); !slices.Equal(got, []string{"signin.failed"}) {
+		t.Fatalf("%v", got)
+	}
+}
+
+func TestOrganizationsListsTheChoicesForASessionWithNoneChosen(t *testing.T) {
+	a := newApp(t)
+	first, second := a.newSite("First Hotel"), a.newSite("Second Hotel")
+	id := a.seedUser("mai@hotel.com", goodPassword, first, "owner")
+	a.addMembership(id, second, "owner")
+	c := a.client()
+	c.get("/api/organizations").want(401)
+	c.fullSignIn("mai@hotel.com", goodPassword, false).want(200, "choose_organization")
+	c.get("/api/organizations").want(200, "First Hotel", "Second Hotel", first.org.String())
+}

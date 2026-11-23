@@ -58,6 +58,14 @@ describe('api', () => {
 		expect(calls[2].init.method).toBe('PUT');
 	});
 
+	test('DELETE sends the CSRF token and no body', async () => {
+		replies.push(json(200, { token: 't' }), json(204, null));
+		await api.delete('/api/staff-invites/1');
+		expect(calls[1].init.method).toBe('DELETE');
+		expect(header(calls[1], 'X-CSRF-Token')).toBe('t');
+		expect(calls[1].init.body).toBeUndefined();
+	});
+
 	test('the chosen property goes along as X-Property-Id', async () => {
 		setProperty('prop-1');
 		replies.push(json(200, []));

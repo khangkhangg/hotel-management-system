@@ -4,6 +4,7 @@ package httpx
 import (
 	"encoding/json"
 	"net/http"
+	"net/netip"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -14,12 +15,14 @@ import (
 
 // Deps is everything routes need. It grows as tasks add routes.
 type Deps struct {
-	Pool         *pgxpool.Pool
-	Mail         mail.Sender
-	Now          func() time.Time // injected so tests control time
-	CookieSecure bool
-	BaseURL      string                 // the address people use, for links in emails
-	Passwords    password.BreachChecker // checks new passwords against breach lists; nil skips the check
+	Pool           *pgxpool.Pool
+	Mail           mail.Sender
+	Now            func() time.Time // injected so tests control time
+	CookieSecure   bool
+	BaseURL        string                 // the address people use, for links in emails
+	Passwords      password.BreachChecker // checks new passwords against breach lists; nil skips the check
+	TrustedProxies []netip.Prefix         // peers whose X-Forwarded-For is believed; none by default
+	Background     func(func())           // runs work after the response is decided; nil starts a goroutine, tests run it at once
 }
 
 // Clock returns the current time from Now, or the real time when Now is not set.
@@ -28,6 +31,15 @@ func (d Deps) Clock() time.Time {
 		return d.Now()
 	}
 	return time.Now()
+}
+
+// Spawn runs f in the background, so a response does not wait for it (and so cannot reveal how long it took).
+func (d Deps) Spawn(f func()) {
+	if d.Background != nil {
+		d.Background(f)
+		return
+	}
+	go f()
 }
 
 // Mount registers a package's routes. Packages that import httpx provide one, so httpx never imports them.
@@ -47,7 +59,7 @@ func NewRouter(d Deps, mounts ...Mount) http.Handler {
 	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		Error(w, http.StatusNotFound, "not_found", "There is nothing at this address.")
 	})
-	return Trace(d.csrf(mux))
+	return RealIP(d.TrustedProxies)(Trace(d.csrf(mux)))
 }
 
 func JSON(w http.ResponseWriter, status int, body any) {

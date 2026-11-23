@@ -4,14 +4,17 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
 	DatabaseURL        string
 	BaseURL            string
-	MigrateURL         string // an owner-role connection, used only to run migrations
+	MigrateURL         string         // an owner-role connection, used only to run migrations
+	TrustedProxies     []netip.Prefix // proxies whose X-Forwarded-For is believed (TRUSTED_PROXIES, comma separated)
 	SMTPFrom           string
 	SMTPURL            string
 	GoogleClientID     string
@@ -36,6 +39,20 @@ func Load() (Config, error) {
 	}
 	if c.SMTPFrom == "" {
 		c.SMTPFrom = "Hotel PMS <no-reply@localhost>"
+	}
+	for _, part := range strings.Split(os.Getenv("TRUSTED_PROXIES"), ",") {
+		if part = strings.TrimSpace(part); part == "" {
+			continue
+		}
+		p, err := netip.ParsePrefix(part)
+		if err != nil {
+			a, aerr := netip.ParseAddr(part)
+			if aerr != nil {
+				return Config{}, fmt.Errorf("TRUSTED_PROXIES must list addresses or ranges, got %q", part)
+			}
+			p = netip.PrefixFrom(a, a.BitLen())
+		}
+		c.TrustedProxies = append(c.TrustedProxies, p)
 	}
 	if v := os.Getenv("COOKIE_SECURE"); v != "" {
 		b, err := strconv.ParseBool(v)

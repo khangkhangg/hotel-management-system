@@ -13,7 +13,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"hotelpms/api/internal/db"
 	"hotelpms/api/internal/httpx"
+	"hotelpms/api/internal/session"
 )
 
 // Hub listens on the PostgreSQL channel "notifications" and wakes the open streams of the people named in it,
@@ -148,8 +150,14 @@ func (h *handler) stream(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case <-beat.C:
+			if !h.alive(r.Context(), s.ID) {
+				return
+			}
 			fmt.Fprint(w, ": keep-alive\n\n")
 		case <-events:
+			if !h.alive(r.Context(), s.ID) { // signed out, expired or deactivated since the stream opened
+				return
+			}
 			l, err := h.list(r.Context(), *s.OrgID, s.UserID)
 			if err != nil {
 				log.Printf("notification stream: %v", err)
@@ -160,4 +168,13 @@ func (h *handler) stream(w http.ResponseWriter, r *http.Request) {
 		}
 		flusher.Flush()
 	}
+}
+
+// alive reports whether the session is still valid, so a stream ends when its person is signed out or deactivated.
+func (h *handler) alive(ctx context.Context, id string) bool {
+	err := db.WithoutOrg(ctx, h.Pool, func(tx pgx.Tx) error {
+		_, err := session.Lookup(ctx, tx, id, h.Clock())
+		return err
+	})
+	return err == nil
 }

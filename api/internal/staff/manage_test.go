@@ -265,3 +265,13 @@ func TestAnInviteRowIsNotAPerson(t *testing.T) {
 	inviteID := w.list(owner, nil)["new@hotel.com"].ID
 	w.do(owner, "POST", "/api/staff/"+inviteID+"/deactivate", ptr(w.a1), "").want(t, 404)
 }
+
+func TestAnOwnerCanManageAnotherOwnerWhileWorkingInAProperty(t *testing.T) {
+	w := newWorld(t)
+	first := w.member("linh@hotel.com", w.orgA, nil, "owner")
+	second := w.member("nam@hotel.com", w.orgA, nil, "owner")
+	id := "/api/staff/" + second.id.String()
+	w.do(first, "POST", id+"/reset-sign-in", ptr(w.a1), "").want(t, 204)
+	w.do(first, "POST", id+"/deactivate", ptr(w.a1), "").want(t, 204)
+	w.do(first, "POST", id+"/reactivate", ptr(w.a1), "").want(t, 204)
+}

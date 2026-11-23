@@ -10,8 +10,12 @@
 	let choices = $state<OrganizationChoice[]>([]);
 	let message = $state('');
 
-	onMount(() => {
+	onMount(async () => {
 		choices = organizationChoices.get();
+		if (choices.length === 0) {
+			// Opened in a new tab, or after Google sign-in: ask the server which organizations this session can enter.
+			choices = await api.get<OrganizationChoice[]>('/api/organizations').catch(() => []);
+		}
 		if (choices.length === 0) goto('/sign-in');
 	});
 

@@ -441,6 +441,7 @@ func (p *person) openStream() (events <-chan string, closeStream func()) {
 	out := make(chan string, 16)
 	go func() {
 		defer res.Body.Close()
+		defer close(out)
 		sc := bufio.NewScanner(res.Body)
 		for sc.Scan() {
 			if name, ok := strings.CutPrefix(sc.Text(), "event: "); ok {
@@ -485,5 +486,35 @@ func TestStreamIsPerUser(t *testing.T) {
 	case name := <-theirs:
 		t.Fatalf("another person's stream received %q", name)
 	case <-time.After(500 * time.Millisecond):
+	}
+}
+
+func TestTheSameKeyInAnotherOrganizationOrPropertyIsSeparate(t *testing.T) {
+	a := newApp(t)
+	p := a.person(a.orgA, &a.a1, access.Manager)
+	must(t, db.WithOrg(ctx, a.pool, a.orgB, func(tx pgx.Tx) error { return tenant.AddMembership(ctx, tx, a.orgB, p.id, &a.b1, "manager") }))
+	id := p.id
+	a.send(notify.Input{OrgID: a.orgA, PropertyID: a.a1, ToUser: &id, Level: notify.Info, Key: "channel-down:expedia", Title: "t"})
+	a.send(notify.Input{OrgID: a.orgA, PropertyID: a.a2, ToUser: &id, Level: notify.Info, Key: "channel-down:expedia", Title: "t"})
+	a.send(notify.Input{OrgID: a.orgB, PropertyID: a.b1, ToUser: &id, Level: notify.Info, Key: "channel-down:expedia", Title: "t"})
+	if got := p.notifications(); len(got.Items) != 2 || got.Items[0].Count != 1 || got.Items[1].Count != 1 {
+		t.Fatalf("organization A should hold one alert per property: %+v", got)
+	}
+}
+
+func TestStreamStopsWhenTheSessionEnds(t *testing.T) {
+	a := newApp(t)
+	mgr := a.person(a.orgA, &a.a1, access.Manager)
+	events, closeStream := mgr.openStream()
+	defer closeStream()
+	must(t, db.WithoutOrg(ctx, a.pool, func(tx pgx.Tx) error { return session.EndAll(ctx, tx, mgr.id) }))
+	a.send(notify.Input{ToRole: access.Manager, Level: notify.Info, Key: "k", Title: "t"})
+	select {
+	case name, open := <-events:
+		if open {
+			t.Fatalf("an ended session still received %q", name)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("the stream stayed open after the session ended")
 	}
 }

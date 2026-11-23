@@ -1,6 +1,7 @@
 package staff
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -33,6 +34,8 @@ func (h *handler) requestReset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx, now := r.Context(), h.Clock()
+	var msg *mail.Message
+	var resetID uuid.UUID
 	err := db.WithoutOrg(ctx, h.Pool, func(tx pgx.Tx) error {
 		user, err := account.ByEmail(ctx, tx, in.Email)
 		if errors.Is(err, account.ErrNotFound) || (err == nil && user.Status != "active") {
@@ -52,23 +55,41 @@ func (h *handler) requestReset(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
+		id := ids.New()
 		if _, err := tx.Exec(ctx, `insert into password_reset (id, user_id, token_hash, created_at, expires_at) values ($1, $2, $3, $4, $5)`,
-			ids.New(), user.ID, hash, now, now.Add(resetLifetime)); err != nil {
+			id, user.ID, hash, now, now.Add(resetLifetime)); err != nil {
 			return err
 		}
-		text := fmt.Sprintf("Someone asked to reset the password for this account.\n\nOpen this link to choose a new one. It works for 30 minutes and only once:\n%s/reset/%s\n\nIf it was not you, ignore this email. Your password stays as it is.\n", h.BaseURL, token)
-		if err := h.Mail.Send(ctx, mail.Message{To: user.Email, Subject: "Reset your password", Text: text}); err != nil {
-			// The answer must not depend on whether the email went out, so log it and roll the row back.
-			log.Printf("password reset email failed: %v", err)
-			return errEmailFailed
-		}
+		msg = &mail.Message{To: user.Email, Subject: "Reset your password", Text: fmt.Sprintf("Someone asked to reset the password for this account.\n\nOpen this link to choose a new one. It works for 30 minutes and only once:\n%s/reset/%s\n\nIf it was not you, ignore this email. Your password stays as it is.\n", h.BaseURL, token)}
+		resetID = id
 		return nil
 	})
-	if err != nil && !errors.Is(err, errEmailFailed) {
+	if err != nil {
 		httpx.InternalError(w, err)
 		return
 	}
+	if msg != nil {
+		// Sent after the answer is decided, so the response takes the same time whether or not the account exists.
+		bg := context.WithoutCancel(ctx)
+		h.Spawn(func() { h.sendReset(bg, *msg, resetID) })
+	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// sendReset emails the link. If that fails the reset is voided and no longer counts toward the hourly limit.
+func (h *handler) sendReset(ctx context.Context, m mail.Message, id uuid.UUID) {
+	if err := h.Mail.Send(ctx, m); err == nil {
+		return
+	} else {
+		log.Printf("password reset email failed: %v", err)
+	}
+	err := db.WithoutOrg(ctx, h.Pool, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `update password_reset set used_at = now(), created_at = to_timestamp(0) where id = $1`, id)
+		return err
+	})
+	if err != nil {
+		log.Printf("password reset void failed: %v", err)
+	}
 }
 
 var errLinkInvalid = errors.New("staff: reset link invalid")
