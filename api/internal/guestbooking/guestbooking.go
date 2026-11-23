@@ -29,6 +29,7 @@ import (
 	"hotelpms/api/internal/ids"
 	"hotelpms/api/internal/mail"
 	"hotelpms/api/internal/payments"
+	"hotelpms/api/internal/promo"
 	"hotelpms/api/internal/ratelimit"
 	"hotelpms/api/internal/risk"
 	"hotelpms/api/internal/siteprofile"
@@ -340,6 +341,7 @@ type bookIn struct {
 	PaymentKind string                `json:"paymentKind"`
 	Key         string                `json:"key"`
 	Extras      []extraReq            `json:"extras"`
+	Promo       string                `json:"promo"`
 }
 
 type lineOut struct {
@@ -352,6 +354,22 @@ func price(ctx context.Context, tx pgx.Tx, org, prop uuid.UUID, in bookIn, now t
 	res, err := booking.Create(ctx, tx, org, prop, booking.CreateInput{Guest: in.Guest, Rooms: in.Rooms, Source: "website"}, now)
 	if err != nil {
 		return res, uuid.Nil, 0, nil, err
+	}
+	if strings.TrimSpace(in.Promo) != "" {
+		nights, arrival := 0, time.Time{}
+		for _, rm := range in.Rooms {
+			from, e1 := time.Parse("2006-01-02", rm.From)
+			to, e2 := time.Parse("2006-01-02", rm.To)
+			if e1 == nil && e2 == nil {
+				nights = max(nights, int(to.Sub(from).Hours()/24))
+				if arrival.IsZero() || from.Before(arrival) {
+					arrival = from
+				}
+			}
+		}
+		if err := promo.Apply(ctx, tx, org, prop, res.ID, in.Promo, res.Total, nights, arrival, now); err != nil {
+			return res, uuid.Nil, 0, nil, err
+		}
 	}
 	for _, x := range in.Extras {
 		if _, err := extras.Add(ctx, tx, org, prop, res.ID, x.ID, x.Quantity, uuid.Nil, now); err != nil {
@@ -394,6 +412,8 @@ func bookingError(w http.ResponseWriter, err error) bool {
 		httpx.Error(w, http.StatusBadRequest, "bad_request", "Check the dates and guests.")
 	case errors.Is(err, booking.ErrNotFound), errors.Is(err, pgx.ErrNoRows):
 		httpx.Error(w, http.StatusNotFound, "not_found", "That room or rate is not available here.")
+	case errors.Is(err, promo.ErrInvalid):
+		httpx.Error(w, http.StatusConflict, "promo_invalid", "That promo code does not work for these dates.")
 	case errors.Is(err, errTypeOff):
 		httpx.Error(w, http.StatusConflict, "payment_type_off", "The hotel no longer offers that way to pay. Choose another.")
 	default:
@@ -566,7 +586,7 @@ func sane(in bookIn) bool {
 	if err != nil || a.Address != in.Guest.Email || len(in.Guest.Email) > 200 || len(in.Guest.Phone) > 50 || len(in.Guest.Name) > 200 || len(in.Guest.Country) > 100 {
 		return false
 	}
-	if len(in.Key) > 64 || !extrasOK(in) {
+	if len(in.Key) > 64 || len(in.Promo) > 20 || !extrasOK(in) {
 		return false
 	}
 	if len(in.Rooms) < 1 || len(in.Rooms) > 4 {

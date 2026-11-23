@@ -17,6 +17,7 @@ import (
 	"hotelpms/api/internal/guestbooking"
 	"hotelpms/api/internal/httpx"
 	"hotelpms/api/internal/payments"
+	"hotelpms/api/internal/promo"
 	"hotelpms/api/internal/risk"
 	"hotelpms/api/internal/rooms"
 	"hotelpms/api/internal/siteprofile"
@@ -52,7 +53,7 @@ func newHotelFor(t *testing.T, nRooms int, cardIsOurs bool) *hotel {
 		if cardIsOurs {
 			owner = w.OrgA
 		}
-		return []httpx.Mount{rooms.Mount, extras.Mount, siteprofile.Mount, risk.Mount, booking.Mount, folio.Mount, guestbooking.Mount(fake, owner)}
+		return []httpx.Mount{rooms.Mount, extras.Mount, siteprofile.Mount, risk.Mount, promo.Mount, booking.Mount, folio.Mount, guestbooking.Mount(fake, owner)}
 	})
 	h := &hotel{w: w, fake: fake, prop: &w.A1}
 	h.owner = w.Member(w.OrgA, nil, "owner")
@@ -506,4 +507,56 @@ func TestARiskyCardBookingAsksForA3DSecureCheckAndAHighOneJoinsTheReviewQueue(t 
 	if c := h.fake.Checkouts; !c[len(c)-1].ThreeDS {
 		t.Fatal("a high risk booking did not ask for a 3-D Secure check")
 	}
+}
+
+func withPromo(body, code string) string {
+	return strings.Replace(body, `{"guest"`, `{"promo":"`+code+`","guest"`, 1)
+}
+
+func TestAPromoCodeTakesMoneyOffTheQuoteAndTheBookingAndIsCountedOnlyByABooking(t *testing.T) {
+	h := newHotel(t, 3)
+	desk := h.w.Member(h.w.OrgA, h.prop, "front_desk")
+	desk.Do("POST", "/api/promo-codes", h.prop, `{"code":"SPRING10","kind":"percent","value":10,"active":true}`).Want(t, 403)
+	h.mgr.Do("POST", "/api/promo-codes", h.prop, `{"code":"spring10","kind":"percent","value":10,"active":true}`).Want(t, 201, `"SPRING10"`)
+	h.mgr.Do("POST", "/api/promo-codes", h.prop, `{"code":"SPRING10","kind":"percent","value":5,"active":true}`).Want(t, 409)
+	h.mgr.Do("POST", "/api/promo-codes", h.prop, `{"code":"BIG","kind":"percent","value":150,"active":true}`).Want(t, 400)
+	body := h.booking("hotel", "2026-12-10", "2026-12-12")
+	plain := h.w.Anon("POST", "/api/public/a1/quote", body).Want(t, 200, `"total":20000`)
+	_ = plain
+	for i := 0; i < 2; i++ {
+		h.w.Anon("POST", "/api/public/a1/quote", withPromo(body, "spring10")).Want(t, 200, `"total":18000`, "Promo SPRING10", `"amount":-2000`)
+	}
+	h.mgr.Do("GET", "/api/promo-codes", h.prop, "").Want(t, 200, `"used":0`)
+	h.w.Anon("POST", "/api/public/a1/bookings", withPromo(body, "SPRING10")).Want(t, 201, `"total":18000`)
+	h.mgr.Do("GET", "/api/promo-codes", h.prop, "").Want(t, 200, `"used":1`)
+}
+
+func TestAPromoCodeThatDoesNotFitTheStayIsRefusedAndNothingIsBooked(t *testing.T) {
+	h := newHotel(t, 3)
+	for _, c := range []string{
+		`{"code":"THREENIGHTS","kind":"amount","value":1000,"minNights":3,"active":true}`,
+		`{"code":"NEXTYEAR","kind":"amount","value":1000,"arriveFrom":"2027-01-01","active":true}`,
+		`{"code":"OFF","kind":"amount","value":1000,"active":false}`,
+		`{"code":"ONCE","kind":"amount","value":1000,"maxUses":1,"active":true}`,
+	} {
+		h.mgr.Do("POST", "/api/promo-codes", h.prop, c).Want(t, 201)
+	}
+	body := h.booking("hotel", "2026-12-10", "2026-12-12")
+	for _, code := range []string{"NOPE", "OFF"} {
+		h.w.Anon("POST", "/api/public/a1/bookings", withPromo(body, code)).Want(t, 409, "promo_invalid")
+	}
+	for _, code := range []string{"THREENIGHTS", "NEXTYEAR"} {
+		h.w.Anon("POST", "/api/public/a1/quote", withPromo(body, code)).Want(t, 409, "promo_invalid")
+	}
+	if got := h.row(t, `select count(*)::text from reservation`); got != "0" {
+		t.Fatalf("%s reservations were made with a refused code", got)
+	}
+	h.w.Anon("POST", "/api/public/a1/bookings", withPromo(body, "ONCE")).Want(t, 201, `"total":19000`)
+	h.w.Anon("POST", "/api/public/a1/bookings", withPromo(h.booking("hotel", "2026-12-14", "2026-12-16"), "ONCE")).Want(t, 409, "promo_invalid")
+}
+
+func TestAFixedAmountNeverTakesMoreThanTheRoomPrice(t *testing.T) {
+	h := newHotel(t, 3)
+	h.mgr.Do("POST", "/api/promo-codes", h.prop, `{"code":"HUGE","kind":"amount","value":99999999,"active":true}`).Want(t, 201)
+	h.w.Anon("POST", "/api/public/a1/quote", withPromo(h.booking("hotel", "2026-12-10", "2026-12-12"), "HUGE")).Want(t, 200, `"total":0`)
 }
