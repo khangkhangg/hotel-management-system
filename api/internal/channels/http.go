@@ -46,7 +46,7 @@ func GuardedClient() *http.Client {
 // Real makes the adapters that talk over the internet. getenv turns the name of a server setting into its value.
 func Real(getenv func(string) string) Factory {
 	return func(c Connection) (Adapter, error) {
-		known := map[string]bool{"cm_generic": true, "channex": true, "agoda": true, "booking_com": true, "expedia": true, "google": true}
+		known := map[string]bool{"cm_generic": true, "channex": true, "beds24": true, "agoda": true, "booking_com": true, "expedia": true, "google": true}
 		if !known[c.Provider] {
 			return nil, ErrUnavailable
 		}
@@ -64,6 +64,8 @@ func Real(getenv func(string) string) Factory {
 				return nil, errors.New("channels: the address of the channel manager's connection is needed")
 			}
 			return NewChannelManager(c.BaseURL, c.ExternalHotelID, secret, GuardedClient()), nil
+		case "beds24":
+			return NewBeds24(c.BaseURL, c.ExternalHotelID, secret, GuardedClient()), nil
 		case "channex":
 			return NewChannex(c.BaseURL, c.ExternalHotelID, secret, GuardedClient()), nil
 		case "agoda":

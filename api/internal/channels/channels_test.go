@@ -170,6 +170,7 @@ func TestTheSetupListsProvidersAndTheRecommendedOneComesFirst(t *testing.T) {
 	var ps []struct {
 		ID, Mode, Name string
 		Recommended    bool
+		Connectable    bool
 		Fields         []string
 	}
 	testkit.Must(t, json.Unmarshal([]byte(got), &ps))
@@ -182,7 +183,7 @@ func TestTheSetupListsProvidersAndTheRecommendedOneComesFirst(t *testing.T) {
 		if p.ID == "fake" {
 			t.Fatal("the test provider is offered to owners")
 		}
-		if len(p.Fields) == 0 {
+		if p.Connectable && len(p.Fields) == 0 {
 			t.Errorf("%s names no fields to fill in", p.ID)
 		}
 	}
@@ -276,4 +277,49 @@ func TestTheNightlyCheckMovesAStayAndImportsABookingThatNoMessageBrought(t *test
 	if got := h.row(t, `select count(*)::text from reservation where source_channel = 'fake' and status <> 'cancelled'`); got != "2" {
 		t.Fatalf("%s reservations", got)
 	}
+}
+
+func TestTheCatalogNamesMarketsAndSaysWhichVendorsNeedTheirApproval(t *testing.T) {
+	h := newHotel(t, 1)
+	got := h.manager.Do("GET", "/api/channel/providers", &h.w.A1, "").Want(t, 200).Body
+	var ps []struct {
+		ID          string
+		Mode        string
+		Access      string
+		Connectable bool
+		Markets     []string
+		Steps       []string
+	}
+	testkit.Must(t, json.Unmarshal([]byte(got), &ps))
+	by := map[string]int{}
+	for i, p := range ps {
+		by[p.ID] = i
+	}
+	for id, market := range map[string]string{"channex": "ALL", "beds24": "ALL", "siteminder": "TW", "staah": "VN", "ezee": "TH", "rategain": "SG", "cloudbeds": "US", "omnibees": "MX", "tllincoln": "JP", "neppan": "JP", "mirai": "EU"} {
+		i, ok := by[id]
+		if !ok {
+			t.Errorf("%s is missing", id)
+			continue
+		}
+		p := ps[i]
+		if p.Mode != "channel_manager" && id != "agoda" {
+			t.Errorf("%s mode %s", id, p.Mode)
+		}
+		found := false
+		for _, m := range p.Markets {
+			found = found || m == market
+		}
+		if !found {
+			t.Errorf("%s does not name %s: %v", id, market, p.Markets)
+		}
+		open := id == "channex" || id == "beds24"
+		if p.Connectable != open || (p.Access == "self_serve") != open {
+			t.Errorf("%s connectable %v access %s", id, p.Connectable, p.Access)
+		}
+		if len(p.Steps) == 0 {
+			t.Errorf("%s has no steps", id)
+		}
+	}
+	h.manager.Do("PUT", "/api/channel", &h.w.A1, `{"mode":"channel_manager","provider":"beds24","externalHotelId":"77","secretSetting":"BEDS24_TOKEN","enabled":false}`).Want(t, 200)
+	h.manager.Do("PUT", "/api/channel", &h.w.A1, `{"mode":"channel_manager","provider":"siteminder","externalHotelId":"77"}`).Want(t, 400)
 }

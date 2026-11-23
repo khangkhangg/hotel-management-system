@@ -18,16 +18,19 @@ type Profile struct {
 	Mode        string   `json:"mode"` // channel_manager or direct
 	Name        string   `json:"name"`
 	Recommended bool     `json:"recommended"`
-	Fields      []string `json:"fields"`     // which inputs the owner fills in: hotelId, baseUrl, secret
-	Steps       []string `json:"steps"`      // plain-language things to do on the other side first
-	Reaches     []string `json:"reaches"`    // the booking sites this connection serves
-	Verified    bool     `json:"verified"`   // false until it has been run against the provider's own test system
-	SecretHint  string   `json:"secretHint"` // how the secret is written
-	Bookings    bool     `json:"bookings"`   // false when the provider only shows prices and sends guests to your site
+	Fields      []string `json:"fields"`      // which inputs the owner fills in: hotelId, baseUrl, secret
+	Steps       []string `json:"steps"`       // plain-language things to do on the other side first
+	Reaches     []string `json:"reaches"`     // the booking sites this connection serves
+	Verified    bool     `json:"verified"`    // false until it has been run against the provider's own test system
+	SecretHint  string   `json:"secretHint"`  // how the secret is written
+	Bookings    bool     `json:"bookings"`    // false when the provider only shows prices and sends guests to your site
+	Access      string   `json:"access"`      // self_serve when an owner can connect today, partner when the vendor must approve this system first
+	Connectable bool     `json:"connectable"` // whether this system can save a connection to it now
+	Markets     []string `json:"markets"`     // where hotels use it: ALL, EU or a country code
 }
 
-// Profiles lists what owners can connect to. The recommended one comes first.
-func Profiles() []Profile {
+// baseProfiles are the providers this system has an adapter for, or the plain JSON connection.
+func baseProfiles() []Profile {
 	return []Profile{
 		{ID: "channex", Mode: "channel_manager", Name: "Channex", Recommended: true, Fields: []string{"hotelId", "secret", "baseUrl"}, Bookings: true,
 			Reaches: []string{"Booking.com", "Expedia", "Agoda", "Airbnb"}, Verified: true, SecretHint: "The API key from your Channex profile.",
@@ -47,6 +50,77 @@ func Profiles() []Profile {
 		{ID: "cm_generic", Mode: "channel_manager", Name: "Another channel manager (JSON connection)", Fields: []string{"hotelId", "baseUrl", "secret"}, Bookings: true,
 			Reaches: []string{}, Verified: false, SecretHint: "A bearer token.",
 			Steps: []string{"Ask your channel manager for a connector that speaks this system's JSON format, or ask us for the format sheet."}},
+	}
+}
+
+// Profiles lists what owners can connect to, most useful first: the open channel managers, then the direct
+// connections, then the channel managers that must approve this system, then the plain JSON connection.
+func Profiles() []Profile {
+	base := baseProfiles()
+	out := []Profile{base[0], beds24Profile()}
+	out = append(out, base[1:len(base)-1]...)
+	out = append(out, partnerProfiles()...)
+	out = append(out, base[len(base)-1])
+	for i := range out {
+		p := &out[i]
+		for _, id := range modes[p.Mode] {
+			p.Connectable = p.Connectable || id == p.ID
+		}
+		p.Access = "partner"
+		if p.Connectable {
+			p.Access = "self_serve"
+		}
+		p.Markets = markets[p.ID]
+	}
+	return out
+}
+
+// markets says where hotels use each provider. Notes come from the vendors' own pages and from review sites.
+var markets = map[string][]string{
+	"channex": {"ALL"}, "beds24": {"ALL"}, "cm_generic": {"ALL"}, "booking_com": {"ALL"}, "expedia": {"ALL"}, "google": {"ALL"},
+	"agoda":      {"VN", "TH", "SG", "JP", "TW"},
+	"siteminder": {"VN", "SG", "TH", "TW", "JP", "MX", "US", "EU"},
+	"staah":      {"VN", "SG", "TH"},
+	"ezee":       {"VN", "TH", "SG"},
+	"rategain":   {"SG", "US", "EU"},
+	"cloudbeds":  {"US", "MX", "EU"},
+	"omnibees":   {"MX", "EU"},
+	"tllincoln":  {"JP"},
+	"neppan":     {"JP"},
+	"mirai":      {"EU"},
+	"roiback":    {"EU"},
+	"wubook":     {"EU"},
+}
+
+func beds24Profile() Profile {
+	return Profile{ID: "beds24", Mode: "channel_manager", Name: "Beds24", Fields: []string{"hotelId", "secret", "baseUrl"}, Bookings: true,
+		Reaches: []string{"Booking.com", "Expedia", "Airbnb", "Agoda"}, SecretHint: "A long life token made from an invite code in Beds24.",
+		Steps: []string{"Make a Beds24 account, add your property and connect your booking sites there.",
+			"In Beds24, open Settings, Apps and Integrations, then API, and make an invite code with the bookings and inventory scopes.",
+			"Ask your server administrator to turn the invite code into a long life token (Beds24 documents this under authentication) and save it as a server setting.",
+			"Put the Beds24 property id in the hotel code box below."}}
+}
+
+// partnerProfiles are channel managers that take a property management system only after their own approval.
+func partnerProfiles() []Profile {
+	one := func(id, name string, reaches ...string) Profile {
+		return Profile{ID: id, Mode: "channel_manager", Name: name, Bookings: true, Reaches: reaches, Fields: []string{},
+			Steps: []string{"Ask " + name + " how a property management system joins its partner program. Expect a certification and a test account.",
+				"The company running this system applies. Until " + name + " approves it, connect through Channex or Beds24, or directly to the booking sites.",
+				"Once approved, your server administrator switches the connection on and it appears here."}}
+	}
+	return []Profile{
+		one("siteminder", "SiteMinder", "Booking.com", "Expedia", "Agoda", "Airbnb"),
+		one("staah", "STAAH", "Booking.com", "Expedia", "Agoda"),
+		one("ezee", "eZee Centrix (Yanolja Cloud Solution)", "Booking.com", "Expedia", "Agoda"),
+		one("rategain", "RateGain", "Booking.com", "Expedia", "Agoda"),
+		one("cloudbeds", "Cloudbeds", "Booking.com", "Expedia", "Airbnb"),
+		one("omnibees", "Omnibees"),
+		one("tllincoln", "TL-Lincoln"),
+		one("neppan", "Neppan"),
+		one("mirai", "Mirai"),
+		one("roiback", "Roiback"),
+		one("wubook", "WuBook"),
 	}
 }
 
