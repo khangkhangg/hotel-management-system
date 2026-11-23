@@ -113,9 +113,17 @@
 		busy = true;
 		try {
 			const entries = await Promise.all(
-				info.ratePlans.map(async (p) => [p.id, await api.post<Quote>(`/api/public/${slug}/quote`, { ...body(p.id, p.roomTypeId), paymentKind: 'hotel' })] as const)
+				// A rate plan with no prices yet is left out, so it cannot hide the plans that can be booked.
+				info.ratePlans.map(async (p) => {
+					try {
+						return [p.id, await api.post<Quote>(`/api/public/${slug}/quote`, { ...body(p.id, p.roomTypeId), paymentKind: 'hotel' })] as const;
+					} catch (e) {
+						if (e instanceof ApiError && e.code === 'slow_down') throw e;
+						return null;
+					}
+				})
 			);
-			quotes = Object.fromEntries(entries);
+			quotes = Object.fromEntries(entries.filter((x) => x !== null));
 		} catch (e) {
 			error = e instanceof ApiError ? t(`guest.error.${e.code}`) : t('guest.error.generic');
 		}
