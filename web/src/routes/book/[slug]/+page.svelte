@@ -106,6 +106,9 @@
 		busy = false;
 	}
 
+	// One key per page, so a double click or a retry finds the booking already made.
+	const bookingKey = crypto.randomUUID();
+
 	async function book(event: SubmitEvent) {
 		event.preventDefault();
 		if (!chosen) return;
@@ -115,6 +118,7 @@
 			made = await api.post<Made>(`/api/public/${slug}/bookings`, {
 				guest: { name, email, phone, locale },
 				paymentKind: kind,
+				key: bookingKey,
 				...body(chosen.planId, chosen.typeId)
 			});
 			if (made.checkoutUrl) {
