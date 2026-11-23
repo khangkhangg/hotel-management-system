@@ -27,7 +27,9 @@ func seedHotel(ctx context.Context, pool *pgxpool.Pool, org, property uuid.UUID)
 		}
 	}
 	now := time.Now().UTC()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	// The sample hotel is in Ho Chi Minh City, so its day starts seven hours before the UTC day.
+	local := now.In(time.FixedZone("ICT", 7*3600))
+	today := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
 	var owner uuid.UUID
 	must(db.WithoutOrg(ctx, pool, func(tx pgx.Tx) error {
 		u, err := account.ByEmail(ctx, tx, "owner@hotel.com")
