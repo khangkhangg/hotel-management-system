@@ -29,7 +29,7 @@ import (
 
 // NewHandler mounts every area of the API. google is nil when Google sign-in is not configured.
 func NewHandler(d httpx.Deps, hub *notify.Hub, google httpx.Mount, card payments.Provider, cardOrg uuid.UUID) http.Handler {
-	mounts := []httpx.Mount{signin.Mount, access.Mount, staff.Mount, activity.Mount, notify.Mount(hub), rooms.Mount, chain.Mount, extras.Mount, group.Mount, reports.Mount, booking.Mount, folio.Mount, housekeeping.Mount, alerts.Mount, notes.Mount(hub), guestbooking.Mount(card, cardOrg), channels.Mount(channels.Real(os.Getenv))}
+	mounts := []httpx.Mount{signin.Mount, access.Mount, staff.Mount, activity.Mount, notify.Mount(hub), rooms.Mount, chain.Mount, extras.Mount, group.Mount, reports.Mount, booking.Mount, folio.MountWith(card), housekeeping.Mount, alerts.Mount, notes.Mount(hub), guestbooking.Mount(card, cardOrg), channels.Mount(channels.Real(os.Getenv))}
 	if google != nil {
 		mounts = append(mounts, google)
 	}

@@ -214,6 +214,35 @@ func RefundLimit(ctx context.Context, tx pgx.Tx, propertyID uuid.UUID, role acce
 // Refund asks to give money back on a payment. It is done at once when the person may approve it or it is within
 // their limit; otherwise it waits for a manager or owner. A waiting refund already holds its share of the payment.
 func Refund(ctx context.Context, tx pgx.Tx, orgID, propertyID, paymentID, by uuid.UUID, role access.Role, amount int64, reason string, now time.Time) (id uuid.UUID, status string, err error) {
+	return RefundVia(ctx, tx, orgID, propertyID, paymentID, by, role, amount, reason, now, nil)
+}
+
+// Pay sends a refund to the card provider. The key makes a repeat of the same request safe.
+type Pay func(ctx context.Context, providerRef string, amount int64, key string) error
+
+// ErrProviderRefused means the card provider did not give the money back, so nothing was recorded.
+var ErrProviderRefused = errors.New("folio: the card provider did not refund")
+
+// payOut sends the money back through the provider when the payment was made by card. Other payments need nothing.
+func payOut(ctx context.Context, tx pgx.Tx, paymentID uuid.UUID, amount int64, key string, pay Pay) error {
+	var ref *string
+	if err := tx.QueryRow(ctx, `select provider_ref from payment where id = $1`, paymentID).Scan(&ref); err != nil {
+		return err
+	}
+	if ref == nil {
+		return nil
+	}
+	if pay == nil {
+		return ErrProviderRefused
+	}
+	if err := pay(ctx, *ref, amount, key); err != nil {
+		return fmt.Errorf("%w: %v", ErrProviderRefused, err)
+	}
+	return nil
+}
+
+// RefundVia is Refund for a server that has a card provider. A refund that is done at once goes to the provider first.
+func RefundVia(ctx context.Context, tx pgx.Tx, orgID, propertyID, paymentID, by uuid.UUID, role access.Role, amount int64, reason string, now time.Time, pay Pay) (id uuid.UUID, status string, err error) {
 	reason = strings.TrimSpace(reason)
 	if amount < 1 || reason == "" || len(reason) > 500 {
 		return uuid.Nil, "", ErrBad
@@ -240,6 +269,11 @@ func Refund(ctx context.Context, tx pgx.Tx, orgID, propertyID, paymentID, by uui
 		status = "done"
 	}
 	id = ids.New()
+	if status == "done" {
+		if err = payOut(ctx, tx, paymentID, amount, fmt.Sprintf("refund-%s-%d-%d", paymentID, taken, amount), pay); err != nil {
+			return uuid.Nil, "", err
+		}
+	}
 	var decided *time.Time
 	var approver *uuid.UUID
 	if status == "done" {
@@ -260,6 +294,12 @@ func Refund(ctx context.Context, tx pgx.Tx, orgID, propertyID, paymentID, by uui
 
 // Decide approves or rejects a waiting refund. Only people with refund approval rights call it.
 func Decide(ctx context.Context, tx pgx.Tx, propertyID, refundID, by uuid.UUID, approve bool, now time.Time) error {
+	return DecideVia(ctx, tx, propertyID, refundID, by, approve, now, nil)
+}
+
+// DecideVia is Decide for a server that has a card provider. An approved card refund goes to the provider first,
+// and if the provider refuses it stays waiting.
+func DecideVia(ctx context.Context, tx pgx.Tx, propertyID, refundID, by uuid.UUID, approve bool, now time.Time, pay Pay) error {
 	var status string
 	var paymentID uuid.UUID
 	var amount int64
@@ -270,6 +310,11 @@ func Decide(ctx context.Context, tx pgx.Tx, propertyID, refundID, by uuid.UUID, 
 	}
 	if status != "pending" {
 		return ErrAlreadyDecided
+	}
+	if approve {
+		if err := payOut(ctx, tx, paymentID, amount, "refund-"+refundID.String(), pay); err != nil {
+			return err
+		}
 	}
 	next := "rejected"
 	if approve {

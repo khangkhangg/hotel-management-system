@@ -1,6 +1,7 @@
 package folio
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -14,12 +15,34 @@ import (
 	"hotelpms/api/internal/db"
 	"hotelpms/api/internal/httpx"
 	"hotelpms/api/internal/ids"
+	"hotelpms/api/internal/payments"
 )
 
-type handler struct{ httpx.Deps }
+type handler struct {
+	httpx.Deps
+	card payments.Provider // nil when no card provider is configured
+}
 
-func Mount(mux *http.ServeMux, d httpx.Deps) {
-	h := &handler{d}
+func Mount(mux *http.ServeMux, d httpx.Deps) { mount(mux, d, nil) }
+
+// MountWith adds the folio routes for a server that takes card payments, so card refunds go to the provider.
+func MountWith(card payments.Provider) httpx.Mount {
+	return func(mux *http.ServeMux, d httpx.Deps) { mount(mux, d, card) }
+}
+
+// pay sends a refund to the card provider, or is nil when there is none.
+func (h *handler) pay() Pay {
+	if h.card == nil {
+		return nil
+	}
+	return func(ctx context.Context, ref string, amount int64, key string) error {
+		_, err := h.card.RefundPayment(ctx, ref, amount, key)
+		return err
+	}
+}
+
+func mount(mux *http.ServeMux, d httpx.Deps, card payments.Provider) {
+	h := &handler{d, card}
 	route := func(methods map[string]http.HandlerFunc, perms map[string][]access.Permission) http.HandlerFunc {
 		m := map[string]http.HandlerFunc{}
 		for method, f := range methods {
@@ -68,6 +91,8 @@ func fail(w http.ResponseWriter, err error) bool {
 		bad(w, "Check the amount, the method and the text.")
 	case errors.Is(err, ErrRefundTooLarge):
 		httpx.Error(w, http.StatusConflict, "refund_too_large", "That is more than what is left of the payment.")
+	case errors.Is(err, ErrProviderRefused):
+		httpx.Error(w, http.StatusBadGateway, "provider_refused", "The card provider did not give the money back. Nothing was changed.")
 	case errors.Is(err, ErrAlreadyDecided):
 		httpx.Error(w, http.StatusConflict, "already_decided", "That refund was already decided.")
 	default:
@@ -274,7 +299,7 @@ func (h *handler) refund(w http.ResponseWriter, r *http.Request) {
 	var refund uuid.UUID
 	var status string
 	err := db.WithOrg(r.Context(), h.Pool, a.OrgID, func(tx pgx.Tx) (e error) {
-		refund, status, e = Refund(r.Context(), tx, a.OrgID, a.PropertyID, id, a.UserID, a.Role, in.Amount, in.Reason, h.Clock())
+		refund, status, e = RefundVia(r.Context(), tx, a.OrgID, a.PropertyID, id, a.UserID, a.Role, in.Amount, in.Reason, h.Clock(), h.pay())
 		return
 	})
 	if !fail(w, err) {
@@ -293,7 +318,7 @@ func (h *handler) decide(approve bool) http.HandlerFunc {
 			return
 		}
 		err := db.WithOrg(r.Context(), h.Pool, a.OrgID, func(tx pgx.Tx) error {
-			return Decide(r.Context(), tx, a.PropertyID, id, a.UserID, approve, h.Clock())
+			return DecideVia(r.Context(), tx, a.PropertyID, id, a.UserID, approve, h.Clock(), h.pay())
 		})
 		if !fail(w, err) {
 			w.WriteHeader(http.StatusNoContent)

@@ -15,6 +15,7 @@ import (
 	"hotelpms/api/internal/booking"
 	"hotelpms/api/internal/db"
 	"hotelpms/api/internal/folio"
+	"hotelpms/api/internal/payments"
 	"hotelpms/api/internal/rooms"
 	"hotelpms/api/internal/testkit"
 )
@@ -35,8 +36,10 @@ func idOf(t *testing.T, r testkit.Reply) string {
 	return b.ID
 }
 
-func newHotel(t *testing.T) *hotel {
-	w := testkit.New(t, rooms.Mount, booking.Mount, folio.Mount)
+func newHotel(t *testing.T) *hotel { return newHotelCard(t, nil) }
+
+func newHotelCard(t *testing.T, card payments.Provider) *hotel {
+	w := testkit.New(t, rooms.Mount, booking.Mount, folio.MountWith(card))
 	h := &hotel{w: w, prop: w.A1}
 	h.owner = w.Member(w.OrgA, nil, "owner")
 	h.mgr = w.Member(w.OrgA, &w.A1, "manager")
