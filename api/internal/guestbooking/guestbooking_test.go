@@ -17,6 +17,7 @@ import (
 	"hotelpms/api/internal/guestbooking"
 	"hotelpms/api/internal/httpx"
 	"hotelpms/api/internal/payments"
+	"hotelpms/api/internal/risk"
 	"hotelpms/api/internal/rooms"
 	"hotelpms/api/internal/siteprofile"
 	"hotelpms/api/internal/testkit"
@@ -51,7 +52,7 @@ func newHotelFor(t *testing.T, nRooms int, cardIsOurs bool) *hotel {
 		if cardIsOurs {
 			owner = w.OrgA
 		}
-		return []httpx.Mount{rooms.Mount, extras.Mount, siteprofile.Mount, booking.Mount, folio.Mount, guestbooking.Mount(fake, owner)}
+		return []httpx.Mount{rooms.Mount, extras.Mount, siteprofile.Mount, risk.Mount, booking.Mount, folio.Mount, guestbooking.Mount(fake, owner)}
 	})
 	h := &hotel{w: w, fake: fake, prop: &w.A1}
 	h.owner = w.Member(w.OrgA, nil, "owner")
@@ -472,4 +473,37 @@ func TestAPhotoCannotBeReadThroughAnotherHotelsAddress(t *testing.T) {
 	h.w.Anon("GET", "/api/public/a2/photos/"+pid, "").Want(t, 404)
 	h.w.Anon("GET", "/api/public/a1/photos/not-an-id", "").Want(t, 404)
 	h.w.Anon("GET", "/api/public/nowhere/photos/"+pid, "").Want(t, 404)
+}
+
+func (h *hotel) cardBooking(t *testing.T, email, name, from, to string) testkit.Reply {
+	t.Helper()
+	body := fmt.Sprintf(`{"guest":{"name":%q,"email":%q,"phone":"+84 90 111 2222","locale":"en"},"paymentKind":"card","rooms":[{"roomTypeId":%q,"ratePlanId":%q,"from":%q,"to":%q,"adults":2,"children":0}]}`, name, email, h.rt, h.rp, from, to)
+	return h.w.Anon("POST", "/api/public/a1/bookings", body)
+}
+
+func TestARiskyCardBookingAsksForA3DSecureCheckAndAHighOneJoinsTheReviewQueue(t *testing.T) {
+	h := newHotel(t, 5)
+	h.cardBooking(t, "mai@hotel.com", "Mai Pham", "2026-12-10", "2026-12-12").Want(t, 201)
+	if c := h.fake.Checkouts; len(c) != 1 || c[0].ThreeDS {
+		t.Fatalf("an ordinary booking asked for a 3-D Secure check: %+v", c)
+	}
+	h.mgr.Do("GET", "/api/risk", h.prop, "").Want(t, 200, "[]")
+
+	h.cardBooking(t, "x1@mailinator.com", "Tom Burns", "2026-12-14", "2026-12-15").Want(t, 201)
+	if c := h.fake.Checkouts; len(c) != 2 || !c[1].ThreeDS {
+		t.Fatalf("a throwaway email did not ask for a 3-D Secure check: %+v", c)
+	}
+	h.mgr.Do("GET", "/api/risk", h.prop, "").Want(t, 200, "[]") // medium goes through without staff
+
+	// The same throwaway email again and again, from one address, reaches a high score on the fourth booking.
+	h.cardBooking(t, "x1@mailinator.com", "Tom Burns", "2026-12-16", "2026-12-17").Want(t, 201)
+	h.mgr.Do("GET", "/api/risk", h.prop, "").Want(t, 200, "[]")
+	h.cardBooking(t, "x1@mailinator.com", "Tom Burns", "2026-12-20", "2026-12-21").Want(t, 201)
+	q := h.mgr.Do("GET", "/api/risk", h.prop, "").Want(t, 200, `"level":"high"`, "throwaway email service", "many_from_address").Body
+	if strings.Count(q, `"reservationId"`) != 1 {
+		t.Fatalf("only the high booking waits: %s", q)
+	}
+	if c := h.fake.Checkouts; !c[len(c)-1].ThreeDS {
+		t.Fatal("a high risk booking did not ask for a 3-D Secure check")
+	}
 }

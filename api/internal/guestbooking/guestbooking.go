@@ -30,6 +30,7 @@ import (
 	"hotelpms/api/internal/mail"
 	"hotelpms/api/internal/payments"
 	"hotelpms/api/internal/ratelimit"
+	"hotelpms/api/internal/risk"
 	"hotelpms/api/internal/siteprofile"
 )
 
@@ -469,6 +470,7 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 	var out madeOut
 	var resID uuid.UUID
 	var replay bool
+	var assessed risk.Result
 	err := db.WithOrg(r.Context(), h.Pool, org, func(tx pgx.Tx) error {
 		ctx := r.Context()
 		on, err := h.offered(ctx, tx, org, prop)
@@ -505,6 +507,9 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 		}
 		out = madeOut{Code: res.Code, Total: due, Currency: res.Currency, Status: "confirmed"}
 		resID = res.ID
+		if assessed, err = h.assess(ctx, tx, org, prop, res.ID, in, r, now); err != nil {
+			return err
+		}
 		if in.Key != "" {
 			if _, err := tx.Exec(ctx, `update reservation set channel_booking_ref = $2 where id = $1`, resID, in.Key); err != nil {
 				return err
@@ -540,7 +545,7 @@ func (h *handler) create(w http.ResponseWriter, r *http.Request) {
 		c, err := h.card.CreateCheckout(r.Context(), payments.CheckoutRequest{
 			Reference: org.String() + ":" + out.Code, Amount: out.Total, Currency: out.Currency, Description: "Booking " + out.Code,
 			SuccessURL: h.BaseURL + "/book/" + r.PathValue("slug") + "?done=" + out.Code, CancelURL: h.BaseURL + "/book/" + r.PathValue("slug"),
-			Key: "booking-" + resID.String(), ExpiresAt: out.HoldUntil,
+			Key: "booking-" + resID.String(), ExpiresAt: out.HoldUntil, ThreeDS: assessed.Level != "low",
 		})
 		if err != nil {
 			// Give the room back at once, so the guest's retry is not turned away by their own hold.
@@ -879,4 +884,31 @@ func (h *handler) photo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Security-Policy", "default-src 'none'")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
 	_, _ = w.Write(data)
+}
+
+// assess scores the fraud risk of a new booking and keeps the score. A booking is never turned away because of it.
+// The caller asks a risky card for a 3-D Secure check, and a high score waits in the managers' queue.
+func (h *handler) assess(ctx context.Context, tx pgx.Tx, org, prop, res uuid.UUID, in bookIn, r *http.Request, now time.Time) (risk.Result, error) {
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		ip = r.RemoteAddr
+	}
+	ipHash, mailHash := risk.Hash(ip), risk.Hash(in.Guest.Email)
+	fromAddr, forEmail, err := risk.Counts(ctx, tx, prop, ipHash, mailHash, now)
+	if err != nil {
+		return risk.Result{}, err
+	}
+	nights, days := 0, 1<<20
+	for _, rm := range in.Rooms {
+		from, e1 := time.Parse("2006-01-02", rm.From)
+		to, e2 := time.Parse("2006-01-02", rm.To)
+		if e1 != nil || e2 != nil {
+			continue
+		}
+		nights = max(nights, int(to.Sub(from).Hours()/24))
+		days = min(days, int(from.Sub(now.UTC().Truncate(24*time.Hour)).Hours()/24))
+	}
+	out := risk.Score(risk.Signals{Email: in.Guest.Email, Name: in.Guest.Name, Nights: nights, DaysToArrival: days, Card: in.PaymentKind == "card",
+		FromAddressLastHour: fromAddr, ForEmailLastDay: forEmail})
+	return out, risk.Record(ctx, tx, org, prop, res, ipHash, mailHash, out, now)
 }

@@ -520,5 +520,15 @@
 	"yield.remove": "Remove",
 	"yield.added": "The rule is added.",
 	"yield.changed": "The rule is changed.",
-	"yield.removed": "The rule is removed."
+	"yield.removed": "The rule is removed.",
+	"risk.title": "Review queue",
+	"risk.note": "Guest bookings that look risky. Check each one, then approve or decline it.",
+	"risk.none": "Nothing is waiting for review.",
+	"risk.booking": "Booking {code} for {guest}",
+	"risk.score": "Risk score {score} of 100. The guest was asked for a 3-D Secure card check.",
+	"risk.approve": "Approve",
+	"risk.decline": "Decline and cancel",
+	"risk.declineNote": "Declining cancels the booking and frees the room. If the guest already paid, refund the payment on the booking.",
+	"risk.approved": "Booking {code} is approved.",
+	"risk.declined": "Booking {code} is cancelled."
 }

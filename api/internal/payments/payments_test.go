@@ -120,3 +120,23 @@ func TestTheFakeProviderRecordsEverythingAndIsRepeatable(t *testing.T) {
 		t.Fatal("refund should fail")
 	}
 }
+
+func TestStripeCheckoutAsksForA3DSecureCheckOnlyWhenTold(t *testing.T) {
+	var form string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b := new(bytes.Buffer)
+		b.ReadFrom(r.Body)
+		form = b.String()
+		w.Write([]byte(`{"id":"cs_9","url":"https://checkout.stripe.test/pay/cs_9"}`))
+	}))
+	defer srv.Close()
+	s := payments.NewStripe("sk_test", "whsec", srv.URL)
+	req := payments.CheckoutRequest{Reference: "RES-1", Amount: 22000, Currency: "USD", Description: "x", SuccessURL: "https://x.test/ok", CancelURL: "https://x.test/no", Key: "k1"}
+	if _, err := s.CreateCheckout(context.Background(), req); err != nil || strings.Contains(form, "three_d_secure") {
+		t.Fatalf("%v %s", err, form)
+	}
+	req.ThreeDS, req.Key = true, "k2"
+	if _, err := s.CreateCheckout(context.Background(), req); err != nil || !strings.Contains(form, "payment_method_options%5Bcard%5D%5Brequest_three_d_secure%5D=any") {
+		t.Fatalf("%v %s", err, form)
+	}
+}

@@ -40,6 +40,7 @@ type CheckoutRequest struct {
 	CancelURL   string
 	Key         string    // idempotency key: the same key never charges twice
 	ExpiresAt   time.Time // after this the payment page no longer takes money, so a late payment cannot happen
+	ThreeDS     bool      // ask the card for a 3-D Secure check, which moves a fraud chargeback to the card issuer
 }
 
 type Checkout struct{ ID, URL string }
@@ -114,6 +115,9 @@ func (s *Stripe) CreateCheckout(ctx context.Context, r CheckoutRequest) (Checkou
 	f.Set("cancel_url", r.CancelURL)
 	if !r.ExpiresAt.IsZero() {
 		f.Set("expires_at", strconv.FormatInt(r.ExpiresAt.Unix(), 10))
+	}
+	if r.ThreeDS {
+		f.Set("payment_method_options[card][request_three_d_secure]", "any")
 	}
 	f.Set("line_items[0][quantity]", "1")
 	f.Set("line_items[0][price_data][currency]", strings.ToLower(r.Currency))

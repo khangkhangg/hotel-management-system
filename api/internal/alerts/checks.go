@@ -25,6 +25,7 @@ var registry = []check{
 	{kind: "returning_guest", role: access.FrontDesk, find: returningGuest},
 	{kind: "refund_waiting", role: access.Manager, find: refundWaiting},
 	{kind: "paid_late", role: access.Manager, find: paidLate},
+	{kind: "booking_review", role: access.Manager, find: bookingReview},
 	{kind: "channel_trouble", role: access.Manager, defaults: map[string]float64{"staleHours": 3}, find: channelTrouble},
 	{kind: "tag_not_answered", role: access.FrontDesk, defaults: map[string]float64{"hours": 4}, find: tagNotAnswered},
 }
@@ -481,6 +482,30 @@ func channelTrouble(ctx context.Context, tx pgx.Tx, sc scope) ([]Finding, error)
 		}
 		out = append(out, Finding{SubjectType: "channel", Subject: id, Severity: "warning", Text: text,
 			Facts: map[string]any{"provider": provider}, Action: openAction("Open the sync log", "/sync-log")})
+	}
+	return out, rows.Err()
+}
+
+// bookingReview finds guest bookings whose fraud score is high and that no manager has decided yet.
+func bookingReview(ctx context.Context, tx pgx.Tx, sc scope) ([]Finding, error) {
+	rows, err := tx.Query(ctx, `select b.reservation_id, r.code, b.score from booking_risk b join reservation r on r.id = b.reservation_id
+		where b.property_id = $1 and b.status = 'review' order by b.created_at`, sc.propertyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Finding
+	for rows.Next() {
+		var id uuid.UUID
+		var code string
+		var score int
+		if err := rows.Scan(&id, &code, &score); err != nil {
+			return nil, err
+		}
+		out = append(out, Finding{SubjectType: "reservation", Subject: id, Severity: "warning",
+			Text:   fmt.Sprintf("Booking %s looks risky (score %d). Check it, then approve or decline it.", code, score),
+			Facts:  map[string]any{"score": score},
+			Action: openAction("Open the review queue", "/risk")})
 	}
 	return out, rows.Err()
 }
