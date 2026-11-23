@@ -29,5 +29,5 @@ test('the owner adds an extra and the front desk puts it on a stay', async ({ pa
 	await page.getByLabel('How many').fill('2');
 	await page.getByRole('button', { name: 'Add to the stay' }).click();
 	await expect(page.getByText('Extra added to the stay.')).toBeVisible();
-	await expect(page.getByRole('cell', { name: /Airport pickup/ })).toBeVisible();
+	await expect(page.getByRole('cell', { name: 'Airport pickup × 2' })).toBeVisible();
 });

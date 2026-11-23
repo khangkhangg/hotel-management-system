@@ -343,5 +343,19 @@
 	"panel.extra": "Extra",
 	"panel.extraQty": "How many",
 	"panel.addExtra": "Add to the stay",
-	"panel.extraAdded": "Extra added to the stay."
+	"panel.extraAdded": "Extra added to the stay.",
+	"group.title": "All properties",
+	"group.note": "How each hotel is doing today, and the sums across them.",
+	"group.sum": "All properties, {currency}",
+	"group.compare": "Compare properties",
+	"group.property": "Property",
+	"group.rooms": "Rooms",
+	"group.rooms.note": "in total",
+	"group.occupied": "In house",
+	"group.arriving": "Arriving",
+	"group.leaving": "Leaving",
+	"group.today": "today",
+	"group.tonight": "tonight",
+	"group.paid": "Paid in",
+	"group.last30": "last 30 days, after refunds"
 }

@@ -22,7 +22,7 @@ import (
 
 type handler struct{ httpx.Deps }
 
-// Mount adds the catalog routes. Rates people edit it, and anyone who can edit a reservation sells from it.
+// Mount adds the catalog routes. Owners and managers edit it, and anyone who can edit a reservation sells from it.
 func Mount(mux *http.ServeMux, d httpx.Deps) {
 	h := &handler{d}
 	wrap := func(f http.HandlerFunc, ps ...access.Permission) http.HandlerFunc {
@@ -30,10 +30,10 @@ func Mount(mux *http.ServeMux, d httpx.Deps) {
 	}
 	sell := []access.Permission{access.ReservationsEdit, access.PaymentsTake}
 	mux.HandleFunc("/api/extras", httpx.Methods(map[string]http.HandlerFunc{
-		http.MethodGet:  wrap(h.list, append([]access.Permission{access.RatesEdit}, sell...)...),
-		http.MethodPost: wrap(h.create, access.RatesEdit),
+		http.MethodGet:  wrap(h.list, append([]access.Permission{access.ExtrasManage}, sell...)...),
+		http.MethodPost: wrap(h.create, access.ExtrasManage),
 	}))
-	mux.HandleFunc("/api/extras/{id}", httpx.Methods(map[string]http.HandlerFunc{http.MethodPatch: wrap(h.patch, access.RatesEdit)}))
+	mux.HandleFunc("/api/extras/{id}", httpx.Methods(map[string]http.HandlerFunc{http.MethodPatch: wrap(h.patch, access.ExtrasManage)}))
 	mux.HandleFunc("/api/reservations/{id}/extras", httpx.Methods(map[string]http.HandlerFunc{http.MethodPost: wrap(h.sell, sell...)}))
 }
 
@@ -71,7 +71,7 @@ func (h *handler) list(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Only people who edit rates see switched-off extras, so staff selling never offers one.
-	all := r.URL.Query().Get("all") == "1" && access.Can(a.Role, access.RatesEdit)
+	all := r.URL.Query().Get("all") == "1" && access.Can(a.Role, access.ExtrasManage)
 	out := []extraOut{}
 	err := db.WithOrg(r.Context(), h.Pool, a.OrgID, func(tx pgx.Tx) error {
 		rows, err := tx.Query(r.Context(), `select id, name, kind, unit, price, active from extra where property_id = $1 and (active or $2) order by name`, a.PropertyID, all)
