@@ -27,7 +27,7 @@ describe('translate', () => {
 	it('fills placeholders and falls back to English, then to the key', () => {
 		expect(translate('en', 'guest.nights', { count: 2 })).toBe('2 nights');
 		expect(translate('en', 'guest.nights', { count: 1 })).toBe('1 night');
-		expect(translate('ru', 'guest.total')).toBe(translate('en', 'guest.total'));
+		expect(translate('de', 'guest.total')).toBe(translate('en', 'guest.total'));
 		expect(translate('en', 'nope.nothing')).toBe('nope.nothing');
 	});
 });

@@ -1,5 +1,14 @@
 // The guest site's languages (spec 05). A language is offered only once a native speaker has reviewed its text.
 import en from '../../../messages/guest.en.json';
+import zhHans from '../../../messages/guest.zh-Hans.json';
+import hi from '../../../messages/guest.hi.json';
+import es from '../../../messages/guest.es.json';
+import fr from '../../../messages/guest.fr.json';
+import ar from '../../../messages/guest.ar.json';
+import bn from '../../../messages/guest.bn.json';
+import pt from '../../../messages/guest.pt.json';
+import ru from '../../../messages/guest.ru.json';
+import ur from '../../../messages/guest.ur.json';
 
 export type Locale = { code: string; name: string; dir: 'ltr' | 'rtl'; reviewed: boolean };
 
@@ -16,8 +25,8 @@ export const locales: Locale[] = [
 	{ code: 'ur', name: 'اردو', dir: 'rtl', reviewed: false }
 ];
 
-// Other languages join this map as their reviewed files are added; until then they fall back to English.
-const dictionaries: Record<string, Record<string, string>> = { en };
+// The other nine are drafts. A native speaker reviews each file, and the language is offered when `reviewed` is set above.
+const dictionaries: Record<string, Record<string, string>> = { en, 'zh-Hans': zhHans, hi, es, fr, ar, bn, pt, ru, ur };
 
 export const offered = (): Locale[] => locales.filter((l) => l.reviewed);
 
