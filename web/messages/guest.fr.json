@@ -94,5 +94,7 @@
 	"amenity.front_desk_24h": "Réception 24 h/24",
 	"amenity.laundry": "Blanchisserie",
 	"amenity.family_rooms": "Chambres familiales",
-	"amenity.accessible": "Chambres accessibles"
+	"amenity.accessible": "Chambres accessibles",
+	"guest.promo": "Code promo (facultatif)",
+	"guest.error.promo_invalid": "Ce code promo ne s’applique pas à ces dates."
 }

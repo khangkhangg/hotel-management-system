@@ -94,5 +94,7 @@
 	"amenity.front_desk_24h": "24 小时前台",
 	"amenity.laundry": "洗衣服务",
 	"amenity.family_rooms": "家庭房",
-	"amenity.accessible": "无障碍客房"
+	"amenity.accessible": "无障碍客房",
+	"guest.promo": "优惠码（可选）",
+	"guest.error.promo_invalid": "此优惠码不适用于所选日期。"
 }

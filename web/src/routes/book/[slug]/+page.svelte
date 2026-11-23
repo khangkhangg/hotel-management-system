@@ -43,6 +43,7 @@
 	let email = $state('');
 	let phone = $state('');
 	let kind = $state('');
+	let promo = $state('');
 	let error = $state('');
 	let busy = $state(false);
 	let picked = $state<string[]>([]);
@@ -111,7 +112,7 @@
 		document.documentElement.dir = dir;
 	});
 
-	const body = (planId: string, typeId: string) => ({ extras: picked.map((id) => ({ id, quantity: 1 })), rooms: [{ roomTypeId: typeId, ratePlanId: planId, from, to, adults: +adults || 1, children: +children || 0 }] });
+	const body = (planId: string, typeId: string) => ({ promo: promo.trim(), extras: picked.map((id) => ({ id, quantity: 1 })), rooms: [{ roomTypeId: typeId, ratePlanId: planId, from, to, adults: +adults || 1, children: +children || 0 }] });
 
 	// Extras change the total, so the quote is asked again with them.
 	async function toggleExtra(id: string) {
@@ -140,7 +141,7 @@
 					try {
 						return [p.id, await api.post<Quote>(`/api/public/${slug}/quote`, { ...body(p.id, p.roomTypeId), paymentKind: 'hotel' })] as const;
 					} catch (e) {
-						if (e instanceof ApiError && e.code === 'slow_down') throw e;
+						if (e instanceof ApiError && (e.code === 'slow_down' || e.code === 'promo_invalid')) throw e;
 						return null;
 					}
 				})
@@ -247,6 +248,7 @@
 				<Field label={t('guest.departure')} type="date" bind:value={to} />
 				<Field label={t('guest.adults')} inputmode="numeric" bind:value={adults} />
 				<Field label={t('guest.children')} inputmode="numeric" bind:value={children} />
+				<Field label={t('guest.promo')} bind:value={promo} />
 				<Button type="submit" disabled={busy || nights < 1}>{t('guest.search')}</Button>
 			</form>
 			{#if error}<p class="error" role="alert">{error}</p>{/if}

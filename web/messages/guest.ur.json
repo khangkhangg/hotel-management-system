@@ -94,5 +94,7 @@
 	"amenity.front_desk_24h": "24 گھنٹے فرنٹ ڈیسک",
 	"amenity.laundry": "لانڈری",
 	"amenity.family_rooms": "فیملی کمرے",
-	"amenity.accessible": "قابلِ رسائی کمرے"
+	"amenity.accessible": "قابلِ رسائی کمرے",
+	"guest.promo": "پروموشن کوڈ (اختیاری)",
+	"guest.error.promo_invalid": "یہ پروموشن کوڈ ان تاریخوں کے لیے درست نہیں۔"
 }

@@ -98,5 +98,7 @@
 	"amenity.front_desk_24h": "مكتب استقبال على مدار الساعة",
 	"amenity.laundry": "مغسلة",
 	"amenity.family_rooms": "غرف عائلية",
-	"amenity.accessible": "غرف مهيأة لذوي الإعاقة"
+	"amenity.accessible": "غرف مهيأة لذوي الإعاقة",
+	"guest.promo": "رمز الخصم (اختياري)",
+	"guest.error.promo_invalid": "رمز الخصم هذا لا يصلح لهذه التواريخ."
 }

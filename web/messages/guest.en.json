@@ -94,5 +94,7 @@
 	"amenity.front_desk_24h": "24-hour front desk",
 	"amenity.laundry": "Laundry",
 	"amenity.family_rooms": "Family rooms",
-	"amenity.accessible": "Accessible rooms"
+	"amenity.accessible": "Accessible rooms",
+	"guest.promo": "Promo code (optional)",
+	"guest.error.promo_invalid": "That promo code does not work for these dates."
 }

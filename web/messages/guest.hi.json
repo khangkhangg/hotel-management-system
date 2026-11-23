@@ -94,5 +94,7 @@
 	"amenity.front_desk_24h": "24 घंटे फ़्रंट डेस्क",
 	"amenity.laundry": "लॉन्ड्री",
 	"amenity.family_rooms": "फ़ैमिली रूम",
-	"amenity.accessible": "सुगम्य कमरे"
+	"amenity.accessible": "सुगम्य कमरे",
+	"guest.promo": "प्रोमो कोड (वैकल्पिक)",
+	"guest.error.promo_invalid": "यह प्रोमो कोड इन तारीखों के लिए मान्य नहीं है।"
 }
