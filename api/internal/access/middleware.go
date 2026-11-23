@@ -142,3 +142,22 @@ func Mount(mux *http.ServeMux, d httpx.Deps) {
 func (a Actor) who() audit.Who {
 	return audit.Who{UserID: a.UserID, OrgID: a.OrgID, PropertyID: a.PropertyID, Role: string(a.Role), ViewAs: a.ViewAs}
 }
+
+// RequireAny is Require for a route that more than one permission opens.
+func RequireAny(d httpx.Deps, ps ...Permission) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return d.RequireSession(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			a, ok := load(d, w, r)
+			if !ok {
+				return
+			}
+			for _, p := range ps {
+				if Can(a.Role, p) {
+					next.ServeHTTP(w, r.WithContext(audit.WithWho(context.WithValue(r.Context(), actorKey{}, a), a.who())))
+					return
+				}
+			}
+			forbidden(w)
+		}))
+	}
+}

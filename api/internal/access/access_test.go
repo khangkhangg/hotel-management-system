@@ -429,3 +429,19 @@ func TestViewAsChangeIsRecordedWithTheRealRole(t *testing.T) {
 		t.Fatalf("rows %d, role %q, after %s", n, role, after)
 	}
 }
+
+func TestRequireAnyLetsThroughAnyOneOfTheRoles(t *testing.T) {
+	w := newWorld(t)
+	any := func(mux *http.ServeMux, d httpx.Deps) {
+		mux.Handle("/api/test-any", access.RequireAny(d, access.CheckIn, access.HousekeepingUpdate)(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) { rw.WriteHeader(204) })))
+	}
+	srv := httptest.NewServer(httpx.NewRouter(httpx.Deps{Pool: w.pool, Now: func() time.Time { return time.Now() }}, any))
+	defer srv.Close()
+	w.srv = srv
+	for role, want := range map[string]int{"front_desk": 204, "housekeeping": 204, "manager": 204, "revenue": 403} {
+		p := w.signedIn(t, role+"@hotel.com", &w.orgA).member(t, w.orgA, &w.propA1, role)
+		if r := p.do("GET", "/api/test-any", &w.propA1, ""); r.status != want {
+			t.Fatalf("%s: %d, want %d", role, r.status, want)
+		}
+	}
+}
