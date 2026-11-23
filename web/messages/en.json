@@ -436,5 +436,17 @@
 	"channels.theirs": "Their room and rate",
 	"channels.none": "Not sold there",
 	"channels.saveMatches": "Save matches",
-	"channels.noBookings": "Google shows your prices and sends guests to your own booking site. No bookings come back through this connection."
+	"channels.noBookings": "Google shows your prices and sends guests to your own booking site. No bookings come back through this connection.",
+	"channels.market": "Where is your hotel?",
+	"channels.market.all": "Show everything",
+	"channels.market.VN": "Vietnam",
+	"channels.market.SG": "Singapore",
+	"channels.market.TH": "Thailand",
+	"channels.market.JP": "Japan",
+	"channels.market.TW": "Taiwan",
+	"channels.market.MX": "Mexico",
+	"channels.market.US": "United States",
+	"channels.market.EU": "Europe",
+	"channels.partnerTitle": "Needs the vendor’s approval first",
+	"channels.partnerNote": "These channel managers take a new system only after their own approval. Until then, use Channex or Beds24, or connect straight to the booking sites."
 }

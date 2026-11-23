@@ -47,3 +47,18 @@ test('the sync log and the channels page are accessible', async ({ page }) => {
 		expect(results.violations, path).toEqual([]);
 	}
 });
+
+test('picking a country brings that market\u2019s channel managers forward, and the ones that need approval show their steps', async ({ page }) => {
+	await page.request.get('/api/test/login?email=daniel@hotel.com');
+	await page.goto('/channels');
+	await expect(page.getByRole('radio', { name: /^Beds24/ })).toBeVisible();
+	await page.getByLabel('Where is your hotel?').selectOption('JP');
+	await expect(page.getByText('TL-Lincoln', { exact: true })).toBeVisible();
+	await expect(page.getByText('Neppan', { exact: true })).toBeVisible();
+	await expect(page.getByText('STAAH', { exact: true })).toHaveCount(0);
+	await expect(page.getByRole('radio', { name: /^Channex/ })).toBeVisible();
+	await page.getByText('TL-Lincoln', { exact: true }).click();
+	await expect(page.getByText(/applies\. Until TL-Lincoln approves/)).toBeVisible();
+	await page.getByLabel('Where is your hotel?').selectOption('VN');
+	await expect(page.getByText('STAAH', { exact: true })).toBeVisible();
+});

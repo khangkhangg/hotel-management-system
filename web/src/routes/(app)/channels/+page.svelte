@@ -8,7 +8,7 @@
 	import Select from '#lib/ui/Select.svelte';
 	import StatusBadge from '#lib/ui/StatusBadge.svelte';
 
-	type Profile = { id: string; mode: string; name: string; recommended: boolean; fields: string[]; steps: string[]; reaches: string[]; verified: boolean; secretHint: string; bookings: boolean };
+	type Profile = { id: string; mode: string; name: string; recommended: boolean; fields: string[]; steps: string[]; reaches: string[]; verified: boolean; secretHint: string; bookings: boolean; access: string; connectable: boolean; markets: string[] };
 	type Connection = { mode: string; provider: string; externalHotelId: string; baseUrl: string; hasSecret: boolean; enabled: boolean };
 	type Map = { ratePlanId: string; externalRoomId: string; externalRateId: string };
 	type Plan = { id: string; name: string; roomTypeId: string };
@@ -33,6 +33,12 @@
 	let busy = $state(false);
 
 	const profile = $derived(profiles.find((p) => p.id === provider));
+	let market = $state('');
+	const countries = ['VN', 'SG', 'TH', 'JP', 'TW', 'MX', 'US', 'EU'];
+	const here = (p: Profile) => market !== '' && p.markets.includes(market);
+	const inMarket = (p: Profile) => market === '' || here(p) || p.markets.includes('ALL');
+	const shown = $derived(profiles.filter((p) => p.connectable && inMarket(p)).sort((a, b) => Number(here(b)) - Number(here(a))));
+	const partners = $derived(profiles.filter((p) => !p.connectable && inMarket(p)));
 	const pairs = $derived(remote.map((r) => ({ id: `${r.RoomID}|${r.RateID}`, label: `${r.RoomName} · ${r.RateName}` })));
 
 	async function load() {
@@ -139,8 +145,9 @@
 
 <section class="card">
 	<h2>{t('channels.step1')}</h2>
+		<Select label={t('channels.market')} options={[{ id: '', label: t('channels.market.all') }, ...countries.map((c) => ({ id: c, label: t(`channels.market.${c}`) }))]} value={market} onchange={(id) => (market = id)} />
 	<div class="choices" role="radiogroup" aria-label={t('channels.step1')}>
-		{#each profiles as p (p.id)}
+		{#each shown as p (p.id)}
 			<label class="choice" class:on={provider === p.id}>
 				<input type="radio" name="provider" value={p.id} bind:group={provider} />
 				<span>
@@ -151,8 +158,18 @@
 				</span>
 			</label>
 		{/each}
-	</div>
-</section>
+		</div>
+		{#if partners.length}
+			<h3>{t('channels.partnerTitle')}</h3>
+			<p class="muted">{t('channels.partnerNote')}</p>
+			{#each partners as p (p.id)}
+				<details class="partner">
+					<summary>{p.name}</summary>
+					<ol class="steps">{#each p.steps as s}<li>{s}</li>{/each}</ol>
+				</details>
+			{/each}
+		{/if}
+	</section>
 
 {#if profile}
 	<form class="card" onsubmit={save}>
@@ -209,7 +226,8 @@
 {/if}
 
 <style>
-	h2 {
+	h2,
+	h3 {
 		margin: 0;
 		font: var(--font-heading);
 	}
@@ -238,6 +256,14 @@
 		padding: var(--space-3);
 		border: var(--border-width) solid var(--color-border);
 		border-radius: var(--radius-md);
+	}
+	.partner {
+		padding: var(--space-3);
+		border: var(--border-width) solid var(--color-border);
+		border-radius: var(--radius-md);
+	}
+	.partner summary {
+		cursor: pointer;
 	}
 	.choice.on {
 		border-color: var(--color-focus);
