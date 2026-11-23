@@ -41,6 +41,8 @@ func Mount(mux *http.ServeMux, d httpx.Deps) {
 	mux.HandleFunc("/api/reservations/{id}/cancel", route(map[string]e{http.MethodPost: {h.cancel, edit}}))
 	mux.HandleFunc("/api/availability", route(map[string]e{http.MethodGet: {h.availability, view}}))
 	mountStay(mux, h, d)
+	mux.HandleFunc("/api/calendar", route(map[string]e{http.MethodGet: {h.calendar, view}}))
+	mux.HandleFunc("/api/quote", route(map[string]e{http.MethodGet: {h.quote, view}}))
 	mux.HandleFunc("/api/guests", route(map[string]e{http.MethodGet: {h.listGuests, view}}))
 	mux.HandleFunc("/api/guests/{id}", route(map[string]e{http.MethodGet: {h.getGuest, view}, http.MethodPatch: {h.patchGuest, edit}}))
 }

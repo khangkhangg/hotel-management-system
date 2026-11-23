@@ -263,3 +263,52 @@ func TestListFiltersByStayStatusAndSearch(t *testing.T) {
 		t.Fatal("the cancelled booking is not listed")
 	}
 }
+
+func TestTheCalendarListsStaysWithTheirRoomsAndTheUnassignedOnes(t *testing.T) {
+	h := newHotel(t, 2)
+	a := newID(t, h.book(h.desk, "2026-12-10", "2026-12-12", "").Want(t, 201))
+	b := newID(t, h.book(h.desk, "2026-12-11", "2026-12-14", "").Want(t, 201))
+	h.desk.Do("POST", "/api/reservations/"+a.ID+"/assign", &h.property, fmt.Sprintf(`{"roomId":%q}`, h.roomID("101"))).Want(t, 204)
+	h.book(h.desk, "2027-03-01", "2027-03-02", "").Want(t, 400) // no rate that far out, so it is not on the calendar
+	var out struct {
+		Rooms []struct{ ID, Number, RoomTypeName string }
+		Stays []struct {
+			ReservationID, Code, Status, GuestName string
+			RoomID                                 *string
+			From, To                               string
+			Total                                  int64
+		}
+	}
+	must(t, json.Unmarshal([]byte(h.desk.Do("GET", "/api/calendar?from=2026-12-09&to=2026-12-16", &h.property, "").Want(t, 200).Body), &out))
+	if len(out.Rooms) != 2 || out.Rooms[0].Number != "101" || out.Rooms[0].RoomTypeName != "Deluxe" || len(out.Stays) != 2 {
+		t.Fatalf("%+v", out)
+	}
+	for _, s := range out.Stays {
+		switch s.ReservationID {
+		case a.ID:
+			if s.RoomID == nil || s.From != "2026-12-10" || s.To != "2026-12-12" || s.GuestName != "Mai Pham" || s.Total != 20000 {
+				t.Fatalf("%+v", s)
+			}
+		case b.ID:
+			if s.RoomID != nil {
+				t.Fatalf("an unassigned stay has a room: %+v", s)
+			}
+		default:
+			t.Fatalf("unexpected stay %+v", s)
+		}
+	}
+	h.desk.Do("GET", "/api/calendar?from=2026-12-16&to=2026-12-09", &h.property, "").Want(t, 400)
+	hk := h.w.Member(h.w.OrgA, &h.property, "housekeeping")
+	hk.Do("GET", "/api/calendar?from=2026-12-09&to=2026-12-16", &h.property, "").Want(t, 403)
+}
+
+func TestAQuoteShowsThePriceAndWhetherTheRoomIsFree(t *testing.T) {
+	h := newHotel(t, 1)
+	q := fmt.Sprintf("/api/quote?roomTypeId=%s&ratePlanId=%s&adults=2&children=0", h.roomType, h.ratePlan)
+	h.desk.Do("GET", q+"&from=2026-12-10&to=2026-12-12", &h.property, "").Want(t, 200, `"total":20000`, `"nights":2`, `"available":true`, `"currency":"USD"`)
+	h.book(h.desk, "2026-12-11", "2026-12-12", "").Want(t, 201)
+	h.desk.Do("GET", q+"&from=2026-12-10&to=2026-12-12", &h.property, "").Want(t, 200, `"available":false`)
+	h.desk.Do("GET", q+"&from=2026-12-10&to=2026-12-10", &h.property, "").Want(t, 400)
+	h.desk.Do("GET", q+"&from=2027-06-10&to=2027-06-12", &h.property, "").Want(t, 400, "no_rate")
+	h.desk.Do("GET", strings.Replace(q, "adults=2", "adults=9", 1)+"&from=2026-12-14&to=2026-12-15", &h.property, "").Want(t, 400, "too_many_guests")
+}
