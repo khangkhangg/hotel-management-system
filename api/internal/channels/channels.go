@@ -20,6 +20,7 @@ import (
 	"hotelpms/api/internal/db"
 	"hotelpms/api/internal/httpx"
 	"hotelpms/api/internal/ids"
+	"hotelpms/api/internal/yieldrules"
 )
 
 const (
@@ -459,8 +460,12 @@ func load(ctx context.Context, tx pgx.Tx, org, prop uuid.UUID, now time.Time, l 
 	if err := rows.Err(); err != nil {
 		return err
 	}
+	rules, err := yieldrules.Load(ctx, tx, prop)
+	if err != nil {
+		return err
+	}
 	for _, m := range l.maps {
-		s, err := tx.Query(ctx, `select to_char(i.date, 'YYYY-MM-DD'), case when r.closed then 0 else greatest(i.total - i.sold - i.blocked, 0) end, r.price
+		s, err := tx.Query(ctx, `select to_char(i.date, 'YYYY-MM-DD'), case when r.closed then 0 else greatest(i.total - i.sold - i.blocked, 0) end, r.price, i.total, i.sold + i.blocked
 			from inventory i join rate r on r.rate_plan_id = $1 and r.date = i.date
 			where i.room_type_id = $2 and i.date >= $3::date and i.date < $3::date + $4::int order by i.date`, m.ratePlan, m.roomType, today, Horizon)
 		if err != nil {
@@ -468,10 +473,13 @@ func load(ctx context.Context, tx pgx.Tx, org, prop uuid.UUID, now time.Time, l 
 		}
 		for s.Next() {
 			sl := Slot{ExternalRoomID: m.room, ExternalRateID: m.rate, Currency: currency}
-			if err := s.Scan(&sl.Date, &sl.Available, &sl.Price); err != nil {
+			var total, taken int
+			if err := s.Scan(&sl.Date, &sl.Available, &sl.Price, &total, &taken); err != nil {
 				s.Close()
 				return err
 			}
+			night := yieldrules.Apply(yieldrules.Night{Date: sl.Date, RoomTypeID: m.roomType, Total: total, Taken: taken, Available: sl.Available, Price: sl.Price}, rules)
+			sl.Available, sl.Price = night.Available, night.Price
 			l.slots = append(l.slots, sl)
 		}
 		s.Close()

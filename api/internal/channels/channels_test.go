@@ -9,6 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/google/uuid"
 	"hotelpms/api/internal/booking"
 	"hotelpms/api/internal/channels"
 	"hotelpms/api/internal/db"
@@ -16,6 +17,7 @@ import (
 	"hotelpms/api/internal/httpx"
 	"hotelpms/api/internal/rooms"
 	"hotelpms/api/internal/testkit"
+	"hotelpms/api/internal/yieldrules"
 )
 
 type hotel struct {
@@ -34,7 +36,7 @@ func idOf(t *testing.T, r testkit.Reply) string {
 
 func newHotel(t *testing.T, nRooms int) *hotel {
 	fake := channels.NewFake()
-	w := testkit.New(t, rooms.Mount, booking.Mount, folio.Mount, channels.Mount(channels.Fixed(fake)))
+	w := testkit.New(t, rooms.Mount, booking.Mount, folio.Mount, yieldrules.Mount, channels.Mount(channels.Fixed(fake)))
 	h := &hotel{w: w, fake: fake}
 	h.owner = w.Member(w.OrgA, nil, "owner")
 	h.manager = w.Member(w.OrgA, &w.A1, "manager")
@@ -322,4 +324,45 @@ func TestTheCatalogNamesMarketsAndSaysWhichVendorsNeedTheirApproval(t *testing.T
 	}
 	h.manager.Do("PUT", "/api/channel", &h.w.A1, `{"mode":"channel_manager","provider":"beds24","externalHotelId":"77","secretSetting":"BEDS24_TOKEN","enabled":false}`).Want(t, 200)
 	h.manager.Do("PUT", "/api/channel", &h.w.A1, `{"mode":"channel_manager","provider":"siteminder","externalHotelId":"77"}`).Want(t, 400)
+}
+
+func TestYieldRulesChangeWhatTheChannelSeesAndNeverTheStock(t *testing.T) {
+	h := newHotel(t, 3)
+	h.connect(t, "channel_manager", "fake", true)
+	for i := 0; i < 2; i++ {
+		h.manager.Do("POST", "/api/reservations", &h.w.A1, fmt.Sprintf(`{"guest":{"name":"Guest %d"},"rooms":[{"roomTypeId":%q,"ratePlanId":%q,"from":"2026-12-10","to":"2026-12-11","adults":2,"children":0}]}`, i, h.rt, h.rp)).Want(t, 201)
+	}
+	h.desk.Do("GET", "/api/yield-rules", &h.w.A1, "").Want(t, 403)
+	h.manager.Do("POST", "/api/yield-rules", &h.w.A1, `{"kind":"availability_cap","value":2,"active":true}`).Want(t, 201)
+	h.manager.Do("POST", "/api/yield-rules", &h.w.A1, `{"kind":"rate_adjust","value":1,"percent":10,"active":true}`).Want(t, 201)
+	h.manager.Do("POST", "/api/yield-rules", &h.w.A1, `{"kind":"free_rooms","value":1,"active":true}`).Want(t, 400)
+	h.manager.Do("POST", "/api/yield-rules", &h.w.A1, `{"kind":"auto_close","value":1,"roomTypeId":"`+uuid.NewString()+`","active":true}`).Want(t, 404)
+	h.manager.Do("POST", "/api/channel/sync", &h.w.A1, "").Want(t, 200)
+	by := map[string]channels.Slot{}
+	for _, s := range h.fake.Pushed {
+		by[s.Date] = s
+	}
+	if s := by["2026-12-09"]; s.Available != 2 || s.Price != 10000 {
+		t.Fatalf("a quiet night: %+v", s)
+	}
+	if s := by["2026-12-10"]; s.Available != 1 || s.Price != 11000 {
+		t.Fatalf("a night with one room left: %+v", s)
+	}
+	if got := h.row(t, `select sold::text from inventory where date = '2026-12-10'`); got != "2" {
+		t.Fatalf("a rule changed the stock: sold %s", got)
+	}
+	var rules []struct{ ID, Kind string }
+	testkit.Must(t, json.Unmarshal([]byte(h.manager.Do("GET", "/api/yield-rules", &h.w.A1, "").Want(t, 200).Body), &rules))
+	for _, r := range rules {
+		if r.Kind == "availability_cap" {
+			h.manager.Do("DELETE", "/api/yield-rules/"+r.ID, &h.w.A1, "").Want(t, 204)
+		}
+	}
+	h.fake.Pushed = nil
+	h.manager.Do("POST", "/api/channel/sync", &h.w.A1, "").Want(t, 200)
+	for _, s := range h.fake.Pushed {
+		if s.Date == "2026-12-09" && s.Available != 3 {
+			t.Fatalf("a deleted rule still applies: %+v", s)
+		}
+	}
 }
