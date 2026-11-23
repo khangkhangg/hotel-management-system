@@ -229,7 +229,14 @@ func TestANoteCanBeEditedByItsAuthorForFiveMinutes(t *testing.T) {
 	h.mgr.Do("PATCH", "/api/notes/"+id, &h.prop, `{"body":"hijacked"}`).Want(t, 403)
 	h.w.Advance(2 * time.Minute)
 	h.desk.Do("PATCH", "/api/notes/"+id, &h.prop, `{"body":"too late"}`).Want(t, 409, "edit_window_closed")
-	if got := *h.thread(h.desk).Items[len(h.thread(h.desk).Items)-1].Body; got != "better" {
+	// Audit rows use the real clock and notes the test clock, so the last item is not always the note.
+	var got string
+	for _, it := range h.thread(h.desk).Items {
+		if it.Body != nil {
+			got = *it.Body
+		}
+	}
+	if got != "better" {
 		t.Fatalf("%q", got)
 	}
 	// Pinning is not an edit, and the author or a manager may do it at any time.
@@ -276,7 +283,8 @@ func TestARemovedNoteIsHiddenFromStaffButKeptForOwners(t *testing.T) {
 
 func TestTheThreadMixesEventsAndNotesInTimeOrder(t *testing.T) {
 	h := newHotel(t)
-	h.w.Advance(time.Minute)
+	// The activity trail stamps real time and notes use the test clock, so the test clock must be past real time for the order to mean anything.
+	h.w.Advance(max(0, time.Since(h.w.Now)) + time.Minute)
 	h.note(h.desk, `{"body":"first note"}`).Want(t, 201)
 	h.w.Advance(time.Minute)
 	h.note(h.mgr, `{"body":"second note"}`).Want(t, 201)
