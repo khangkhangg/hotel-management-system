@@ -104,3 +104,16 @@ body {
 	clip-path: inset(50%);
 	white-space: nowrap;
 }
+
+/* The "choose a file" button looks like the app's own secondary button. */
+input[type='file']::file-selector-button {
+	margin-inline-end: var(--space-3);
+	min-block-size: var(--control-height);
+	padding-inline: var(--space-4);
+	border: var(--border-width) solid var(--color-border-button);
+	border-radius: var(--radius-md);
+	background: var(--color-button-secondary-bg);
+	color: var(--color-text);
+	font: var(--font-control);
+	cursor: pointer;
+}

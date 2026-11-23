@@ -30,6 +30,7 @@ import (
 	"hotelpms/api/internal/password"
 	"hotelpms/api/internal/payments"
 	"hotelpms/api/internal/session"
+	"hotelpms/api/internal/translate"
 )
 
 // logMailer prints emails instead of sending them, for a machine with no SMTP server set up.
@@ -100,6 +101,10 @@ func main() {
 			log.Fatal("PAYMENT_ORGANIZATION_ID must be the id of the organization that owns the MoMo account")
 		}
 	}
+	var tr translate.Translator // nil leaves automatic translation off
+	if cfg.TranslateURL != "" {
+		tr = translate.NewLibre(cfg.TranslateURL, cfg.TranslateKey, nil)
+	}
 	var google httpx.Mount
 	if cfg.GoogleClientID != "" {
 		google = app.GoogleFor(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.BaseURL)
@@ -120,7 +125,7 @@ func main() {
 		addr = "127.0.0.1:8080"
 	}
 	// No WriteTimeout: the notification stream is a response that stays open.
-	srv := &http.Server{Addr: addr, Handler: app.NewHandler(deps, hub, google, card, cardOrg), ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{Addr: addr, Handler: app.NewHandler(deps, hub, google, card, cardOrg, tr), ReadHeaderTimeout: 10 * time.Second}
 	go func() {
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)

@@ -46,3 +46,17 @@ test('the owner brands the booking page and fills in its content, and a guest se
 	expect(await page.evaluate(() => document.documentElement.style.getPropertyValue('--brand'))).toBe('#1D5C8F');
 	expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 });
+
+test('the owner fills the other languages from English and each translation is marked as a draft', async ({ page }) => {
+	await page.request.get('/api/test/login?email=owner@hotel.com');
+	await page.goto('/site-content');
+	await page.getByLabel('About the hotel').fill('A quiet hotel by the sea.');
+	await page.getByRole('button', { name: 'Save', exact: true }).first().click();
+	await expect(page.getByRole('status')).toHaveText('The English text is saved.');
+	await page.getByRole('button', { name: 'Translate into the other languages' }).click();
+	await expect(page.getByRole('status')).toContainText('texts translated');
+	await page.getByLabel('Language').selectOption('es');
+	await expect(page.getByLabel('About the hotel')).toHaveValue('[es] A quiet hotel by the sea.');
+	await expect(page.getByRole('note')).toContainText('A translation service wrote some of these texts');
+	expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+});

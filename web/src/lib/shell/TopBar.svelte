@@ -1,11 +1,10 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { api } from '#lib/api.ts';
-	import { roleLabels, roles } from '#lib/nav.ts';
+	import { roleLabels, roles, type Role } from '#lib/nav.ts';
 	import { t } from '#lib/i18n.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
-	import Segmented from '#lib/ui/Segmented.svelte';
 	import Select from '#lib/ui/Select.svelte';
 	import NotificationBell from './NotificationBell.svelte';
 
@@ -29,14 +28,15 @@
 	</div>
 
 	{#if session.role === 'owner'}
-		<div class="view" role="group" aria-label={t('topbar.viewAs')}>
-			<div class="wide"><Segmented options={viewOptions} value={session.viewingAs ?? ''} onchange={(id) => session.setViewAs(id as '')} /></div>
-			<div class="narrow"><Select label={t('topbar.viewAs')} hideLabel options={viewOptions} value={session.viewingAs ?? ''} onchange={(id) => session.setViewAs(id as '')} /></div>
+		<div class="view">
+			<span class="viewlabel">{t('topbar.viewAs')}</span>
+			<div class="viewselect"><Select label={t('topbar.viewAs')} hideLabel options={viewOptions} value={session.viewingAs ?? ''} onchange={(id) => session.setViewAs(id as Role | '')} /></div>
 		</div>
 	{/if}
 
 	<div class="end">
 		<NotificationBell />
+		<span class="me">{session.current?.user.name ?? ''}</span>
 		<Button variant="quiet" icon="logout" iconOnly onclick={signOut}>{t('topbar.signOut')}</Button>
 	</div>
 </header>
@@ -66,20 +66,38 @@
 		font: var(--font-heading);
 		color: var(--color-text);
 	}
+	.view {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		color: var(--color-text-muted);
+		font: var(--font-label);
+	}
+	.viewlabel {
+		display: none;
+	}
+	.viewselect {
+		inline-size: var(--card-min);
+		max-inline-size: 40vw;
+	}
+	@media (min-width: 640px) {
+		.viewlabel {
+			display: inline;
+		}
+	}
+	.me {
+		display: none;
+		color: var(--color-text-muted);
+		font: var(--font-label);
+	}
+	@media (min-width: 640px) {
+		.me {
+			display: inline;
+		}
+	}
 	.end {
 		display: flex;
 		align-items: center;
 		gap: var(--gap-tight);
 	}
-	.wide {
-		display: none;
-	}
-	@media (min-width: 640px) {
-		.wide {
-			display: block;
-		}
-		.narrow {
-			display: none;
-		}
-	}
-</style>
+	</style>

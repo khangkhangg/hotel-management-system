@@ -374,7 +374,7 @@ func (h *handler) listGuests(w http.ResponseWriter, r *http.Request) {
 	out := []guestOut{}
 	err := db.WithOrg(r.Context(), h.Pool, a.OrgID, func(tx pgx.Tx) error {
 		rows, err := tx.Query(r.Context(),
-			`select id, name, coalesce(email, ''), phone, country from guest where ($1 = '%%' or name ilike $1 or ($2 and email ilike $1)) order by name limit 50`, search, contact)
+			`select id, name, coalesce(email, ''), phone, country from guest where ($1 = '%%' or name ilike $1 or ($2 and (email ilike $1 or phone ilike $1))) order by name limit 50`, search, contact)
 		if err != nil {
 			return err
 		}

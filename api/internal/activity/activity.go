@@ -4,6 +4,7 @@ package activity
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -84,6 +85,7 @@ type filter struct {
 	from, to   *time.Time
 	cursor     int64
 	limit      int
+	q          string
 }
 
 func parseFilter(r *http.Request) (f filter, ok bool) {
@@ -127,7 +129,7 @@ func parseFilter(r *http.Request) (f filter, ok bool) {
 			*p.dst = &t
 		}
 	}
-	f.action, f.targetType = q.Get("action"), q.Get("targetType")
+	f.action, f.targetType, f.q = q.Get("action"), q.Get("targetType"), strings.TrimSpace(q.Get("q"))
 	return f, true
 }
 
@@ -181,8 +183,9 @@ func (h *handler) serve(w http.ResponseWriter, r *http.Request, f filter, withWh
 			   and ($7::timestamptz is null or a.occurred_at >= $7)
 			   and ($8::timestamptz is null or a.occurred_at < $8)
 			   and ($9::bigint = 0 or a.seq < $9)
+				  and ($11 = '' or strpos(lower(concat_ws(' ', a.action, a.target_label, a.reason, u.name)), lower($11)) > 0)
 			 order by a.seq desc limit $10`,
-			a.OrgID, property, f.user, f.action, f.targetType, f.targetID, f.from, f.to, f.cursor, f.limit+1)
+			a.OrgID, property, f.user, f.action, f.targetType, f.targetID, f.from, f.to, f.cursor, f.limit+1, f.q)
 		if err != nil {
 			return err
 		}

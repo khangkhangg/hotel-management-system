@@ -71,6 +71,7 @@
 {#if unassigned.length}
 	<section class="tray" aria-label={t('calendar.unassigned')}>
 		<h2>{t('calendar.unassigned')}</h2>
+		<p class="muted">{t('calendar.unassignedHint')}</p>
 		<ul>
 			{#each unassigned as s (s.id)}
 				<li><Button variant="secondary" onclick={() => open(s.reservationId)}>{s.guestName}, {formatDay(s.from)} to {formatDay(s.to)}</Button></li>

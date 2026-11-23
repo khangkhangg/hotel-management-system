@@ -15,6 +15,7 @@
 		texts: Record<string, Record<string, string>>;
 		amenities: string[];
 		photos: { id: string; caption: string }[];
+		auto: Record<string, string[]>;
 	};
 
 	const fieldNames = ['tagline', 'description', 'policies'] as const;
@@ -23,6 +24,7 @@
 	let catalog = $state<string[]>([]);
 	let texts = $state<Record<string, Record<string, string>>>({});
 	let picked = $state<Record<string, boolean>>({});
+	let auto = $state<Record<string, string[]>>({});
 	let photos = $state<{ id: string; caption: string }[]>([]);
 	let locale = $state('en');
 	let draft = $state<Record<string, string>>({ tagline: '', description: '', policies: '' });
@@ -43,6 +45,7 @@
 			slug = s.slug;
 			catalog = s.catalog;
 			texts = s.texts;
+			auto = s.auto ?? {};
 			picked = Object.fromEntries(s.catalog.map((c) => [c, s.amenities.includes(c)]));
 			photos = s.photos;
 			show();
@@ -68,6 +71,17 @@
 			busy = false;
 		}
 	}
+
+	async function translateAll() {
+		let created = 0;
+		await run(async () => {
+			created = (await api.post<{ created: number }>('/api/site/translate', { from: locale })).created;
+			await load();
+		}, '');
+		if (!message) ok = t(created ? 'siteContent.translated' : 'siteContent.translatedNone', { count: created });
+	}
+
+	const isDraft = $derived((auto[locale] ?? []).length > 0);
 
 	const saveTexts = (event: SubmitEvent) => {
 		event.preventDefault();
@@ -118,7 +132,12 @@
 		<span>{t('siteContent.policies')}</span>
 		<textarea rows="4" bind:value={draft.policies} dir={locales.find((l) => l.code === locale)?.dir}></textarea>
 	</label>
-	<div class="row"><Button type="submit" disabled={busy}>{t('common.save')}</Button></div>
+	{#if isDraft}<p class="muted" role="note">{t('siteContent.draftNote')}</p>{/if}
+	<div class="row">
+		<Button type="submit" disabled={busy}>{t('common.save')}</Button>
+		<Button variant="secondary" disabled={busy} onclick={translateAll}>{t('siteContent.translate')}</Button>
+	</div>
+	<p class="muted">{t('siteContent.translateNote')}</p>
 </form>
 
 <section class="card">

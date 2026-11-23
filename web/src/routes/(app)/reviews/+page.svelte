@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { api, errorText } from '#lib/api.ts';
+	import { formatWhen } from '#lib/format.ts';
 	import { t } from '#lib/i18n.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import Field from '#lib/ui/Field.svelte';
@@ -60,7 +61,7 @@
 			{#each reviews as r (r.id)}
 				<li class="card" class:off={r.status === 'hidden'}>
 					<h2>{r.name} · {t('reviews.rating', { rating: r.rating })}{r.status === 'hidden' ? ` · ${t('reviews.hidden')}` : ''}</h2>
-					<p class="muted">{new Date(r.createdAt).toLocaleDateString()}</p>
+					<p class="muted">{formatWhen(r.createdAt)}</p>
 					{#if r.comment}<p>{r.comment}</p>{/if}
 					<Field label={t('reviews.replyLabel')} bind:value={replies[r.id]} />
 					<div class="row">

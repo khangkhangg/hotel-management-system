@@ -25,8 +25,8 @@ test('describes each action in a sentence that names the target', () => {
 	expect(describeEntry(entry({ action: 'view_as.changed' }))).toBe('switched the view');
 });
 
-test('an action the screen does not know yet is shown with its code', () => {
-	expect(describeEntry(entry({ action: 'booking.moved', target: { type: 'booking', id: 'b', label: 'Room 4' } }))).toBe('booking.moved Room 4');
+test('an action the screen has no sentence for reads as its verb and its subject', () => {
+	expect(describeEntry(entry({ action: 'booking.moved', target: { type: 'booking', id: 'b', label: 'Room 4' } }))).toBe('moved booking Room 4');
 });
 
 test('a change shows what moved, in words', () => {

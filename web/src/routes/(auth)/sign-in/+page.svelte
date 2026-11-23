@@ -32,7 +32,7 @@
 
 <svelte:head><title>{t('signIn.title')} · {t('app.name')}</title></svelte:head>
 
-<PageHeader title={t('signIn.title')} />
+<PageHeader title={t('signIn.title')} note={t('signIn.note')} />
 
 <form class="stack" onsubmit={submit}>
 	{#if message}<p class="notice danger" role="alert">{message}</p>{/if}
@@ -42,6 +42,16 @@
 </form>
 
 <div class="stack-tight">
+	<p class="or">{t('signIn.or')}</p>
 	<Button variant="secondary" block href="/api/sign-in/google/start">{t('signIn.google')}</Button>
 	<Button variant="quiet" block href="/reset">{t('signIn.forgot')}</Button>
 </div>
+
+<style>
+	.or {
+		margin: 0;
+		text-align: center;
+		color: var(--color-text-muted);
+		font: var(--font-caption);
+	}
+</style>

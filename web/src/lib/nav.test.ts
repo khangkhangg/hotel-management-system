@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { allowed, homeFor, isBuilt, itemsFor, milestoneFor, roles, moreFor, type Role } from './nav.ts';
+import { allowed, homeFor, isBuilt, itemsFor, milestoneFor, moreGrouped, roles, moreFor, type Role } from './nav.ts';
 
 const labels = (role: Role) => itemsFor(role).map((i) => i.label);
 
@@ -90,5 +90,21 @@ describe('home and milestones', () => {
 
 	test('a screen that is not built still names the milestone that builds it', () => {
 		expect(milestoneFor('/somewhere-new')).toBe('a later milestone');
+	});
+});
+
+describe('more screens grouped by what they are for', () => {
+	test('each role gets the same screens as before, in named groups with no screen twice and no empty group', () => {
+		for (const role of roles) {
+			const groups = moreGrouped(role);
+			const hrefs = groups.flatMap((g) => g.items.map((i) => i.href));
+			expect(new Set(hrefs).size, role).toBe(hrefs.length);
+			expect([...hrefs].sort(), role).toEqual(moreFor(role).map((i) => i.href).sort());
+			for (const g of groups) expect(g.items.length, `${role} ${g.id}`).toBeGreaterThan(0);
+		}
+	});
+	test('an owner sees the hotel, the money, and the online side apart', () => {
+		expect(moreGrouped('owner').map((g) => g.label)).toEqual(['Hotel', 'Prices and money', 'Online and guests']);
+		expect(moreGrouped('revenue').map((g) => g.label)).toEqual(['Prices and money']);
 	});
 });

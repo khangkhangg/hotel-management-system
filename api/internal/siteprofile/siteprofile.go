@@ -22,6 +22,7 @@ import (
 	"hotelpms/api/internal/db"
 	"hotelpms/api/internal/httpx"
 	"hotelpms/api/internal/ids"
+	"hotelpms/api/internal/translate"
 )
 
 // Locales are the ten languages of the guest site.
@@ -142,17 +143,28 @@ func contrastWithWhite(hex string) float64 {
 	return 1.05 / (l + 0.05)
 }
 
-type handler struct{ httpx.Deps }
+type handler struct {
+	httpx.Deps
+	tr translate.Translator // nil when no translation service is set up
+}
 
 // Mount adds the staff routes. They need the branding permission, which only owners have.
-func Mount(mux *http.ServeMux, d httpx.Deps) {
-	h := &handler{d}
+func Mount(mux *http.ServeMux, d httpx.Deps) { MountWith(nil)(mux, d) }
+
+// MountWith adds the staff routes for a server that has a translation service, which can fill in the other languages.
+func MountWith(tr translate.Translator) httpx.Mount {
+	return func(mux *http.ServeMux, d httpx.Deps) { mount(mux, d, tr) }
+}
+
+func mount(mux *http.ServeMux, d httpx.Deps, tr translate.Translator) {
+	h := &handler{d, tr}
 	one := func(method string, f http.HandlerFunc) http.HandlerFunc {
 		return httpx.Methods(map[string]http.HandlerFunc{method: httpx.Wrap(access.Require(d, access.BrandingConfigure)(f))})
 	}
 	mux.HandleFunc("/api/site", one(http.MethodGet, h.get))
 	mux.HandleFunc("/api/site/brand", one(http.MethodPut, h.putBrand))
 	mux.HandleFunc("/api/site/texts/{locale}/{field}", one(http.MethodPut, h.putText))
+	mux.HandleFunc("/api/site/translate", one(http.MethodPost, h.translateTexts))
 	mux.HandleFunc("/api/site/amenities", one(http.MethodPut, h.putAmenities))
 	mux.HandleFunc("/api/site/photos", one(http.MethodPost, h.postPhoto))
 	mux.HandleFunc("/api/site/photos/{id}", one(http.MethodDelete, h.deletePhoto))
@@ -202,18 +214,34 @@ func (h *handler) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out := struct {
-		Slug    string   `json:"slug"`
-		Catalog []string `json:"catalog"`
-		Locales []string `json:"locales"`
+		Slug    string              `json:"slug"`
+		Catalog []string            `json:"catalog"`
+		Locales []string            `json:"locales"`
+		Auto    map[string][]string `json:"auto"` // the texts a translation service wrote, by language
 		Public
-	}{Catalog: Catalog, Locales: Locales}
+	}{Catalog: Catalog, Locales: Locales, Auto: map[string][]string{}}
 	err := db.WithOrg(r.Context(), h.Pool, a.OrgID, func(tx pgx.Tx) error {
 		if err := tx.QueryRow(r.Context(), `select slug from property where id = $1`, a.PropertyID).Scan(&out.Slug); err != nil {
 			return err
 		}
 		var err error
 		out.Public, err = LoadPublic(r.Context(), tx, a.PropertyID)
-		return err
+		if err != nil {
+			return err
+		}
+		rows, err := tx.Query(r.Context(), `select locale, field from property_text where property_id = $1 and auto order by locale, field`, a.PropertyID)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var l, f string
+			if err := rows.Scan(&l, &f); err != nil {
+				return err
+			}
+			out.Auto[l] = append(out.Auto[l], f)
+		}
+		return rows.Err()
 	})
 	if fail(w, err) {
 		return
@@ -288,7 +316,7 @@ func (h *handler) putText(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		_, err := tx.Exec(r.Context(), `insert into property_text (organization_id, property_id, locale, field, body) values ($1, $2, $3, $4, $5)
-			on conflict (property_id, locale, field) do update set body = excluded.body`, a.OrgID, a.PropertyID, locale, field, in.Body)
+			on conflict (property_id, locale, field) do update set body = excluded.body, auto = false`, a.OrgID, a.PropertyID, locale, field, in.Body)
 		return err
 	})
 }
@@ -416,4 +444,102 @@ func (h *handler) deletePhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// translateTexts fills the other languages from one. It never replaces a text a person wrote, and it asks the service for
+// everything before it saves anything, so a failure leaves the hotel's texts as they were.
+func (h *handler) translateTexts(w http.ResponseWriter, r *http.Request) {
+	a, ok := scope(w, r)
+	if !ok {
+		return
+	}
+	if h.tr == nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "translation_off", "Automatic translation is not set up on this server.")
+		return
+	}
+	var in struct {
+		From    string `json:"from"`
+		Refresh bool   `json:"refresh"` // translate again the drafts that a service wrote before
+	}
+	if !readBody(w, r, 4<<10, &in) {
+		return
+	}
+	if !slices.Contains(Locales, in.From) {
+		bad(w, "bad_request", "Choose the language to translate from.")
+		return
+	}
+	type key struct{ locale, field string }
+	have := map[key]string{}
+	auto := map[key]bool{}
+	err := db.WithOrg(r.Context(), h.Pool, a.OrgID, func(tx pgx.Tx) error {
+		rows, err := tx.Query(r.Context(), `select locale, field, body, auto from property_text where property_id = $1`, a.PropertyID)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var l, f, b string
+			var au bool
+			if err := rows.Scan(&l, &f, &b, &au); err != nil {
+				return err
+			}
+			have[key{l, f}], auto[key{l, f}] = b, au
+		}
+		return rows.Err()
+	})
+	if fail(w, err) {
+		return
+	}
+	type job struct{ to, field, text string }
+	var jobs []job
+	sources := 0
+	for _, field := range []string{"tagline", "description", "policies"} {
+		src, there := have[key{in.From, field}]
+		if !there {
+			continue
+		}
+		sources++
+		for _, to := range Locales {
+			k := key{to, field}
+			if to == in.From {
+				continue
+			}
+			if _, exists := have[k]; exists && (!auto[k] || !in.Refresh) {
+				continue
+			}
+			jobs = append(jobs, job{to, field, src})
+		}
+	}
+	if sources == 0 {
+		bad(w, "nothing_to_translate", "Write the text in this language first.")
+		return
+	}
+	done := make([]string, len(jobs))
+	for i, j := range jobs {
+		text, err := h.tr.Translate(r.Context(), j.text, in.From, j.to)
+		if err != nil {
+			httpx.Error(w, http.StatusBadGateway, "translation_failed", "The translation service did not answer. Nothing was changed. Try again in a moment.")
+			return
+		}
+		if utf8.RuneCountInString(text) > fields[j.field] {
+			text = string([]rune(text)[:fields[j.field]])
+		}
+		done[i] = text
+	}
+	if len(jobs) > 0 {
+		err = db.WithOrg(r.Context(), h.Pool, a.OrgID, func(tx pgx.Tx) error {
+			for i, j := range jobs {
+				// A person may have written the text while the service was working, and that text wins.
+				if _, err := tx.Exec(r.Context(), `insert into property_text (organization_id, property_id, locale, field, body, auto) values ($1, $2, $3, $4, $5, true)
+					on conflict (property_id, locale, field) do update set body = excluded.body where property_text.auto`, a.OrgID, a.PropertyID, j.to, j.field, done[i]); err != nil {
+					return err
+				}
+			}
+			return audit.Record(r.Context(), tx, audit.Entry{Action: "site.texts_translated", TargetType: "property", TargetID: a.PropertyID, After: map[string]any{"from": in.From, "count": len(jobs)}})
+		})
+		if fail(w, err) {
+			return
+		}
+	}
+	httpx.JSON(w, http.StatusOK, map[string]int{"created": len(jobs)})
 }

@@ -29,6 +29,8 @@ type Config struct {
 	MoMoAccessKey      string
 	MoMoSecretKey      string
 	MoMoURL            string
+	TranslateURL       string // a LibreTranslate server, which fills in the hotel texts in the other languages
+	TranslateKey       string
 	PaymentOrgID       string // the organization whose VNPay or MoMo account the keys belong to
 	CookieSecure       bool
 }
@@ -53,6 +55,8 @@ func Load() (Config, error) {
 		MoMoAccessKey:      os.Getenv("MOMO_ACCESS_KEY"),
 		MoMoSecretKey:      os.Getenv("MOMO_SECRET_KEY"),
 		MoMoURL:            os.Getenv("MOMO_URL"),
+		TranslateURL:       os.Getenv("LIBRETRANSLATE_URL"),
+		TranslateKey:       os.Getenv("LIBRETRANSLATE_API_KEY"),
 		PaymentOrgID:       os.Getenv("PAYMENT_ORGANIZATION_ID"),
 		CookieSecure:       true,
 	}

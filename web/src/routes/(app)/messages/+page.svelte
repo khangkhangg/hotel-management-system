@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { api, errorText } from '#lib/api.ts';
+	import { formatWhen } from '#lib/format.ts';
 	import { t } from '#lib/i18n.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
@@ -87,7 +88,7 @@
 				{#each messages as m, i (i)}
 					<li class={m.sender}>
 						<strong>{m.sender === 'guest' ? t('messages.guest') : t('messages.hotel')}</strong>
-						<span class="muted">{new Date(m.createdAt).toLocaleString()}</span>
+						<span class="muted">{formatWhen(m.createdAt)}</span>
 						<p>{m.body}</p>
 					</li>
 				{/each}

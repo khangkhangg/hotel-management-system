@@ -32,6 +32,24 @@
 	let loaded = $state(false);
 
 	const key = (s: Suggestion) => `${s.ratePlanId}|${s.date}`;
+
+	// Nights next to each other that get the same change are one line, so a quiet month reads as a few lines and not sixty.
+	type Group = { key: string; roomType: string; from: string; to: string; nights: Suggestion[]; current: number; price: number; reasons: string[] };
+	const nextDay = (d: string) => new Date(Date.parse(`${d}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
+	const groupOf = (list: Suggestion[]): Group[] => {
+		const out: Group[] = [];
+		const sorted = [...list].sort((a, b) => (a.ratePlanId === b.ratePlanId ? a.date.localeCompare(b.date) : a.ratePlanId.localeCompare(b.ratePlanId)));
+		for (const s of sorted) {
+			const last = out[out.length - 1];
+			const same = last && last.nights[0].ratePlanId === s.ratePlanId && last.current === s.current && last.price === s.price && last.reasons.join() === s.reasons.join() && nextDay(last.to) === s.date;
+			if (same) {
+				last.to = s.date;
+				last.nights.push(s);
+			} else out.push({ key: key(s), roomType: s.roomType, from: s.date, to: s.date, nights: [s], current: s.current, price: s.price, reasons: s.reasons });
+		}
+		return out.sort((a, b) => a.from.localeCompare(b.from) || a.roomType.localeCompare(b.roomType));
+	};
+	const groups = $derived(groupOf(suggestions));
 	const major = (n: number | null) => (n === null ? '' : String(n / (['VND', 'JPY', 'KRW', 'CLP', 'IDR'].includes(currency) ? 1 : 100)));
 
 	async function load() {
@@ -43,7 +61,7 @@
 				api.get<Competitor[]>(`/api/competitor-rates?from=${today}&to=${later}`)
 			]);
 			suggestions = s;
-			picked = Object.fromEntries(s.map((x) => [key(x), true]));
+			picked = Object.fromEntries(groupOf(s).map((g) => [g.key, true])); // every line starts checked
 			roomTypes = r;
 			limits = Object.fromEntries(r.map((rt) => [rt.id, { floor: major(l.find((x) => x.roomTypeId === rt.id)?.floor ?? null), ceiling: major(l.find((x) => x.roomTypeId === rt.id)?.ceiling ?? null) }]));
 			competitors = c;
@@ -73,7 +91,7 @@
 
 	const apply = () =>
 		run(
-			() => api.post('/api/price-suggestions/apply', { changes: suggestions.filter((s) => picked[key(s)]).map((s) => ({ ratePlanId: s.ratePlanId, date: s.date, price: s.price })) }),
+			() => api.post('/api/price-suggestions/apply', { changes: groups.filter((g) => picked[g.key]).flatMap((g) => g.nights.map((s) => ({ ratePlanId: s.ratePlanId, date: s.date, price: s.price }))) }),
 			t('pricing.applied')
 		);
 
@@ -117,12 +135,12 @@
 			<p class="muted">{t('pricing.noSuggestions')}</p>
 		{:else}
 			<ul class="rows">
-				{#each suggestions as s (key(s))}
+				{#each groups as g (g.key)}
 					<li>
-						<Checkbox label={`${s.date} · ${s.roomType}`} bind:checked={picked[key(s)]} />
-						<p><strong>{formatMoney(s.current, currency)}</strong> → <strong>{formatMoney(s.price, currency)}</strong> <span class="muted">{t('pricing.occupancy', { percent: Math.round(s.occupancy * 100) })}</span></p>
+						<Checkbox label={g.from === g.to ? `${g.from} · ${g.roomType}` : t('pricing.range', { from: g.from, to: g.to, roomType: g.roomType, count: g.nights.length })} bind:checked={picked[g.key]} />
+						<p><strong>{formatMoney(g.current, currency)}</strong> → <strong>{formatMoney(g.price, currency)}</strong> <span class="muted">{t('pricing.occupancy', { percent: Math.round(g.nights[0].occupancy * 100) })}</span></p>
 						<ul class="reasons">
-							{#each s.reasons as r (r)}<li>{r}</li>{/each}
+							{#each g.reasons as r (r)}<li>{r}</li>{/each}
 						</ul>
 					</li>
 				{/each}

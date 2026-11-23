@@ -70,6 +70,12 @@
 		if (!info) return;
 		locale = pickLocale({ url: page.url.searchParams.get('lang') ?? undefined, saved, browser: navigator.languages, fallback: info.defaultLocale });
 		kind = info.payments[0] ?? '';
+		// A stay for tomorrow night is the usual first try, so the guest sees rooms without typing dates first.
+		if (!from && !to) {
+			const day = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+			from = day(1);
+			to = day(2);
+		}
 	});
 	// Back from the payment page: the webhook may take a few seconds to confirm, so ask a few times.
 	$effect(() => {
@@ -296,7 +302,7 @@
 					{/if}
 				</section>
 			{/if}
-			<form class="stack search" onsubmit={search}>
+			<form class="search" onsubmit={search}>
 				<Field label={t('guest.arrival')} type="date" bind:value={from} />
 				<Field label={t('guest.departure')} type="date" bind:value={to} />
 				<Field label={t('guest.adults')} inputmode="numeric" bind:value={adults} />
@@ -470,7 +476,8 @@
 		justify-content: space-between;
 		align-items: center;
 		gap: var(--gap-related);
-		padding: var(--space-4);
+		/* The header lines up with the page column below it on a wide screen. */
+		padding: var(--space-4) max(var(--space-4), calc((100% - var(--page-width)) / 2 + var(--space-4)));
 		border-block-end: var(--border-width) solid var(--color-border);
 		background: var(--color-surface);
 	}
@@ -482,7 +489,7 @@
 	.progress {
 		display: flex;
 		gap: var(--space-4);
-		padding: var(--space-3) var(--space-4);
+		padding: var(--space-3) max(var(--space-4), calc((100% - var(--page-width)) / 2 + var(--space-4)));
 		font: var(--font-body);
 		color: var(--color-text-muted);
 	}

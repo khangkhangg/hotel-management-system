@@ -33,7 +33,13 @@ const phrases: Record<string, (e: Entry) => string> = {
 	'view_as.changed': () => 'switched the view'
 };
 
-export const describeEntry = (e: Entry): string => phrases[e.action]?.(e) ?? `${e.action} ${e.target.label}`.trim();
+/** "alert.opened" reads as "opened alert". */
+const plain = (e: Entry) => {
+	const [noun, verb] = e.action.split('.');
+	return [verb, noun, e.target.label].filter(Boolean).join(' ').replace(/_/g, ' ');
+};
+
+export const describeEntry = (e: Entry): string => phrases[e.action]?.(e) ?? plain(e);
 
 /** The actions the filter offers, with the first meaning "everything". */
 export const actionOptions: { id: string; label: string }[] = [

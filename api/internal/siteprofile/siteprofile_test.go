@@ -10,6 +10,7 @@ import (
 
 	"hotelpms/api/internal/siteprofile"
 	"hotelpms/api/internal/testkit"
+	"hotelpms/api/internal/translate"
 )
 
 const png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
@@ -20,8 +21,10 @@ type hotel struct {
 	owner, mgr, desk *testkit.Person
 }
 
-func newHotel(t *testing.T) *hotel {
-	w := testkit.New(t, siteprofile.Mount)
+func newHotel(t *testing.T) *hotel { return newHotelWith(t, nil) }
+
+func newHotelWith(t *testing.T, tr translate.Translator) *hotel {
+	w := testkit.New(t, siteprofile.MountWith(tr))
 	h := &hotel{w: w, prop: w.A1}
 	h.owner = w.Member(w.OrgA, nil, "owner")
 	h.mgr = w.Member(w.OrgA, &w.A1, "manager")
@@ -34,6 +37,7 @@ func (h *hotel) get(t *testing.T) (out struct {
 	Color     string
 	Logo      string
 	Texts     map[string]map[string]string
+	Auto      map[string][]string
 	Amenities []string
 	Catalog   []string
 	Photos    []struct{ ID, Caption string }
@@ -146,5 +150,59 @@ func TestAnotherPropertyCannotDeleteThisPropertysPhoto(t *testing.T) {
 	h.owner.Do("DELETE", "/api/site/photos/"+id, &other, "").Want(t, 404)
 	if len(h.get(t).Photos) != 1 {
 		t.Fatal("the photo was deleted from another property")
+	}
+}
+
+func TestTheOwnerFillsTheOtherLanguagesFromOneAndEveryTranslationIsADraftThatEditingTakesOver(t *testing.T) {
+	fake := translate.NewFake()
+	h := newHotelWith(t, fake)
+	h.owner.Do("PUT", "/api/site/texts/en/description", &h.prop, `{"body":"A quiet hotel by the sea."}`).Want(t, 204)
+	h.owner.Do("PUT", "/api/site/texts/en/tagline", &h.prop, `{"body":"Rest by the sea"}`).Want(t, 204)
+	h.owner.Do("PUT", "/api/site/texts/fr/description", &h.prop, `{"body":"Notre texte à nous"}`).Want(t, 204) // written by hand, so never replaced
+	h.mgr.Do("POST", "/api/site/translate", &h.prop, `{"from":"en"}`).Want(t, 403)
+	h.owner.Do("POST", "/api/site/translate", &h.prop, `{"from":"en"}`).Want(t, 200, `"created":17`) // nine languages and two texts, less the one already written
+	s := h.get(t)
+	if s.Texts["es"]["description"] != "[es] A quiet hotel by the sea." || s.Texts["zh-Hans"]["tagline"] != "[zh-Hans] Rest by the sea" {
+		t.Fatalf("%+v", s.Texts)
+	}
+	if s.Texts["fr"]["description"] != "Notre texte à nous" || s.Texts["fr"]["tagline"] != "[fr] Rest by the sea" {
+		t.Fatalf("a hand written text was replaced: %+v", s.Texts["fr"])
+	}
+	if len(s.Auto["es"]) != 2 || len(s.Auto["fr"]) != 1 || s.Auto["fr"][0] != "tagline" || len(s.Auto["en"]) != 0 {
+		t.Fatalf("which texts are machine drafts: %+v", s.Auto)
+	}
+	calls := fake.Calls
+	h.owner.Do("POST", "/api/site/translate", &h.prop, `{"from":"en"}`).Want(t, 200, `"created":0`)
+	if fake.Calls != calls {
+		t.Fatal("the service was asked again for texts that are already there")
+	}
+	// A person who edits a draft takes it over, and a refresh then leaves it alone.
+	h.owner.Do("PUT", "/api/site/texts/es/description", &h.prop, `{"body":"Un hotel tranquilo junto al mar."}`).Want(t, 204)
+	h.owner.Do("PUT", "/api/site/texts/en/description", &h.prop, `{"body":"A calm hotel by the sea."}`).Want(t, 204)
+	h.owner.Do("POST", "/api/site/translate", &h.prop, `{"from":"en","refresh":true}`).Want(t, 200)
+	s = h.get(t)
+	if s.Texts["es"]["description"] != "Un hotel tranquilo junto al mar." || s.Texts["de"] != nil {
+		t.Fatalf("%+v", s.Texts["es"])
+	}
+	if s.Texts["pt"]["description"] != "[pt] A calm hotel by the sea." {
+		t.Fatalf("a draft was not refreshed from the new source: %q", s.Texts["pt"]["description"])
+	}
+}
+
+func TestTranslationNeedsATextAndAServiceAndASingleFailureSavesNothing(t *testing.T) {
+	h := newHotel(t) // no service configured
+	h.owner.Do("PUT", "/api/site/texts/en/description", &h.prop, `{"body":"A quiet hotel."}`).Want(t, 204)
+	h.owner.Do("POST", "/api/site/translate", &h.prop, `{"from":"en"}`).Want(t, 503, "translation_off")
+
+	fake := translate.NewFake()
+	h = newHotelWith(t, fake)
+	h.owner.Do("POST", "/api/site/translate", &h.prop, `{"from":"en"}`).Want(t, 400, "nothing_to_translate")
+	h.owner.Do("POST", "/api/site/translate", &h.prop, `{"from":"vi"}`).Want(t, 400)
+	h.owner.Do("POST", "/api/site/translate", &h.prop, `{}`).Want(t, 400)
+	h.owner.Do("PUT", "/api/site/texts/en/description", &h.prop, `{"body":"A quiet hotel."}`).Want(t, 204)
+	fake.Fail = true
+	h.owner.Do("POST", "/api/site/translate", &h.prop, `{"from":"en"}`).Want(t, 502, "translation_failed")
+	if s := h.get(t); len(s.Texts) != 1 {
+		t.Fatalf("a failed translation left texts behind: %+v", s.Texts)
 	}
 }

@@ -82,7 +82,7 @@ func TestEveryRoleIsAllowedOrRefusedOnEachRouteExactlyAsThePermissionTableSays(t
 		hub, err := notify.NewHub(w.Pool)
 		testkit.Must(t, err)
 		t.Cleanup(hub.Close)
-		return app.Mounts(hub, nil, payments.NewFake(), w.OrgA)
+		return app.Mounts(hub, nil, payments.NewFake(), w.OrgA, nil)
 	})
 	people := map[access.Role]*testkit.Person{}
 	for _, role := range access.AllRoles {
@@ -121,7 +121,7 @@ func TestAPersonFromAnotherOrganizationGetsNothingFromAnyRoute(t *testing.T) {
 		hub, err := notify.NewHub(w.Pool)
 		testkit.Must(t, err)
 		t.Cleanup(hub.Close)
-		return app.Mounts(hub, nil, payments.NewFake(), w.OrgA)
+		return app.Mounts(hub, nil, payments.NewFake(), w.OrgA, nil)
 	})
 	stranger := w.Member(w.OrgB, nil, "owner")
 	for _, r := range matrix {

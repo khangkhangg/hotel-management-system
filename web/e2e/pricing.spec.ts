@@ -10,7 +10,7 @@ test('a manager reads price suggestions with their reasons, sets limits and keep
 	await expect(page.getByRole('heading', { name: 'Suggestions for the next 30 days' })).toBeVisible();
 	await expect(page.getByText(/Occupancy is \d+ percent/).first()).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Apply the checked prices' })).toBeVisible();
-	await page.getByLabel('Night').fill('2099-01-01');
+	await page.getByLabel('Night', { exact: true }).fill('2099-01-01');
 	await page.getByLabel('Hotel name').fill('Sea Hotel');
 	await page.getByLabel(/^Price \(/).fill('120');
 	await page.getByRole('button', { name: 'Save price' }).click();

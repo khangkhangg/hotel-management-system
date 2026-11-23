@@ -2,6 +2,7 @@
 	import { api, errorText } from '#lib/api.ts';
 	import { addDays, formatDay, rangeDays, weekday } from '#lib/booking/dates.ts';
 	import { formatMoney, parseMoney } from '#lib/booking/money.ts';
+	import { foldRuns } from '#lib/booking/runs.ts';
 	import type { RatePlan, RoomType } from '#lib/booking/types.ts';
 	import { t } from '#lib/i18n.ts';
 	import { session } from '#lib/session.svelte.ts';
@@ -34,6 +35,8 @@
 
 	const days = rangeDays(today, DAYS);
 	const byDate = $derived(Object.fromEntries(rates.map((r) => [r.date, r])));
+	const rulesOf = (r: Rate) => [r.minNights, r.closed, r.closedToArrival, r.closedToDeparture, r.suspicious].join();
+	const runs = $derived(foldRuns(days, (d) => byDate[d] ?? null, (a, b) => (a && b ? a.price === b.price && rulesOf(a) === rulesOf(b) : a === b)));
 
 	$effect(() => {
 		Promise.all([api.get<RoomType[]>('/api/room-types'), api.get<RatePlan[]>('/api/rate-plans')])
@@ -109,10 +112,10 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each days as d (d)}
-					{@const r = byDate[d]}
+				{#each runs as run (run.from)}
+					{@const r = run.value}
 					<tr>
-						<th scope="row">{weekday(d)} {formatDay(d)}</th>
+						<th scope="row">{run.n === 1 ? `${weekday(run.from)} ${formatDay(run.from)}` : t('rates.range', { from: formatDay(run.from), to: formatDay(run.to), n: run.n })}</th>
 						<td class="num">{r ? formatMoney(r.price, currency) : '–'}</td>
 						<td>
 							{#if !r}<span class="muted">{t('rates.none')}</span>

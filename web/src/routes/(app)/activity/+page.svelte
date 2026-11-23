@@ -7,6 +7,8 @@
 	import { roleLabels, type Role } from '#lib/nav.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
+	import Field from '#lib/ui/Field.svelte';
+	import FormGrid from '#lib/ui/FormGrid.svelte';
 	import Select from '#lib/ui/Select.svelte';
 
 	type Page = { items: Entry[]; nextCursor: string | null };
@@ -14,6 +16,14 @@
 	let entries = $state<Entry[]>([]);
 	let cursor = $state<string | null>(null);
 	let action = $state('');
+	let person = $state('');
+	let search = $state('');
+	let staff = $state<{ id: string; label: string }[]>([]);
+	let timer: ReturnType<typeof setTimeout>;
+	const typed = () => {
+		clearTimeout(timer);
+		timer = setTimeout(() => load(false), 300);
+	};
 	let loaded = $state(false);
 	let message = $state('');
 
@@ -21,6 +31,8 @@
 		message = '';
 		const params = new URLSearchParams({ limit: '25' });
 		if (action) params.set('action', action);
+		if (person) params.set('user', person);
+		if (search.trim()) params.set('q', search.trim());
 		if (more && cursor) params.set('cursor', cursor);
 		try {
 			const page = await api.get<Page>(`/api/activity?${params}`);
@@ -34,6 +46,9 @@
 
 	onMount(() => {
 		load(false);
+		api.get<{ id: string; name: string }[]>('/api/staff')
+			.then((rows) => (staff = [{ id: '', label: t('activity.everyone') }, ...rows.map((r) => ({ id: r.id, label: r.name }))]))
+			.catch(() => {});
 	});
 
 	const who = (e: Entry) => {
@@ -46,14 +61,16 @@
 
 <PageHeader title={t('activity.title')} note={t('activity.note')} />
 
-<div class="filters">
+<FormGrid>
+	<div oninput={typed}><Field label={t('activity.search')} type="search" bind:value={search} placeholder={t('activity.searchHint')} /></div>
+	{#if staff.length > 1}<Select label={t('activity.person')} options={staff} bind:value={person} onchange={() => load(false)} />{/if}
 	<Select label={t('activity.filter')} options={actionOptions} bind:value={action} onchange={() => load(false)} />
-</div>
+</FormGrid>
 
 {#if message}<p class="notice danger" role="alert">{message}</p>{/if}
 
 {#if loaded && entries.length === 0}
-	<p class="muted">{t('activity.empty')}</p>
+	<p class="muted">{action || person || search ? t('activity.noMatch') : t('activity.empty')}</p>
 {:else}
 	<ol class="list">
 		{#each entries as entry (entry.id)}
@@ -76,9 +93,6 @@
 {/if}
 
 <style>
-	.filters {
-		max-inline-size: var(--form-width);
-	}
 	.list {
 		list-style: none;
 		margin: 0;

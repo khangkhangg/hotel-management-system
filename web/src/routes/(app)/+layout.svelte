@@ -26,6 +26,7 @@
 	const items = $derived(role ? itemsFor(role) : []);
 	const expanded = $derived(desktop.current ? !collapsed : overlayOpen);
 	const path = $derived(page.url.pathname);
+	const viewingLabel = $derived(session.viewingAs ? t('shell.viewingAs', { role: roleLabels[session.viewingAs] }) : roleLabels[session.effectiveRole ?? 'manager']);
 	const denied = $derived(ready && role !== null && !allowed(role, path) && path !== '/');
 
 	onMount(() => {
@@ -93,7 +94,7 @@
 	</main>
 {:else if ready && role}
 	<div class="shell">
-		<Sidebar {items} {expanded} overlay={!desktop.current} hotel={session.current?.organization.name ?? ''} ontoggle={toggle} />
+		<Sidebar {items} {expanded} overlay={!desktop.current} hotel={session.current?.organization.name ?? ''} role={viewingLabel} viewing={session.viewingAs !== null} ontoggle={toggle} />
 		<div class="main">
 			<TopBar />
 			{#if session.viewingAs}

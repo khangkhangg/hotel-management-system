@@ -18,7 +18,7 @@
 	.auth {
 		min-block-size: 100dvh;
 		display: grid;
-		place-items: start center;
+		place-items: center;
 		padding: var(--space-8) var(--space-4);
 		background: var(--color-page);
 	}
@@ -28,6 +28,10 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--gap-section);
+		padding: var(--space-6);
+		border: var(--border-width) solid var(--color-border);
+		border-radius: var(--radius-md);
+		background: var(--color-surface);
 	}
 	.brand {
 		margin: 0;

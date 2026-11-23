@@ -63,6 +63,20 @@ const more: Record<Role, NavItem[]> = {
 };
 export const moreFor = (role: Role): NavItem[] => more[role];
 
+const areas: [string, string, string[]][] = [
+	['hotel', 'Hotel', ['/group', '/arrivals', '/guests', '/rooms', '/issues', '/extras', '/messages', '/lost-and-found']],
+	['money', 'Prices and money', ['/payments', '/rates', '/rate-plans', '/chain-plans', '/yield', '/pricing', '/promo-codes', '/reports', '/payouts']],
+	['online', 'Online and guests', ['/channels', '/booking-site', '/site-content', '/branding', '/reviews', '/risk']]
+];
+
+/** The screens outside the five-item menu, grouped by what they are for, so a long list stays easy to scan. */
+export function moreGrouped(role: Role): { id: string; label: string; items: NavItem[] }[] {
+	const items = moreFor(role);
+	return areas
+		.map(([id, label, hrefs]) => ({ id, label, items: hrefs.flatMap((h) => items.filter((i) => i.href === h)) }))
+		.filter((g) => g.items.length > 0);
+}
+
 /** The menu for a role, in order. At most 5 items, so it fits the phone's bottom bar. */
 export const itemsFor = (role: Role): NavItem[] => menus[role];
 

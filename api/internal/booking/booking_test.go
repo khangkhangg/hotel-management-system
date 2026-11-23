@@ -312,3 +312,15 @@ func TestAQuoteShowsThePriceAndWhetherTheRoomIsFree(t *testing.T) {
 	h.desk.Do("GET", q+"&from=2027-06-10&to=2027-06-12", &h.property, "").Want(t, 400, "no_rate")
 	h.desk.Do("GET", strings.Replace(q, "adults=2", "adults=9", 1)+"&from=2026-12-14&to=2026-12-15", &h.property, "").Want(t, 400, "too_many_guests")
 }
+
+func TestGuestSearchFindsAPhoneNumberOnlyForThoseWhoSeeContacts(t *testing.T) {
+	h := newHotel(t, 2)
+	h.setup(h.w.A2, 1)
+	body := strings.Replace(`{"guest":{"name":"Mai P.","email":"mai@hotel.com","phone":"+84 90 111 2233"},"rooms":[{"roomTypeId":"RT","ratePlanId":"RP","from":"2026-12-12","to":"2026-12-13","adults":1,"children":0}]}`, "RT", h.roomType, 1)
+	body = strings.Replace(body, "RP", h.ratePlan, 1)
+	h.desk.Do("POST", "/api/reservations", &h.property, body).Want(t, 201)
+	h.desk.Do("GET", "/api/guests?q=111%202233", &h.property, "").Want(t, 200, "mai@hotel.com")
+	if got := h.desk.Do("GET", "/api/guests?q=zzz", &h.property, "").Want(t, 200); strings.Contains(got.Body, "mai@hotel.com") {
+		t.Fatalf("a search that matches nothing returned the guest: %s", got.Body)
+	}
+}

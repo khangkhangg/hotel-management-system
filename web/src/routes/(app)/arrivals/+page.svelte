@@ -22,6 +22,7 @@
 	const departures = $derived(data.stays.filter((s) => s.to === today && s.status === 'checked_in'));
 	const inHouse = $derived(data.stays.filter((s) => s.status === 'checked_in' && s.from <= today && s.to > today));
 	const panelId = $derived(page.url.searchParams.get('reservation'));
+	const statusWord = (v: string) => { const w = v.replace('_', ' '); return w.charAt(0).toUpperCase() + w.slice(1); };
 	const roomNumber = (s: Stay) => data.rooms.find((r) => r.id === s.roomId)?.number;
 
 	async function load() {
@@ -77,8 +78,8 @@
 						{#each group.rows as s (s.id)}
 							<tr>
 								<th scope="row">{s.guestName} <small class="muted">{s.code}</small></th>
-								<td>{roomNumber(s) ?? t('arrivals.noRoom')}</td>
-								<td><StatusBadge tone={s.status === 'checked_in' ? 'success' : 'info'}>{s.status.replace('_', ' ')}</StatusBadge></td>
+								<td>{#if roomNumber(s)}{roomNumber(s)}{:else}<StatusBadge tone="warning">{t('arrivals.noRoom')}</StatusBadge>{/if}</td>
+								<td><StatusBadge tone={s.status === 'checked_in' ? 'success' : 'info'}>{statusWord(s.status)}</StatusBadge></td>
 								<td class="num">{formatMoney(s.total, s.currency)}</td>
 								<td class="actions">
 									<span class="row-actions">

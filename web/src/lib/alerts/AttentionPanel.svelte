@@ -67,8 +67,7 @@
 		<ul>
 			{#each alerts as a (a.id)}
 				<li class={a.severity}>
-					<p class="top"><StatusBadge tone={tones[a.severity]}>{words[a.severity]}</StatusBadge></p>
-					<p class="text">{a.reason.text}</p>
+					<p class="what"><StatusBadge tone={tones[a.severity]}>{words[a.severity]}</StatusBadge><span class="text">{a.reason.text}</span></p>
 					<p class="row">
 						{#if a.action}<Button variant={a.action.kind === 'open' ? 'secondary' : 'primary'} onclick={() => choose(a)}>{a.action.label}</Button>{/if}
 						<Button variant="quiet" onclick={() => run(`/api/alerts/${a.id}/snooze`, { hours: 3 })}>{t('attention.snooze')}</Button>
@@ -114,8 +113,10 @@
 	}
 	.panel > ul > li {
 		display: flex;
-		flex-direction: column;
-		gap: var(--gap-tight);
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--gap-related);
 		padding: var(--space-3) var(--space-4);
 		border: var(--border-width) solid var(--color-border);
 		border-radius: var(--radius-md);
@@ -124,6 +125,12 @@
 	.text {
 		font: var(--font-body);
 		color: var(--color-text);
+	}
+	.what {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: var(--gap-related);
 	}
 	.row {
 		display: flex;

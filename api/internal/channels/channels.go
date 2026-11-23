@@ -299,6 +299,8 @@ func (h *handler) syncNow(w http.ResponseWriter, r *http.Request) {
 type Result struct {
 	Pushed int `json:"pushed"`
 	Pulled int `json:"pulled"`
+	// PushFailed says the other side did not take the nights. The failure is in the log, and the hotel stays marked.
+	PushFailed bool `json:"-"`
 }
 
 // ErrOff means the property has no enabled connection.
@@ -362,6 +364,7 @@ func syncWith(ctx context.Context, pool *pgxpool.Pool, factory Factory, org, pro
 	bookings, pullErr := ad.PullBookings(ctx, l.since)
 	var notes []logLine
 	if pushErr != nil {
+		res.PushFailed = true
 		notes = append(notes, logLine{"push", "error", "Sending rooms and prices failed: " + pushErr.Error()})
 	} else {
 		notes = append(notes, logLine{"push", "ok", fmt.Sprintf("Sent %d nights.", len(l.slots))})
@@ -609,18 +612,65 @@ func runEach(ctx context.Context, pool *pgxpool.Pool, factory Factory, now time.
 	return done, nil
 }
 
-// RunSweeper runs RunAll on a timer and RunNightly once a day, until the context ends.
+// RunDirty pushes the hotels that a booking or a rate change marked since their last push. A hotel is cleared only when the
+// push worked, so a late or failed push is tried again. It says how many hotels it pushed.
+func RunDirty(ctx context.Context, pool *pgxpool.Pool, factory Factory, now time.Time) (int, error) {
+	type mark struct {
+		org, prop uuid.UUID
+		at        time.Time
+	}
+	var todo []mark
+	err := db.WithoutOrg(ctx, pool, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `select organization_id, property_id, marked_at from dirty_channel_properties()`)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var m mark
+			if err := rows.Scan(&m.org, &m.prop, &m.at); err != nil {
+				return err
+			}
+			todo = append(todo, m)
+		}
+		return rows.Err()
+	})
+	if err != nil {
+		return 0, err
+	}
+	done := 0
+	for _, m := range todo {
+		res, err := Sync(ctx, pool, factory, m.org, m.prop, now)
+		if err != nil || res.PushFailed {
+			continue
+		}
+		// Only what was marked before this push is cleared, so a booking made meanwhile stays marked.
+		if err := db.WithOrg(ctx, pool, m.org, func(tx pgx.Tx) error {
+			_, e := tx.Exec(ctx, `delete from channel_dirty where property_id = $1 and marked_at <= $2`, m.prop, m.at)
+			return e
+		}); err == nil {
+			done++
+		}
+	}
+	return done, nil
+}
+
+// RunSweeper runs RunAll on a timer, RunDirty every few seconds and RunNightly once a day, until the context ends.
 func RunSweeper(ctx context.Context, pool *pgxpool.Pool, factory Factory, every time.Duration) {
 	t := time.NewTicker(every)
 	defer t.Stop()
 	night := time.NewTicker(24 * time.Hour)
 	defer night.Stop()
+	quick := time.NewTicker(20 * time.Second)
+	defer quick.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
 			_, _ = RunAll(ctx, pool, factory, time.Now())
+		case <-quick.C:
+			_, _ = RunDirty(ctx, pool, factory, time.Now())
 		case <-night.C:
 			_, _ = RunNightly(ctx, pool, factory, time.Now())
 		}

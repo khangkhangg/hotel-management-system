@@ -31,6 +31,7 @@ import (
 	"hotelpms/api/internal/session"
 	"hotelpms/api/internal/staff"
 	"hotelpms/api/internal/tenant"
+	"hotelpms/api/internal/translate"
 )
 
 const (
@@ -67,7 +68,7 @@ func main() {
 	go guestbooking.RunSweeper(ctx, pool, 2*time.Second)
 	go alerts.RunSweeper(ctx, pool, 2*time.Second) // the browser tests do not wait a minute for an alert
 	mux := http.NewServeMux()
-	mux.Handle("/", app.NewHandler(deps, hub, nil, payments.NewFake(), uuid.Nil))
+	mux.Handle("/", app.NewHandler(deps, hub, nil, payments.NewFake(), uuid.Nil, translate.NewFake()))
 	mux.HandleFunc("/api/test/last-code", lastMatch(sender, codeRE, 0))
 	mux.HandleFunc("/api/test/last-link", lastMatch(sender, linkRE, 1))
 	mux.HandleFunc("/api/test/owner-invite", func(w http.ResponseWriter, r *http.Request) {

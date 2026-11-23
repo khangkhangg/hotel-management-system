@@ -37,7 +37,7 @@ test('arrivals lets the front desk check a guest in from the list', async ({ pag
 test('guests can be searched and opened', async ({ page }) => {
 	await loginAs(page, 'mai@hotel.com');
 	await page.goto('/guests');
-	await page.getByLabel('Search by name or email').fill('ben');
+	await page.getByLabel('Search by name, email or phone').fill('ben');
 	await expect(page.getByRole('row', { name: /Ben Carter/ })).toBeVisible();
 	await expect(page.getByRole('row', { name: /Ana Reyes/ })).toHaveCount(0);
 	await page.getByRole('row', { name: /Ben Carter/ }).getByRole('button', { name: 'Open' }).click();
@@ -96,15 +96,15 @@ test('a manager sets up a room type and a room; housekeeping works a cleaning ta
 	// Mark it dirty, then housekeeping sees it on the board.
 	const card = page.getByRole('listitem').filter({ hasText: '301' });
 	await card.getByRole('button', { name: 'Dirty' }).click();
-	await expect(card).toContainText('dirty');
+	await expect(card).toContainText('Dirty');
 
 	const other = await browser.newContext();
 	const hk = await other.newPage();
 	await loginAs(hk, 'tuan@hotel.com');
 	await hk.goto('/rooms');
-	await expect(hk.getByRole('listitem').filter({ hasText: '301' })).toContainText('dirty');
+	await expect(hk.getByRole('listitem').filter({ hasText: '301' })).toContainText('Dirty');
 	await hk.getByRole('listitem').filter({ hasText: '301' }).getByRole('button', { name: 'Clean' }).click();
-	await expect(hk.getByRole('listitem').filter({ hasText: '301' })).toContainText('clean');
+	await expect(hk.getByRole('listitem').filter({ hasText: '301' })).toContainText('Clean');
 	const text = await hk.locator('main').innerText();
 	for (const secret of ['Ana', 'Ben', 'Reyes', 'Carter', 'example.com', '$']) expect(text, secret).not.toContain(secret);
 	await other.close();

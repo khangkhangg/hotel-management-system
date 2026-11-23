@@ -422,3 +422,59 @@ func TestPreviewShowsWhatANewYieldRuleWouldChangeBeforeItIsSaved(t *testing.T) {
 	h.manager.Do("POST", "/api/yield-rules", &h.w.A1, `{"kind":"availability_cap","value":1,"active":true}`).Want(t, 201)
 	h.manager.Do("POST", "/api/channel/yield-preview", &h.w.A1, `{"kind":"availability_cap","value":1,"active":true}`).Want(t, 200, "[]") // already in force
 }
+
+func TestABookingOrARateChangeMarksTheChannelAndTheNextRunPushesItOnceAndAFailureKeepsItMarked(t *testing.T) {
+	h := newHotel(t, 2)
+	h.connect(t, "channel_manager", "fake", true)
+	run := func() int {
+		n, err := channels.RunDirty(testkit.Ctx, h.w.Pool, channels.Fixed(h.fake), h.w.Now)
+		testkit.Must(t, err)
+		return n
+	}
+	if n := run(); n != 1 {
+		t.Fatalf("creating the rooms and rates left %d hotels marked, want 1", n)
+	}
+	if n := run(); n != 0 {
+		t.Fatalf("a hotel with nothing new was pushed again: %d", n)
+	}
+	h.fake.Pushed = nil
+	book := func() {
+		h.manager.Do("POST", "/api/reservations", &h.w.A1, fmt.Sprintf(`{"guest":{"name":"Mai"},"rooms":[{"roomTypeId":%q,"ratePlanId":%q,"from":"2026-12-10","to":"2026-12-11","adults":2,"children":0}]}`, h.rt, h.rp)).Want(t, 201)
+	}
+	book()
+	if n := run(); n != 1 {
+		t.Fatalf("a booking did not mark the hotel: %d", n)
+	}
+	got := map[string]channels.Slot{}
+	for _, s := range h.fake.Pushed {
+		got[s.Date] = s
+	}
+	if got["2026-12-10"].Available != 1 {
+		t.Fatalf("the booking is not in what was pushed: %+v", got["2026-12-10"])
+	}
+	if n := run(); n != 0 {
+		t.Fatalf("pushed twice: %d", n)
+	}
+	// While the other side is down the hotel stays marked, and the next run delivers it.
+	h.fake.Fail = errors.New("down")
+	book()
+	if n := run(); n != 0 {
+		t.Fatalf("a failed push counted: %d", n)
+	}
+	h.fake.Fail = nil
+	h.fake.Pushed = nil
+	if n := run(); n != 1 {
+		t.Fatalf("the failed push was forgotten: %d", n)
+	}
+	got = map[string]channels.Slot{}
+	for _, s := range h.fake.Pushed {
+		got[s.Date] = s
+	}
+	if got["2026-12-10"].Available != 0 {
+		t.Fatalf("both bookings should show: %+v", got["2026-12-10"])
+	}
+	h.manager.Do("PUT", "/api/rates", &h.w.A1, fmt.Sprintf(`{"ratePlanId":%q,"from":"2026-12-20","to":"2026-12-21","price":12345}`, h.rp)).Want(t, 200)
+	if n := run(); n != 1 {
+		t.Fatalf("a rate change did not mark the hotel: %d", n)
+	}
+}

@@ -26,9 +26,9 @@ test('owner switches view and the banner returns', async ({ page }) => {
 	await loginAs(page, 'owner@hotel.com');
 	await page.goto('/');
 	await expect(mainNav(page).getByRole('link', { name: 'Staff' })).toBeVisible();
-	const view = page.getByRole('group', { name: 'Viewing as' });
-	await view.getByRole('button', { name: 'Front desk' }).click();
-	await expect(page.getByText('Viewing as Front desk')).toBeVisible();
+	const view = page.getByRole('combobox', { name: 'Viewing as' });
+	await view.selectOption({ label: 'Front desk' });
+	await expect(page.getByText('Viewing as Front desk').first()).toBeVisible();
 	await expect(mainNav(page).getByRole('link', { name: 'Calendar' })).toBeVisible();
 	await expect(mainNav(page).getByRole('link', { name: 'Staff' })).toHaveCount(0);
 	await page.getByRole('button', { name: 'Back to owner view' }).click();
@@ -40,7 +40,7 @@ test('manager has no Viewing as control', async ({ page }) => {
 	await loginAs(page, 'daniel@hotel.com');
 	await page.goto('/');
 	await expect(mainNav(page).getByRole('link', { name: 'Staff' })).toBeVisible();
-	await expect(page.getByRole('group', { name: 'Viewing as' })).toHaveCount(0);
+	await expect(page.getByRole('combobox', { name: 'Viewing as' })).toHaveCount(0);
 });
 
 test('layout per width', async ({ page }) => {

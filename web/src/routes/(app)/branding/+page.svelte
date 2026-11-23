@@ -57,7 +57,7 @@
 		event.preventDefault();
 		return run(async () => {
 			await api.put('/api/site/brand', { color });
-			saved = color.toUpperCase();
+			saved = color;
 		}, t('branding.saved'));
 	};
 

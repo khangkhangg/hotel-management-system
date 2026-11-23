@@ -4,9 +4,10 @@
 	import { t } from '#lib/i18n.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import Icon from '#lib/ui/Icon.svelte';
+	import StatusBadge from '#lib/ui/StatusBadge.svelte';
 
-	type Props = { items: NavItem[]; expanded: boolean; overlay: boolean; hotel: string; ontoggle: () => void };
-	let { items, expanded, overlay, hotel, ontoggle }: Props = $props();
+	type Props = { items: NavItem[]; expanded: boolean; overlay: boolean; hotel: string; role: string; viewing: boolean; ontoggle: () => void };
+	let { items, expanded, overlay, hotel, role, viewing, ontoggle }: Props = $props();
 
 	const current = (href: string) => (href === '/' ? page.url.pathname === '/' : page.url.pathname === href || page.url.pathname.startsWith(href + '/'));
 </script>
@@ -17,7 +18,12 @@
 
 <aside class="sidebar" class:expanded class:overlay>
 	<div class="head">
-		{#if expanded}<span class="hotel">{hotel}</span>{/if}
+		{#if expanded}
+			<div class="brand">
+				<span class="hotel">{hotel}</span>
+				<StatusBadge tone={viewing ? 'warning' : 'info'}>{role}</StatusBadge>
+			</div>
+		{/if}
 		<Button variant="quiet" icon="panel" iconOnly onclick={ontoggle}>{expanded ? t('nav.collapse') : t('nav.expand')}</Button>
 	</div>
 	<nav aria-label={t('nav.main')}>
@@ -80,6 +86,14 @@
 		justify-content: space-between;
 		gap: var(--gap-related);
 		min-block-size: var(--control-height);
+	}
+	.brand {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: var(--space-1);
+		min-inline-size: 0;
+		padding-block: var(--space-2);
 	}
 	.hotel {
 		font: var(--font-heading);

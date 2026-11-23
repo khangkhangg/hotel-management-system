@@ -253,3 +253,15 @@ func TestFiltersAndPaging(t *testing.T) {
 		}
 	}
 }
+
+func TestSearchFindsTextInActionTargetOrPerson(t *testing.T) {
+	w := newWorld(t)
+	owner := w.member(w.orgA, nil, "owner")
+	w.log(w.orgA, w.a1, owner.id, "owner", "booking.moved", "booking", uuid.New())
+	w.log(w.orgA, w.a1, owner.id, "owner", "user.invited", "user", uuid.New())
+	for q, want := range map[string]int{"moved": 1, "MOVED": 1, "label": 2, "zzz": 0, "%25": 0, "_": 0} {
+		if got := owner.get("/api/activity?q="+q, nil).page(t); len(got.Items) != want {
+			t.Fatalf("q=%s: %d rows, want %d", q, len(got.Items), want)
+		}
+	}
+}

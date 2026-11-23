@@ -5,6 +5,7 @@
 	import { t } from '#lib/i18n.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
+	import Section from '#lib/ui/Section.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 	import StatTile from '#lib/ui/StatTile.svelte';
 
@@ -56,22 +57,24 @@
 	{/each}
 </div>
 
-{#if data.pendingRefunds.length}
-	<section class="stack-tight" aria-label={t('payments.waiting')}>
-		<h2>{t('payments.waiting')}</h2>
-		<ul class="waiting">
-			{#each data.pendingRefunds as r (r.id)}
-				<li>
-					<span>{r.guestName} ({r.code}): {formatMoney(r.amount, r.currency)}, {r.reason}</span>
-					{#if canApprove}
-						<span class="row-actions"><Button onclick={() => decide(r, 'approve')}>{t('payments.approve')}</Button><Button variant="secondary" onclick={() => decide(r, 'reject')}>{t('payments.reject')}</Button></span>
-					{/if}
-				</li>
-			{/each}
-		</ul>
-	</section>
+{#if loaded}
+	<Section title={t('payments.waiting')}>
+		{#if data.pendingRefunds.length === 0}
+			<p class="muted">{t('payments.noRefunds')}</p>
+		{:else}
+			<ul class="waiting">
+				{#each data.pendingRefunds as r (r.id)}
+					<li>
+						<span>{r.guestName} ({r.code}) {formatMoney(r.amount, r.currency)} {r.reason}</span>
+						{#if canApprove}<span class="row-actions"><Button onclick={() => decide(r, 'approve')}>{t('payments.approve')}</Button><Button variant="secondary" onclick={() => decide(r, 'reject')}>{t('payments.reject')}</Button></span>{/if}
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</Section>
 {/if}
 
+<Section title={t('payments.list')}>
 {#if loaded && data.payments.length === 0}
 	<p class="muted">{t('payments.empty')}</p>
 {:else if data.payments.length}
@@ -101,16 +104,13 @@
 		</table>
 	</div>
 {/if}
+</Section>
 
 <style>
 	.tiles {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(var(--field-min), 1fr));
+		grid-template-columns: repeat(auto-fill, minmax(var(--field-min), 1fr));
 		gap: var(--gap-group);
-	}
-	h2 {
-		margin: 0;
-		font: var(--font-heading);
 	}
 	.waiting {
 		list-style: none;

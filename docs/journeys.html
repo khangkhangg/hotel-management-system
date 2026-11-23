@@ -1,0 +1,145 @@
+<title>Hotel PMS Journeys</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: persona picker on the left, one journey canvas on the right. Lanes run across, steps run down the page on a phone. */
+:root {
+  --bg: #f5f6f4; --surface: #ffffff; --ink: #1c2420; --muted: #5d6a63; --line: #dde3df;
+  --accent: #1f5c4a; --accent-ink: #ffffff; --good: #2e7d5b; --warn: #82540a; --bad: #a43a30;
+  --good-bg: #e4f2ea; --warn-bg: #fbf0d9; --bad-bg: #f8e3e0;
+  --font-head: "Space Grotesk", system-ui, sans-serif; --font-body: "Inter", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #141917; --surface: #1d2420; --ink: #e8eeea; --muted: #9aa8a0; --line: #2d3732;
+  --accent: #6fc3a5; --accent-ink: #0f1a15; --good: #6fc3a5; --warn: #e0b563; --bad: #e58a80;
+  --good-bg: #1f3a2f; --warn-bg: #3a2f17; --bad-bg: #3d2320; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #141917; --surface: #1d2420; --ink: #e8eeea; --muted: #9aa8a0; --line: #2d3732;
+  --accent: #6fc3a5; --accent-ink: #0f1a15; --good: #6fc3a5; --warn: #e0b563; --bad: #e58a80;
+  --good-bg: #1f3a2f; --warn-bg: #3a2f17; --bad-bg: #3d2320; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font-body); padding-block: 24px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1240px; margin-inline: auto; display: grid; gap: 20px; }
+h1, h2, h3 { font-family: var(--font-head); margin: 0; text-wrap: balance; }
+h1 { font-size: 26px; } h2 { font-size: 20px; } h3 { font-size: 15px; }
+.lede { color: var(--muted); margin: 4px 0 0; max-width: 70ch; }
+.layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 820px) { .layout { grid-template-columns: 1fr; } }
+.people { display: grid; gap: 8px; }
+.person { text-align: start; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; color: var(--ink); font: inherit; cursor: pointer; }
+.person[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.person:focus-visible, .step:focus-visible, .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.person b { display: block; font-family: var(--font-head); }
+.person span { color: var(--muted); font-size: 13px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: grid; gap: 16px; min-width: 0; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.fact { border-top: 1px solid var(--line); padding-top: 8px; }
+.fact small { color: var(--muted); display: block; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 5px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.canvas { overflow-x: auto; }
+.grid { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(190px, 1fr); gap: 10px; min-width: min-content; }
+@media (max-width: 820px) { .grid { grid-auto-flow: row; grid-auto-columns: auto; } }
+.step { text-align: start; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 8px; align-content: start; color: var(--ink); font: inherit; cursor: pointer; }
+.step[aria-expanded="true"] { border-color: var(--accent); background: var(--surface); }
+.screen { font: 600 12px var(--font-head); color: var(--accent); letter-spacing: .04em; text-transform: uppercase; }
+.row small { display: block; color: var(--muted); font-size: 12px; }
+.mood { display: flex; gap: 3px; } .mood i { width: 14px; height: 6px; border-radius: 3px; background: var(--line); }
+.mood.m1 i:nth-child(-n+1), .mood.m2 i:nth-child(-n+2) { background: var(--bad); }
+.mood.m3 i:nth-child(-n+3) { background: var(--warn); }
+.mood.m4 i:nth-child(-n+4), .mood.m5 i:nth-child(-n+5) { background: var(--good); }
+.tag { display: inline-block; border-radius: 999px; padding: 2px 9px; font-size: 12px; font-weight: 600; }
+.tag.done { background: var(--good-bg); color: var(--good); } .tag.todo { background: var(--warn-bg); color: var(--warn); } .tag.ok { background: var(--line); color: var(--muted); }
+.detail { display: none; border-top: 1px dashed var(--line); padding-top: 8px; gap: 8px; }
+.step[aria-expanded="true"] .detail { display: grid; }
+.step.hide { display: none; }
+.sum { color: var(--muted); font-size: 13px; }
+</style>
+<div class="wrap">
+  <header>
+    <h1>Hotel PMS journeys</h1>
+    <p class="lede">Six people, one journey each. Pick a person, then open a step to see what they do, what they think, what is wrong on that screen and the change made or still to make. Status reflects the audit as of 24 November 2026.</p>
+  </header>
+  <div class="layout">
+    <div class="people" id="people" role="group" aria-label="Personas"></div>
+    <section class="panel" id="panel" aria-live="polite"></section>
+  </div>
+</div>
+<script>
+const P = [
+ { id:'owner', name:'Linh, owner', role:'Owner', lands:'Overview', goal:'Know if the month is on track and that nothing is going wrong.', fear:'Hearing about a problem from a guest first.', day:'Phone in the morning, desk in the evening.', journey:'Morning check',
+  steps:[
+   {screen:'Sign in', do:'Opens the app and signs in.', think:'Please do not make me hunt for a code.', mood:3, find:'Not audited yet.', fix:'Audit next: order of fields, error wording, phone layout.', s:'todo'},
+   {screen:'Overview', do:'Reads what needs a decision.', think:'What do I have to act on, and how are we doing?', mood:2, find:'Showed rooms only. No money, no trend. Alerts were tall cards that pushed the numbers down.', fix:'Money row with month against last month, refunds waiting. One line per alert. Five tiles in one row.', s:'done'},
+   {screen:'Payments', do:'Opens refunds waiting.', think:'Is there anything to approve?', mood:2, find:'Refunds section hid when empty, so no sign the check ran.', fix:'Section always shown with "none waiting". Empty text says what fills the list.', s:'done'},
+   {screen:'Activity', do:'Looks for who did something odd.', think:'Who changed this, and when?', mood:1, find:'No search or staff filter. Codes like alert.opened.', fix:'Search and staff filter (API tested). Codes read as sentences.', s:'done'},
+   {screen:'Header and menu', do:'Switches to view as front desk to check what staff see.', think:'Which view am I in?', mood:3, find:'Role was hidden. Switcher was two wide buttons.', fix:'Role pill under the hotel name. One compact "Viewing as" menu, owner only. Still to audit on phone.', s:'done'}]},
+ { id:'manager', name:'Daniel, manager', role:'Manager', lands:'Overview', goal:'Keep the property moving and clear what is stuck.', fear:'A refund or complaint sitting unseen.', day:'10 to 12 hour days, mostly at a desk.', journey:'Complaint',
+  steps:[
+   {screen:'Overview', do:'Sees the attention list.', think:'What is stuck right now?', mood:3, find:'Same as owner, plus money row shows refunds.', fix:'Done with the owner changes.', s:'done'},
+   {screen:'Issues', do:'Opens the guest issue.', think:'What happened, who has it?', mood:3, find:'Not audited yet.', fix:'Check owner, age and next action are visible.', s:'todo'},
+   {screen:'Messages', do:'Replies to the guest.', think:'What did we already say?', mood:3, find:'Not audited yet.', fix:'Check the thread shows the booking and earlier replies.', s:'todo'},
+   {screen:'Payments', do:'Approves a partial refund.', think:'Will the guest see it today?', mood:3, find:'Approve and reject had no effect preview.', fix:'Show the amount and the method before the action. Still to build.', s:'todo'},
+   {screen:'Activity', do:'Checks the trail.', think:'Prove what we did.', mood:4, find:'Filter by staff and search added.', fix:'Done.', s:'done'}]},
+ { id:'desk', name:'Lan, front desk', role:'Front desk', lands:'Calendar', goal:'Check guests in and out in under a minute.', fear:'A guest with no room or an unpaid stay.', day:'Busy desk, one hand on the phone.', journey:'Arrival',
+  steps:[
+   {screen:'Sign in', do:'Signs in at the start of shift.', think:'Quick, the queue is waiting.', mood:3, find:'Not audited yet.', fix:'Audit next.', s:'todo'},
+   {screen:'Calendar', do:'Finds today and Ana Reyes.', think:'Who needs a room?', mood:2, find:'Two big alert cards pushed the grid below the fold. The chips for bookings without a room looked like labels.', fix:'One line per alert. Hint under the chips.', s:'done'},
+   {screen:'Booking panel', do:'Assigns room 101.', think:'Is it clean and ready?', mood:3, find:'Not audited yet.', fix:'Check that room readiness shows when choosing.', s:'todo'},
+   {screen:'Payments', do:'Takes the 240 USD still due.', think:'Cash or card, and did it go through?', mood:3, find:'Empty state gave no next step.', fix:'Empty text names what fills the list.', s:'done'},
+   {screen:'Arrivals', do:'Checks in and hands over the key.', think:'Anything the guest asked for?', mood:3, find:'Not audited yet.', fix:'Check requests and notes show on the arrival row.', s:'todo'}]},
+ { id:'revenue', name:'Rita, revenue', role:'Revenue', lands:'Rates', goal:'Raise prices when demand is high and catch channel errors.', fear:'A channel showing a wrong price or no stock.', day:'Part time, works in blocks.', journey:'Weekend price',
+  steps:[
+   {screen:'Rates', do:'Looks at the next 30 nights.', think:'Which night is different?', mood:2, find:'30 identical rows hid the one that differed.', fix:'Nights with the same price and rules fold into one row.', s:'done'},
+   {screen:'Price suggestions', do:'Reads the suggested changes.', think:'Why this price?', mood:3, find:'Grouped into ranges earlier. Reason is shown.', fix:'Done earlier. Check the effect on revenue is shown.', s:'todo'},
+   {screen:'Set rates', do:'Raises the weekend.', think:'What will channels get?', mood:3, find:'Not audited yet.', fix:'Show the channel effect before saving.', s:'todo'},
+   {screen:'Channels', do:'Checks the push worked.', think:'Did Booking.com get it?', mood:3, find:'Not audited yet.', fix:'Check failed pushes are loud and say what to do.', s:'todo'}]},
+ { id:'hk', name:'Tuan, housekeeping', role:'Housekeeping', lands:'Rooms', goal:'Clean in the right order and report problems.', fear:'Cleaning the room a guest is waiting for last.', day:'On a phone, on his feet.', journey:'Morning round',
+  steps:[
+   {screen:'Sign in', do:'Signs in on a phone.', think:'Big buttons please.', mood:3, find:'Not audited yet.', fix:'Audit next at phone width.', s:'todo'},
+   {screen:'Rooms', do:'Sees which rooms to clean.', think:'Which first?', mood:2, find:'Buttons read "Dirty" on a clean room. No summary. Lowercase status.', fix:'Summary line. Buttons say Mark clean, Mark dirty, Needs inspection. Capital status words. Arrival-today flag already shown. Still to do: sort arrivals first.', s:'done'},
+   {screen:'Issues', do:'Reports a broken lamp.', think:'Quick, with a photo.', mood:3, find:'Not audited yet.', fix:'Check it works one-handed on a phone.', s:'todo'}]},
+ { id:'guest', name:'Ana, guest', role:'Guest', lands:'Booking site', goal:'Find a room, see the full price and pay safely.', fear:'Hidden fees and not knowing the cancellation rule.', day:'Phone, in her own language.', journey:'Booking',
+  steps:[
+   {screen:'Search', do:'Picks dates.', think:'Is it available and how much?', mood:3, find:'Dates now default to tomorrow and the day after. Header aligned with the page.', fix:'Done earlier.', s:'done'},
+   {screen:'Choose room', do:'Compares rooms.', think:'What is included?', mood:3, find:'Not audited again this round.', fix:'Check total price and cancellation rule beside each room.', s:'todo'},
+   {screen:'Details and pay', do:'Enters details and pays.', think:'Can I trust this?', mood:3, find:'Not audited again this round.', fix:'Check trust signals and error wording.', s:'todo'},
+   {screen:'Confirmation', do:'Reads the confirmation.', think:'What do I do on arrival?', mood:4, find:'Not audited again this round.', fix:'Check it shows address, check-in time and how to change the booking.', s:'todo'}]}
+];
+let cur = 'owner', only = 'all', open = null;
+const $ = s => document.querySelector(s);
+const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+function people() {
+  $('#people').innerHTML = P.map(p => `<button class="person" aria-pressed="${p.id===cur}" data-id="${p.id}"><b>${esc(p.name)}</b><span>${esc(p.role)}, lands on ${esc(p.lands)}</span></button>`).join('');
+  document.querySelectorAll('.person').forEach(b => b.onclick = () => { cur = b.dataset.id; open = null; render(); });
+}
+function render() {
+  people();
+  const p = P.find(x => x.id === cur);
+  const done = p.steps.filter(s => s.s === 'done').length;
+  $('#panel').innerHTML = `
+   <div><h2>${esc(p.name)}: ${esc(p.journey)}</h2><p class="sum">${done} of ${p.steps.length} steps audited and changed.</p></div>
+   <div class="facts">
+     <div class="fact"><small>Goal</small>${esc(p.goal)}</div>
+     <div class="fact"><small>Fear</small>${esc(p.fear)}</div>
+     <div class="fact"><small>Context</small>${esc(p.day)}</div>
+   </div>
+   <div class="bar"><div class="chips" role="group" aria-label="Filter steps">
+     ${[['all','All steps'],['done','Changed'],['todo','Still to audit']].map(([k,l]) => `<button class="chip" data-k="${k}" aria-pressed="${only===k}">${l}</button>`).join('')}
+   </div><span class="sum">Select a step to open it.</span></div>
+   <div class="canvas"><div class="grid">${p.steps.map((s,i) => `
+     <button class="step ${only!=='all' && only!==s.s ? 'hide' : ''}" aria-expanded="${open===i}" data-i="${i}">
+       <span class="screen">${i+1}. ${esc(s.screen)}</span>
+       <span class="row"><small>Does</small>${esc(s.do)}</span>
+       <span class="row"><small>Thinks</small>${esc(s.think)}</span>
+       <span class="row"><small>Feels</small><span class="mood m${s.mood}" aria-label="mood ${s.mood} of 5"><i></i><i></i><i></i><i></i><i></i></span></span>
+       <span class="tag ${s.s}">${s.s==='done'?'Changed':'To audit'}</span>
+       <span class="detail"><span class="row"><small>Finding</small>${esc(s.find)}</span><span class="row"><small>Change</small>${esc(s.fix)}</span></span>
+     </button>`).join('')}</div></div>`;
+  document.querySelectorAll('.chip').forEach(b => b.onclick = () => { only = b.dataset.k; render(); });
+  document.querySelectorAll('.step').forEach(b => b.onclick = () => { const i = +b.dataset.i; open = open === i ? null : i; render(); const el = document.querySelector(`.step[data-i="${i}"]`); el && el.focus(); });
+}
+render();
+</script>

@@ -60,6 +60,8 @@
 			message = errorText(e);
 		}
 	}
+	const statusWord = (v: string) => { const w = v.replace('_', ' '); return w.charAt(0).toUpperCase() + w.slice(1); };
+	const count = (v: string) => rooms.filter((r) => r.status === v).length;
 	const setStatus = (r: Room, status: string) => run(() => api.patch(`/api/rooms/${r.id}/status`, { status }));
 	const setTask = (task: Task, status: string) => run(() => api.patch(`/api/housekeeping/tasks/${task.id}`, { status }));
 
@@ -98,7 +100,7 @@
 					<span><strong>{t('rooms.room', { number: task.roomNumber })}</strong>, {t('rooms.floor', { floor: task.floor })}
 						{#if task.arrivalToday}<StatusBadge tone="info">{t('rooms.arrivalToday')}</StatusBadge>{/if}</span>
 					<span class="row-actions">
-						<StatusBadge tone={task.status === 'done' ? 'success' : task.status === 'in_progress' ? 'info' : 'warning'}>{task.status.replace('_', ' ')}</StatusBadge>
+						<StatusBadge tone={task.status === 'done' ? 'success' : task.status === 'in_progress' ? 'info' : 'warning'}>{statusWord(task.status)}</StatusBadge>
 						{#if task.status === 'todo'}<Button variant="secondary" onclick={() => setTask(task, 'in_progress')}>{t('rooms.start')}</Button>{/if}
 						{#if task.status !== 'done'}<Button onclick={() => setTask(task, 'done')}>{t('rooms.markClean')}</Button>{/if}
 					</span>
@@ -106,6 +108,10 @@
 			{/each}
 		</ul>
 	</section>
+{/if}
+
+{#if loaded && rooms.length > 0}
+	<p class="muted">{t('rooms.summary', { clean: count('clean'), dirty: count('dirty'), inspect: count('inspect') })}</p>
 {/if}
 
 {#if loaded && rooms.length === 0}
@@ -117,7 +123,7 @@
 			<ul class="board">
 				{#each list as r (r.id)}
 					<li class="room">
-						<p class="top"><strong>{r.number}</strong><StatusBadge tone={tones[r.status as keyof typeof tones] ?? 'neutral'}>{r.status.replace('_', ' ')}</StatusBadge></p>
+						<p class="top"><strong>{r.number}</strong><StatusBadge tone={tones[r.status as keyof typeof tones] ?? 'neutral'}>{statusWord(r.status)}</StatusBadge></p>
 						<p class="muted">{r.roomTypeName}</p>
 						{#if r.status !== 'out_of_order'}
 							<p class="row-actions">
