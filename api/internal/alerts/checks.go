@@ -24,6 +24,7 @@ var registry = []check{
 	{kind: "repeat_issue", role: access.Manager, defaults: map[string]float64{"tickets": 3, "days": 30}, find: repeatIssue},
 	{kind: "returning_guest", role: access.FrontDesk, find: returningGuest},
 	{kind: "refund_waiting", role: access.Manager, find: refundWaiting},
+	{kind: "paid_late", role: access.Manager, find: paidLate},
 	{kind: "tag_not_answered", role: access.FrontDesk, defaults: map[string]float64{"hours": 4}, find: tagNotAnswered},
 }
 
@@ -412,6 +413,40 @@ func tagNotAnswered(ctx context.Context, tx pgx.Tx, sc scope) ([]Finding, error)
 		out = append(out, Finding{SubjectType: "note", Subject: id, Severity: "info", Role: access.Role(role),
 			Text:  fmt.Sprintf("%d tag(s) from %s's note have no answer after %d hours: %q", open, author, int(sc.th["hours"]), snippet),
 			Facts: map[string]any{"open": open}, Action: openAction("Open the booking", "/calendar")})
+	}
+	return out, rows.Err()
+}
+
+// paidLate finds guest payments that arrived after the hold ran out, or that did not cover the booking.
+// The alert stays until the booking is confirmed or the money has gone back.
+func paidLate(ctx context.Context, tx pgx.Tx, sc scope) ([]Finding, error) {
+	rows, err := tx.Query(ctx, `select r.id, r.code, r.status, r.currency,
+		coalesce((select sum(p.amount) from payment p where p.folio_id = fo.id), 0)
+		- coalesce((select sum(x.amount) from refund x join payment p on p.id = x.payment_id where p.folio_id = fo.id and x.status <> 'rejected'), 0)
+		from reservation r join folio fo on fo.reservation_id = r.id
+		where r.property_id = $1 and r.paid_late and r.status in ('pending', 'cancelled') order by r.created_at`, sc.propertyID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Finding
+	for rows.Next() {
+		var id uuid.UUID
+		var code, status, cur string
+		var held int64
+		if err := rows.Scan(&id, &code, &status, &cur, &held); err != nil {
+			return nil, err
+		}
+		if held <= 0 {
+			continue
+		}
+		text := fmt.Sprintf("Booking %s was paid late and is cancelled. %s is held.", code, money(held, cur))
+		if status == "pending" {
+			text = fmt.Sprintf("Booking %s was paid, but not the full amount. %s is held.", code, money(held, cur))
+		}
+		out = append(out, Finding{SubjectType: "reservation", Subject: id, Severity: "warning", Text: text,
+			Facts:  map[string]any{"held": held, "currency": cur, "status": status},
+			Action: openAction("Open the booking", "/calendar")})
 	}
 	return out, rows.Err()
 }

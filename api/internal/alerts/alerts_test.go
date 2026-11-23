@@ -551,3 +551,30 @@ func TestApplyingAnActionThatChangedSinceItWasShownIsRefused(t *testing.T) {
 	h.desk.Do("POST", "/api/alerts/"+a.ID+"/apply", &h.prop, `{"kind":"assign_room"}`).Want(t, 204)
 	h.desk.Do("GET", "/api/reservations/"+res, &h.prop, "").Want(t, 200, `"roomNumber":"101"`)
 }
+
+func TestPaidLateAlertsAManagerUntilTheMoneyIsGivenBack(t *testing.T) {
+	h := newHotel(t, 1)
+	v := struct{ ID, FolioID string }{ID: h.book("2026-12-10", "2026-12-12")}
+	h.desk.Do("GET", "/api/reservations/"+v.ID+"/folio", &h.prop, "").Want(t, 200) // creates the folio
+	must(t, db.WithOrg(ctx, h.w.Pool, h.w.OrgA, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, `select id::text from folio where reservation_id = $1`, v.ID).Scan(&v.FolioID)
+	}))
+	pay := idOf(t, h.desk.Do("POST", "/api/folios/"+v.FolioID+"/payments", &h.prop, `{"method":"cash","amount":20000}`).Want(t, 201))
+	must(t, db.WithOrg(ctx, h.w.Pool, h.w.OrgA, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `update reservation set status = 'cancelled', paid_late = true where id = $1`, v.ID)
+		return err
+	}))
+	h.run()
+	if got := h.kinds(h.mgr); len(got) != 1 || got[0] != "paid_late" {
+		t.Fatalf("%v", got)
+	}
+	if len(h.of(h.desk, "paid_late")) != 0 {
+		t.Fatal("front desk cannot refund, so the alert is for managers")
+	}
+	r := idOf(t, h.desk.Do("POST", "/api/payments/"+pay+"/refunds", &h.prop, `{"amount":20000,"reason":"paid too late"}`).Want(t, 201))
+	h.mgr.Do("POST", "/api/refunds/"+r+"/approve", &h.prop, "").Want(t, 204)
+	h.run()
+	if len(h.of(h.mgr, "paid_late")) != 0 {
+		t.Fatal("the alert stayed after the money went back")
+	}
+}
