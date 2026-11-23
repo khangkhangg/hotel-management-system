@@ -5,6 +5,7 @@ const day = (offset: number) => new Date(Date.now() + offset * 86400000).toISOSt
 
 async function search(page: import('@playwright/test').Page) {
 	await page.goto('/book/main-hotel');
+	await page.waitForLoadState('networkidle'); // the page is drawn on the server first, so wait until it is live before typing
 	await expect(page.getByRole('heading', { name: 'Main hotel', level: 1 })).toBeVisible();
 	await page.getByLabel('Arrival').fill(day(10));
 	await page.getByLabel('Departure').fill(day(12));
@@ -53,6 +54,7 @@ test('the owner turns a payment type off and guests stop seeing it', async ({ pa
 	await card.getByRole('button', { name: 'Save' }).click();
 	await expect(card.getByRole('status')).toHaveText('Saved');
 	await page.goto('/book/main-hotel');
+	await page.waitForLoadState('networkidle'); // the page is drawn on the server first, so wait until it is live before typing
 	await page.getByLabel('Arrival').fill(day(14));
 	await page.getByLabel('Departure').fill(day(15));
 	await page.getByRole('button', { name: 'Show rooms' }).click();

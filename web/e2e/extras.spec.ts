@@ -11,6 +11,7 @@ test('the owner adds an extra and the front desk puts it on a stay', async ({ pa
 	await expect(page.getByRole('heading', { name: 'Airport pickup' })).toBeVisible();
 
 	await page.goto('/book/main-hotel');
+	await page.waitForLoadState('networkidle'); // the page is drawn on the server first, so wait until it is live before typing
 	await page.getByLabel('Arrival').fill(day(10));
 	await page.getByLabel('Departure').fill(day(12));
 	await page.getByRole('button', { name: 'Show rooms' }).click();

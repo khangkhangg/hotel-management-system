@@ -4,6 +4,7 @@ import { defineConfig } from '@playwright/test';
 // They use the Edge or Chrome that is already installed, so nothing is downloaded.
 export default defineConfig({
 	testDir: 'e2e',
+	globalSetup: './e2e/warmup.ts',
 	workers: 1,
 	reporter: 'list',
 	use: { baseURL: 'http://127.0.0.1:5173', channel: process.env.E2E_BROWSER ?? 'msedge' },

@@ -3,8 +3,8 @@ import { expect, test } from '@playwright/test';
 
 test.use({ reducedMotion: 'reduce' });
 
-test('housekeeping logs a lost item, the front desk finds it and housekeeping marks it returned', async ({ page }) => {
-	await page.request.get('/api/test/login?email=tuan@hotel.com');
+test('a manager logs a lost item and marks it returned, and the front desk can only look', async ({ page }) => {
+	await page.request.get('/api/test/login?email=daniel@hotel.com');
 	await page.goto('/lost-and-found');
 	await page.getByLabel('What is it').fill('Blue umbrella');
 	await page.getByLabel('Where it was found').fill('Room 101');
