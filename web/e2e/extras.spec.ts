@@ -15,6 +15,8 @@ test('the owner adds an extra and the front desk puts it on a stay', async ({ pa
 	await page.getByLabel('Departure').fill(day(12));
 	await page.getByRole('button', { name: 'Show rooms' }).click();
 	await page.getByRole('button', { name: 'Select room' }).first().click();
+	await page.getByRole('checkbox', { name: /Airport pickup/ }).check();
+	await expect(page.getByRole('listitem').filter({ hasText: 'Airport pickup' })).toBeVisible();
 	await page.getByLabel('Full name').fill('Eva Lindqvist');
 	await page.getByLabel('Email').fill('eva@example.com');
 	await page.getByRole('radio', { name: /Pay at the hotel/ }).check();

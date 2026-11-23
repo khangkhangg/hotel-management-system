@@ -70,5 +70,10 @@
 	"manage.cancelled": "Your booking is cancelled.",
 	"manage.cancelledRefund": "Your booking is cancelled. {amount} is going back to your card.",
 	"manage.cancelledPending": "Your booking is cancelled. The refund needs the hotel to finish it, and they will contact you.",
-	"manage.change": "To change dates or rooms, contact the hotel."
+	"manage.change": "To change dates or rooms, contact the hotel.",
+	"guest.extras": "Add to your stay",
+	"guest.extra.each": "each",
+	"guest.extra.per_night": "per night",
+	"guest.extra.per_person": "per guest",
+	"guest.extra.per_person_night": "per guest per night"
 }

@@ -14,6 +14,7 @@
 		payments: string[];
 		roomTypes: { id: string; name: string; baseGuests: number; maxGuests: number }[];
 		ratePlans: { id: string; roomTypeId: string; name: string }[];
+		extras: { id: string; name: string; unit: string; price: number }[];
 	};
 	type Quote = { total: number; currency: string; soldOut: boolean; lines: { description: string; amount: number }[] };
 	type Made = { code: string; total?: number; currency: string; status: string; checkoutUrl?: string; bankDetails?: string; holdUntil?: string };
@@ -43,13 +44,15 @@
 	let kind = $state('');
 	let error = $state('');
 	let busy = $state(false);
+	let picked = $state<string[]>([]);
+	let requoted = $state<Quote | null>(null);
 	let made = $state<Made | null>(null);
 
 	const t = (key: string, params: Record<string, string | number> = {}) => translate(locale, key, params);
 	const nights = $derived(from && to ? Math.round((Date.parse(to) - Date.parse(from)) / 86400000) : 0);
 	const dir = $derived(direction(locale));
 	const money = (n: number) => formatMoney(n, info?.currency ?? 'USD');
-	const current = $derived(chosen ? quotes[chosen.planId] : undefined);
+	const current = $derived(requoted ?? (chosen ? quotes[chosen.planId] : undefined));
 	const typeName = $derived(info?.roomTypes.find((x) => x.id === chosen?.typeId)?.name ?? '');
 	const steps = $derived(['room', 'details', 'done'] as const);
 
@@ -86,12 +89,25 @@
 		document.documentElement.dir = dir;
 	});
 
-	const body = (planId: string, typeId: string) => ({ rooms: [{ roomTypeId: typeId, ratePlanId: planId, from, to, adults: +adults || 1, children: +children || 0 }] });
+	const body = (planId: string, typeId: string) => ({ extras: picked.map((id) => ({ id, quantity: 1 })), rooms: [{ roomTypeId: typeId, ratePlanId: planId, from, to, adults: +adults || 1, children: +children || 0 }] });
+
+	// Extras change the total, so the quote is asked again with them.
+	async function toggleExtra(id: string) {
+		picked = picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id];
+		if (!chosen) return;
+		try {
+			requoted = await api.post<Quote>(`/api/public/${slug}/quote`, { ...body(chosen.planId, chosen.typeId), paymentKind: 'hotel' });
+		} catch {
+			error = t('guest.error.generic');
+		}
+	}
 
 	async function search(event: SubmitEvent) {
 		event.preventDefault();
 		error = '';
 		quotes = {};
+		picked = [];
+		requoted = null;
 		chosen = null;
 		if (!info || nights < 1) return;
 		busy = true;
@@ -196,6 +212,8 @@
 								{:else}
 									<Button
 										onclick={() => {
+											picked = [];
+											requoted = null;
 											chosen = { typeId: rt.id, planId: p.id };
 											step = 'details';
 										}}>{t('guest.select')}</Button
@@ -212,6 +230,17 @@
 					<Field label={t('guest.name')} autocomplete="name" bind:value={name} />
 					<Field label={t('guest.email')} type="email" autocomplete="email" bind:value={email} />
 					<Field label={t('guest.phone')} type="tel" autocomplete="tel" bind:value={phone} />
+					{#if info?.extras.length}
+						<fieldset class="pay">
+							<legend>{t('guest.extras')}</legend>
+							{#each info.extras as x (x.id)}
+								<label class="choice">
+									<input type="checkbox" checked={picked.includes(x.id)} onchange={() => toggleExtra(x.id)} />
+									<span><strong>{x.name}</strong><br /><span class="muted">{money(x.price)} {t(`guest.extra.${x.unit}`)}</span></span>
+								</label>
+							{/each}
+						</fieldset>
+					{/if}
 					<fieldset class="pay">
 						<legend>{t('guest.payHow')}</legend>
 						{#each info.payments as k (k)}

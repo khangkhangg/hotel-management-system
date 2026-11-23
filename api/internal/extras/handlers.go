@@ -2,9 +2,11 @@
 package extras
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -199,33 +201,9 @@ func (h *handler) sell(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var lineID uuid.UUID
-	err = db.WithOrg(r.Context(), h.Pool, a.OrgID, func(tx pgx.Tx) error {
-		var name, unit string
-		var price int64
-		if err := tx.QueryRow(r.Context(), `select name, unit, price from extra where id = $1 and property_id = $2 and active`, in.ExtraID, a.PropertyID).Scan(&name, &unit, &price); err != nil {
-			return err
-		}
-		var nights, guests, guestNights int
-		if err := tx.QueryRow(r.Context(), `select coalesce(max(upper(stay) - lower(stay)), 0), coalesce(sum(adults + children), 0), coalesce(sum((adults + children) * (upper(stay) - lower(stay))), 0)
-			from reservation_room x join reservation r on r.id = x.reservation_id where r.id = $1 and r.property_id = $2`, res, a.PropertyID).Scan(&nights, &guests, &guestNights); err != nil || nights == 0 {
-			return pgx.ErrNoRows
-		}
-		q := in.Quantity
-		switch unit {
-		case "per_night":
-			q *= nights
-		case "per_person":
-			q *= guests
-		case "per_person_night":
-			q *= guestNights
-		}
-		now := h.Clock()
-		folioID, _, err := folio.Ensure(r.Context(), tx, a.OrgID, a.PropertyID, res, now)
-		if err != nil {
-			return err
-		}
-		lineID, err = folio.AddLine(r.Context(), tx, a.OrgID, a.PropertyID, folioID, a.UserID, "extra", name, q, price, now)
-		return err
+	err = db.WithOrg(r.Context(), h.Pool, a.OrgID, func(tx pgx.Tx) (e error) {
+		lineID, e = Add(r.Context(), tx, a.OrgID, a.PropertyID, res, in.ExtraID, in.Quantity, a.UserID, h.Clock())
+		return e
 	})
 	switch {
 	case errors.Is(err, pgx.ErrNoRows), errors.Is(err, folio.ErrNotFound):
@@ -235,4 +213,32 @@ func (h *handler) sell(w http.ResponseWriter, r *http.Request) {
 	default:
 		httpx.JSON(w, http.StatusCreated, map[string]any{"id": lineID})
 	}
+}
+
+// Add posts an extra to a stay's folio. The unit scales the quantity: nights and guests come from the stay.
+// A missing, switched-off or foreign extra, or a stay with no rooms, is pgx.ErrNoRows. A guest booking has no user, so by may be uuid.Nil.
+func Add(ctx context.Context, tx pgx.Tx, org, prop, reservation, extra uuid.UUID, quantity int, by uuid.UUID, now time.Time) (uuid.UUID, error) {
+	var name, unit string
+	var price int64
+	if err := tx.QueryRow(ctx, `select name, unit, price from extra where id = $1 and property_id = $2 and active`, extra, prop).Scan(&name, &unit, &price); err != nil {
+		return uuid.Nil, err
+	}
+	var nights, guests, guestNights int
+	if err := tx.QueryRow(ctx, `select coalesce(max(upper(stay) - lower(stay)), 0), coalesce(sum(adults + children), 0), coalesce(sum((adults + children) * (upper(stay) - lower(stay))), 0)
+		from reservation_room x join reservation r on r.id = x.reservation_id where r.id = $1 and r.property_id = $2`, reservation, prop).Scan(&nights, &guests, &guestNights); err != nil || nights == 0 {
+		return uuid.Nil, pgx.ErrNoRows
+	}
+	switch unit {
+	case "per_night":
+		quantity *= nights
+	case "per_person":
+		quantity *= guests
+	case "per_person_night":
+		quantity *= guestNights
+	}
+	folioID, _, err := folio.Ensure(ctx, tx, org, prop, reservation, now)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return folio.AddLine(ctx, tx, org, prop, folioID, by, "extra", name, quantity, price, now)
 }

@@ -24,6 +24,7 @@ import (
 	"hotelpms/api/internal/audit"
 	"hotelpms/api/internal/booking"
 	"hotelpms/api/internal/db"
+	"hotelpms/api/internal/extras"
 	"hotelpms/api/internal/folio"
 	"hotelpms/api/internal/httpx"
 	"hotelpms/api/internal/ids"
@@ -280,7 +281,8 @@ func (h *handler) info(w http.ResponseWriter, r *http.Request) {
 		Payments      []string   `json:"payments"`
 		RoomTypes     []roomType `json:"roomTypes"`
 		RatePlans     []ratePlan `json:"ratePlans"`
-	}{RoomTypes: []roomType{}, RatePlans: []ratePlan{}}
+		Extras        []extraOut `json:"extras"`
+	}{RoomTypes: []roomType{}, RatePlans: []ratePlan{}, Extras: []extraOut{}}
 	err := db.WithOrg(r.Context(), h.Pool, org, func(tx pgx.Tx) error {
 		ctx := r.Context()
 		if err := tx.QueryRow(ctx, `select name, currency, default_locale, address from property where id = $1`, prop).Scan(&out.Name, &out.Currency, &out.DefaultLocale, &out.Address); err != nil {
@@ -315,7 +317,23 @@ func (h *handler) info(w http.ResponseWriter, r *http.Request) {
 			}
 			out.RatePlans = append(out.RatePlans, p)
 		}
-		return rows.Err()
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		rows.Close()
+		xs, err := tx.Query(ctx, `select id, name, kind, unit, price from extra where property_id = $1 and active order by name`, prop)
+		if err != nil {
+			return err
+		}
+		defer xs.Close()
+		for xs.Next() {
+			var x extraOut
+			if err := xs.Scan(&x.ID, &x.Name, &x.Kind, &x.Unit, &x.Price); err != nil {
+				return err
+			}
+			out.Extras = append(out.Extras, x)
+		}
+		return xs.Err()
 	})
 	if err != nil {
 		httpx.InternalError(w, err)
@@ -324,11 +342,25 @@ func (h *handler) info(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, out)
 }
 
+type extraReq struct {
+	ID       uuid.UUID `json:"id"`
+	Quantity int       `json:"quantity"`
+}
+
+type extraOut struct {
+	ID    uuid.UUID `json:"id"`
+	Name  string    `json:"name"`
+	Kind  string    `json:"kind"`
+	Unit  string    `json:"unit"`
+	Price int64     `json:"price"`
+}
+
 type bookIn struct {
 	Guest       booking.GuestInput    `json:"guest"`
 	Rooms       []booking.RoomRequest `json:"rooms"`
 	PaymentKind string                `json:"paymentKind"`
 	Key         string                `json:"key"`
+	Extras      []extraReq            `json:"extras"`
 }
 
 type lineOut struct {
@@ -341,6 +373,11 @@ func price(ctx context.Context, tx pgx.Tx, org, prop uuid.UUID, in bookIn, now t
 	res, err := booking.Create(ctx, tx, org, prop, booking.CreateInput{Guest: in.Guest, Rooms: in.Rooms, Source: "website"}, now)
 	if err != nil {
 		return res, uuid.Nil, 0, nil, err
+	}
+	for _, x := range in.Extras {
+		if _, err := extras.Add(ctx, tx, org, prop, res.ID, x.ID, x.Quantity, uuid.Nil, now); err != nil {
+			return res, uuid.Nil, 0, nil, err
+		}
 	}
 	folioID, _, err := folio.Ensure(ctx, tx, org, prop, res.ID, now)
 	if err != nil {
@@ -541,6 +578,14 @@ func sane(in bookIn) bool {
 	a, err := netmail.ParseAddress(in.Guest.Email)
 	if err != nil || a.Address != in.Guest.Email || len(in.Guest.Email) > 200 || len(in.Guest.Phone) > 50 || len(in.Guest.Name) > 200 || len(in.Guest.Country) > 100 {
 		return false
+	}
+	if len(in.Extras) > 10 {
+		return false
+	}
+	for _, x := range in.Extras {
+		if x.Quantity < 1 || x.Quantity > 10 {
+			return false
+		}
 	}
 	if len(in.Rooms) < 1 || len(in.Rooms) > 4 {
 		return false

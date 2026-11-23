@@ -12,6 +12,7 @@ import (
 
 	"hotelpms/api/internal/booking"
 	"hotelpms/api/internal/db"
+	"hotelpms/api/internal/extras"
 	"hotelpms/api/internal/folio"
 	"hotelpms/api/internal/guestbooking"
 	"hotelpms/api/internal/httpx"
@@ -49,7 +50,7 @@ func newHotelFor(t *testing.T, nRooms int, cardIsOurs bool) *hotel {
 		if cardIsOurs {
 			owner = w.OrgA
 		}
-		return []httpx.Mount{rooms.Mount, booking.Mount, folio.Mount, guestbooking.Mount(fake, owner)}
+		return []httpx.Mount{rooms.Mount, extras.Mount, booking.Mount, folio.Mount, guestbooking.Mount(fake, owner)}
 	})
 	h := &hotel{w: w, fake: fake, prop: &w.A1}
 	h.owner = w.Member(w.OrgA, nil, "owner")
@@ -398,5 +399,35 @@ func TestTheSameBookingKeySentTwiceMakesOneBooking(t *testing.T) {
 	h.w.Anon("POST", "/api/public/a1/bookings", other).Want(t, 201)
 	if got := h.row(t, `select count(*)::text from reservation`); got != "2" {
 		t.Fatalf("%s reservations", got)
+	}
+}
+
+func TestAGuestAddsExtrasAndTheyAreInTheTotal(t *testing.T) {
+	h := newHotel(t, 1)
+	pick := idOf(t, h.owner.Do("POST", "/api/extras", h.prop, `{"name":"Airport pickup","kind":"service","unit":"each","price":2500}`).Want(t, 201))
+	food := idOf(t, h.owner.Do("POST", "/api/extras", h.prop, `{"name":"Breakfast","kind":"service","unit":"per_person_night","price":800}`).Want(t, 201))
+	off := idOf(t, h.owner.Do("POST", "/api/extras", h.prop, `{"name":"Tour","kind":"tour","unit":"each","price":9000}`).Want(t, 201))
+	h.owner.Do("PATCH", "/api/extras/"+off, h.prop, `{"active":false}`).Want(t, 200)
+	h.w.Anon("GET", "/api/public/a1", "").Want(t, 200, "Airport pickup")
+	if strings.Contains(h.w.Anon("GET", "/api/public/a1", "").Body, "Tour") {
+		t.Fatal("a switched-off extra is offered to guests")
+	}
+	with := func(id string, from, to string) string {
+		return strings.Replace(h.booking("hotel", from, to), `{"guest"`, fmt.Sprintf(`{"extras":[{"id":%q,"quantity":1}],"guest"`, id), 1)
+	}
+	var q struct{ Total int64 }
+	testkit.Must(t, json.Unmarshal([]byte(h.w.Anon("POST", "/api/public/a1/quote", with(food, "2026-12-10", "2026-12-12")).Want(t, 200).Body), &q))
+	if q.Total != 20000+3200 { // 2 guests x 2 nights x 8.00
+		t.Fatalf("quote %d", q.Total)
+	}
+	var m made
+	testkit.Must(t, json.Unmarshal([]byte(h.w.Anon("POST", "/api/public/a1/bookings", with(pick, "2026-12-10", "2026-12-12")).Want(t, 201).Body), &m))
+	if m.Total != 20000+2500 {
+		t.Fatalf("total %d", m.Total)
+	}
+	h.w.Anon("POST", "/api/public/a1/bookings", with(off, "2026-12-20", "2026-12-22")).Want(t, 404)
+	h.w.Anon("POST", "/api/public/a1/bookings", with(uuid.NewString(), "2026-12-20", "2026-12-22")).Want(t, 404)
+	if got := h.row(t, `select count(*)::text from reservation`); got != "1" {
+		t.Fatalf("%s reservations: a refused extra left a booking behind", got)
 	}
 }

@@ -162,12 +162,20 @@ func AddLine(ctx context.Context, tx pgx.Tx, orgID, propertyID, folioID, by uuid
 		return uuid.Nil, ErrNotFound
 	}
 	id := ids.New()
+	var poster any = by
+	if by == uuid.Nil { // a guest booking on the website has no user
+		poster = nil
+	}
 	if _, err := tx.Exec(ctx, `insert into folio_line (id, organization_id, folio_id, kind, description, quantity, unit_price, posted_by, created_at) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		id, orgID, folioID, kind, description, quantity, unitPrice, by, now); err != nil {
+		id, orgID, folioID, kind, description, quantity, unitPrice, poster, now); err != nil {
 		return uuid.Nil, err
 	}
-	return id, audit.Record(ctx, tx, audit.Entry{Action: "folio.line_added", TargetType: "folio", TargetID: folioID, TargetLabel: description,
-		After: map[string]any{"kind": kind, "quantity": quantity, "unitPrice": unitPrice}})
+	entry := audit.Entry{Action: "folio.line_added", TargetType: "folio", TargetID: folioID, TargetLabel: description,
+		After: map[string]any{"kind": kind, "quantity": quantity, "unitPrice": unitPrice}}
+	if by == uuid.Nil {
+		return id, audit.RecordSystem(ctx, tx, orgID, "website", entry)
+	}
+	return id, audit.Record(ctx, tx, entry)
 }
 
 var methods = map[string]bool{"cash": true, "card_terminal": true, "bank_transfer": true, "other": true}
