@@ -295,7 +295,7 @@ func TestTheCatalogNamesMarketsAndSaysWhichVendorsNeedTheirApproval(t *testing.T
 	for i, p := range ps {
 		by[p.ID] = i
 	}
-	for id, market := range map[string]string{"channex": "ALL", "beds24": "ALL", "siteminder": "TW", "staah": "VN", "ezee": "TH", "rategain": "SG", "cloudbeds": "US", "omnibees": "MX", "tllincoln": "JP", "neppan": "JP", "mirai": "EU"} {
+	for id, market := range map[string]string{"channex": "ALL", "beds24": "ALL", "siteminder": "TW", "staah": "VN", "ezee": "TH", "rategain": "SG", "cloudbeds": "US", "omnibees": "MX", "tllincoln": "JP", "neppan": "JP", "mirai": "EU", "hotellink": "VN"} {
 		i, ok := by[id]
 		if !ok {
 			t.Errorf("%s is missing", id)

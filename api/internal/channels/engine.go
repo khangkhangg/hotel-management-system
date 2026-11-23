@@ -88,6 +88,7 @@ var markets = map[string][]string{
 	"tllincoln":  {"JP"},
 	"neppan":     {"JP"},
 	"mirai":      {"EU"},
+	"hotellink":  {"VN"},
 	"roiback":    {"EU"},
 	"wubook":     {"EU"},
 }
@@ -101,6 +102,12 @@ func beds24Profile() Profile {
 			"Put the Beds24 property id in the hotel code box below."}}
 }
 
+// hotelLink adds the sign-up step. Hotel Link has a form for hotels, but publishes no connection for a property system.
+func hotelLink(p Profile) Profile {
+	p.Steps = append([]string{"Hotels open a Hotel Link channel manager account with the form at hotellinksolutions.com/sign-up. It has local support in Vietnam."}, p.Steps...)
+	return p
+}
+
 // partnerProfiles are channel managers that take a property management system only after their own approval.
 func partnerProfiles() []Profile {
 	one := func(id, name string, reaches ...string) Profile {
@@ -110,6 +117,7 @@ func partnerProfiles() []Profile {
 				"Once approved, your server administrator switches the connection on and it appears here."}}
 	}
 	return []Profile{
+		hotelLink(one("hotellink", "Hotel Link")),
 		one("siteminder", "SiteMinder", "Booking.com", "Expedia", "Agoda", "Airbnb"),
 		one("staah", "STAAH", "Booking.com", "Expedia", "Agoda"),
 		one("ezee", "eZee Centrix (Yanolja Cloud Solution)", "Booking.com", "Expedia", "Agoda"),
