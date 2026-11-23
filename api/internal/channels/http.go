@@ -46,28 +46,35 @@ func GuardedClient() *http.Client {
 // Real makes the adapters that talk over the internet. getenv turns the name of a server setting into its value.
 func Real(getenv func(string) string) Factory {
 	return func(c Connection) (Adapter, error) {
-		switch c.Provider {
-		case "cm_generic", "channex", "agoda", "booking_com", "expedia":
-		default:
+		known := map[string]bool{"cm_generic": true, "channex": true, "agoda": true, "booking_com": true, "expedia": true, "google": true}
+		if !known[c.Provider] {
 			return nil, ErrUnavailable
 		}
 		secret := getenv(c.SecretSetting)
-		if c.SecretSetting == "" || secret == "" {
+		// Google allows the server by its address and needs no password. Every other provider needs its secret.
+		if c.Provider != "google" && (c.SecretSetting == "" || secret == "") {
 			return nil, errors.New("channels: the secret setting named for this connection is not set on the server")
 		}
-		if c.Provider == "channex" {
-			if c.ExternalHotelID == "" || (c.BaseURL != "" && !validBaseURL(c.BaseURL)) {
-				return nil, errors.New("channels: the Channex property id is needed, and any address must be an https name")
+		if c.ExternalHotelID == "" || (c.BaseURL != "" && !validBaseURL(c.BaseURL)) {
+			return nil, errors.New("channels: the hotel code is needed, and any address must be an https name")
+		}
+		switch c.Provider {
+		case "cm_generic":
+			if c.BaseURL == "" {
+				return nil, errors.New("channels: the address of the channel manager's connection is needed")
 			}
-			return NewChannex(c.BaseURL, c.ExternalHotelID, secret, GuardedClient()), nil
-		}
-		if c.BaseURL == "" || !validBaseURL(c.BaseURL) || c.ExternalHotelID == "" {
-			return nil, errors.New("channels: the address and the hotel code are needed")
-		}
-		if c.Provider == "cm_generic" {
 			return NewChannelManager(c.BaseURL, c.ExternalHotelID, secret, GuardedClient()), nil
+		case "channex":
+			return NewChannex(c.BaseURL, c.ExternalHotelID, secret, GuardedClient()), nil
+		case "agoda":
+			return NewAgoda(c.BaseURL, c.ExternalHotelID, secret, GuardedClient()), nil
+		case "booking_com":
+			return NewBookingCom(c.BaseURL, c.ExternalHotelID, secret, GuardedClient()), nil
+		case "expedia":
+			return NewExpedia(c.BaseURL, c.ExternalHotelID, secret, GuardedClient()), nil
+		default:
+			return NewGoogle(c.BaseURL, c.ExternalHotelID, secret, GuardedClient()), nil
 		}
-		return NewOpenTravel(c.BaseURL, c.ExternalHotelID, secret, GuardedClient()), nil
 	}
 }
 

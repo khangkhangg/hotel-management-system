@@ -402,7 +402,7 @@
 	"channels.baseUrl": "Address to connect to",
 	"channels.secret": "Name of the server setting that holds the password or key",
 	"channels.secretKept": "Saved. Type a name only to change it.",
-	"channels.secretNote": "The key itself is never stored here. Your server administrator sets it in the server settings under this name.",
+	"channels.secretNote": "The key itself is never stored here. Your server administrator sets it in the server settings under the name you type.",
 	"channels.enabled": "Keep this connection on",
 	"channels.saved": "The connection is saved.",
 	"channels.mapping": "Match your rate plans to theirs",
@@ -435,5 +435,6 @@
 	"channels.findMatches": "Find matches",
 	"channels.theirs": "Their room and rate",
 	"channels.none": "Not sold there",
-	"channels.saveMatches": "Save matches"
+	"channels.saveMatches": "Save matches",
+	"channels.noBookings": "Google shows your prices and sends guests to your own booking site. No bookings come back through this connection."
 }

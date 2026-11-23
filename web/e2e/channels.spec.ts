@@ -29,6 +29,15 @@ test('a direct OTA is a choice too, and an address that points at the server its
 	await expect(page.getByRole('status')).toHaveText('The connection is saved.');
 });
 
+test('Google is a choice and says no bookings come back', async ({ page }) => {
+	await page.request.get('/api/test/login?email=daniel@hotel.com');
+	await page.goto('/channels');
+	await page.getByRole('radio', { name: /^Google Hotels/ }).check();
+	await expect(page.getByRole('note').filter({ hasText: 'Google shows your prices' })).toBeVisible();
+	await page.getByRole('radio', { name: /^Expedia/ }).check();
+	await expect(page.getByText('does not take direct connections from a single hotel')).toBeVisible();
+});
+
 test('the sync log and the channels page are accessible', async ({ page }) => {
 	await page.request.get('/api/test/login?email=daniel@hotel.com');
 	for (const path of ['/channels', '/sync-log']) {

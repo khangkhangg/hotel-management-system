@@ -136,3 +136,26 @@ func TestTheRealFactoryNeedsTheSecretSettingToBeSet(t *testing.T) {
 		t.Fatal("unknown provider")
 	}
 }
+
+func TestTheRealFactoryMakesEachDirectAdapterAndGoogleNeedsNoSecret(t *testing.T) {
+	f := Real(func(k string) string {
+		if k == "KEY" {
+			return "user:pw"
+		}
+		return ""
+	})
+	for _, p := range []string{"agoda", "booking_com", "expedia"} {
+		if a, err := f(Connection{Provider: p, SecretSetting: "KEY", ExternalHotelID: "H"}); err != nil || a == nil {
+			t.Errorf("%s: %v", p, err)
+		}
+		if _, err := f(Connection{Provider: p, SecretSetting: "", ExternalHotelID: "H"}); err == nil {
+			t.Errorf("%s was made without a secret", p)
+		}
+	}
+	if a, err := f(Connection{Provider: "google", ExternalHotelID: "H"}); err != nil || a == nil {
+		t.Errorf("google: %v", err)
+	}
+	if _, err := f(Connection{Provider: "google"}); err == nil {
+		t.Error("google was made without a hotel code")
+	}
+}

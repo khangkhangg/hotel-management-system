@@ -32,7 +32,7 @@ const (
 // modes says which providers each way of connecting may use.
 var modes = map[string][]string{
 	"channel_manager": {"channex", "cm_generic", "fake"},
-	"direct":          {"agoda", "booking_com", "expedia", "fake"},
+	"direct":          {"agoda", "booking_com", "expedia", "google", "fake"},
 }
 
 type handler struct {

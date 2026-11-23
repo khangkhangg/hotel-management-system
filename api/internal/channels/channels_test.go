@@ -186,7 +186,7 @@ func TestTheSetupListsProvidersAndTheRecommendedOneComesFirst(t *testing.T) {
 			t.Errorf("%s names no fields to fill in", p.ID)
 		}
 	}
-	for _, id := range []string{"channex", "cm_generic", "agoda", "booking_com", "expedia"} {
+	for _, id := range []string{"channex", "cm_generic", "agoda", "booking_com", "expedia", "google"} {
 		if !seen[id] {
 			t.Errorf("%s is missing", id)
 		}

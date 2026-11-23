@@ -18,27 +18,35 @@ type Profile struct {
 	Mode        string   `json:"mode"` // channel_manager or direct
 	Name        string   `json:"name"`
 	Recommended bool     `json:"recommended"`
-	Fields      []string `json:"fields"`   // which inputs the owner fills in: hotelId, baseUrl, secret
-	Steps       []string `json:"steps"`    // plain-language things to do on the other side first
-	Reaches     []string `json:"reaches"`  // the booking sites this connection serves
-	Verified    bool     `json:"verified"` // false when written from the provider's message format but not yet run against their test system
+	Fields      []string `json:"fields"`     // which inputs the owner fills in: hotelId, baseUrl, secret
+	Steps       []string `json:"steps"`      // plain-language things to do on the other side first
+	Reaches     []string `json:"reaches"`    // the booking sites this connection serves
+	Verified    bool     `json:"verified"`   // false until it has been run against the provider's own test system
+	SecretHint  string   `json:"secretHint"` // how the secret is written
+	Bookings    bool     `json:"bookings"`   // false when the provider only shows prices and sends guests to your site
 }
 
 // Profiles lists what owners can connect to. The recommended one comes first.
 func Profiles() []Profile {
 	return []Profile{
-		{ID: "channex", Mode: "channel_manager", Name: "Channex", Recommended: true, Fields: []string{"hotelId", "secret", "baseUrl"},
-			Reaches: []string{"Booking.com", "Expedia", "Agoda", "Airbnb"}, Verified: true,
+		{ID: "channex", Mode: "channel_manager", Name: "Channex", Recommended: true, Fields: []string{"hotelId", "secret", "baseUrl"}, Bookings: true,
+			Reaches: []string{"Booking.com", "Expedia", "Agoda", "Airbnb"}, Verified: true, SecretHint: "The API key from your Channex profile.",
 			Steps: []string{"Make a free Channex account and add your hotel there.", "In Channex, connect your Booking.com, Expedia or Agoda listings to that hotel.", "Create an API key in your Channex profile, and ask your server administrator to save it as a server setting.", "Copy the hotel's Channex property id into the hotel code box below."}},
-		{ID: "cm_generic", Mode: "channel_manager", Name: "Another channel manager (JSON connection)", Fields: []string{"hotelId", "baseUrl", "secret"},
-			Reaches: []string{}, Verified: false,
+		{ID: "agoda", Mode: "direct", Name: "Agoda", Fields: []string{"hotelId", "secret", "baseUrl"}, Reaches: []string{"Agoda"}, Bookings: true,
+			SecretHint: "Written as clientId:clientSecret, from the API access page of the Agoda YCS portal.",
+			Steps:      []string{"Apply as a connectivity partner at Agoda (the partner questionnaire on developer.agoda.com). Agoda tests with 2 or 3 live hotels before it certifies you.", "Ask Agoda to switch your hotel to channel manager mode, or email agoda.chain.support@agoda.com with the hotel id.", "In the YCS portal, open API access, create a client id and secret, and allow this server's address.", "Ask your server administrator to save clientId:clientSecret as a server setting, and put your Agoda hotel id in the hotel code box."}},
+		{ID: "booking_com", Mode: "direct", Name: "Booking.com", Fields: []string{"hotelId", "secret", "baseUrl"}, Reaches: []string{"Booking.com"}, Bookings: true,
+			SecretHint: "Written as user:password for a machine account from the Connectivity Portal, or a current token.",
+			Steps:      []string{"Ask Booking.com Connectivity Support to certify your system as a connectivity provider for Rates and Availability and for Reservations. They run test requests with you.", "Create a machine account for this system in the Connectivity Portal (connect.booking.com).", "Ask your server administrator to save the machine account as a server setting, and put your Booking.com hotel id in the hotel code box."}},
+		{ID: "expedia", Mode: "direct", Name: "Expedia", Fields: []string{"hotelId", "secret", "baseUrl"}, Reaches: []string{"Expedia", "Hotels.com", "Vrbo"}, Bookings: true,
+			SecretHint: "Written as username:password of your Expedia QuickConnect login.",
+			Steps:      []string{"Expedia does not take direct connections from a single hotel. The company running this system applies at developers.expediagroup.com/supply/lodging as a connectivity provider (PCI review, licence agreement, test, go live).", "Once approved, Expedia gives the QuickConnect login for your hotel.", "Ask your server administrator to save username:password as a server setting, and put your Expedia hotel id in the hotel code box."}},
+		{ID: "google", Mode: "direct", Name: "Google Hotels", Fields: []string{"hotelId", "secret", "baseUrl"}, Reaches: []string{"Google Search", "Google Maps"}, Bookings: false,
+			SecretHint: "Optional: the partner key from your Hotel Center account settings.",
+			Steps:      []string{"Open a Hotel Center account (hotelcenter.google.com) and add your hotel, with its landing page. Google tells you the hotel id you use here.", "Ask Google for Hotel Prices (ARI push) access through your account manager, and allow this server's address under price settings.", "Guests who click a price on Google arrive on your own booking site, so no bookings come back through this connection."}},
+		{ID: "cm_generic", Mode: "channel_manager", Name: "Another channel manager (JSON connection)", Fields: []string{"hotelId", "baseUrl", "secret"}, Bookings: true,
+			Reaches: []string{}, Verified: false, SecretHint: "A bearer token.",
 			Steps: []string{"Ask your channel manager for a connector that speaks this system's JSON format, or ask us for the format sheet."}},
-		{ID: "agoda", Mode: "direct", Name: "Agoda", Fields: []string{"hotelId", "baseUrl", "secret"}, Reaches: []string{"Agoda"},
-			Steps: []string{"Apply to Agoda's connectivity partner program and ask for the OpenTravel XML connection.", "Save the access they give you as a server setting."}},
-		{ID: "booking_com", Mode: "direct", Name: "Booking.com", Fields: []string{"hotelId", "baseUrl", "secret"}, Reaches: []string{"Booking.com"},
-			Steps: []string{"Apply to Booking.com's connectivity partner program.", "Save the access they give you as a server setting."}},
-		{ID: "expedia", Mode: "direct", Name: "Expedia", Fields: []string{"hotelId", "baseUrl", "secret"}, Reaches: []string{"Expedia"},
-			Steps: []string{"Apply to Expedia's connectivity partner program.", "Save the access they give you as a server setting."}},
 	}
 }
 

@@ -8,7 +8,7 @@
 	import Select from '#lib/ui/Select.svelte';
 	import StatusBadge from '#lib/ui/StatusBadge.svelte';
 
-	type Profile = { id: string; mode: string; name: string; recommended: boolean; fields: string[]; steps: string[]; reaches: string[]; verified: boolean };
+	type Profile = { id: string; mode: string; name: string; recommended: boolean; fields: string[]; steps: string[]; reaches: string[]; verified: boolean; secretHint: string; bookings: boolean };
 	type Connection = { mode: string; provider: string; externalHotelId: string; baseUrl: string; hasSecret: boolean; enabled: boolean };
 	type Map = { ratePlanId: string; externalRoomId: string; externalRateId: string };
 	type Plan = { id: string; name: string; roomTypeId: string };
@@ -158,6 +158,7 @@
 	<form class="card" onsubmit={save}>
 		<h2>{t('channels.step2', { name: profile.name })}</h2>
 		{#if !profile.verified}<p class="notice" role="note">{t('channels.unverified')}</p>{/if}
+		{#if !profile.bookings}<p class="notice" role="note">{t('channels.noBookings')}</p>{/if}
 		<ol class="steps">
 			{#each profile.steps as s (s)}<li>{s}</li>{/each}
 		</ol>
@@ -165,7 +166,7 @@
 		{#if profile.fields.includes('baseUrl')}<Field label={t('channels.baseUrl')} placeholder="https://" bind:value={baseUrl} />{/if}
 		{#if profile.fields.includes('secret')}
 			<Field label={t('channels.secret')} bind:value={secretSetting} placeholder={saved ? t('channels.secretKept') : ''} />
-			<p class="muted">{t('channels.secretNote')}</p>
+			<p class="muted">{profile.secretHint} {t('channels.secretNote')}</p>
 		{/if}
 		<div class="row">
 			<Button type="submit">{t('common.save')}</Button>
