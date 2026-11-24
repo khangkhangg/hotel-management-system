@@ -40,7 +40,7 @@ test('guests can be searched and opened', async ({ page }) => {
 	await page.getByLabel('Search by name, email or phone').fill('ben');
 	await expect(page.getByRole('row', { name: /Ben Carter/ })).toBeVisible();
 	await expect(page.getByRole('row', { name: /Ana Reyes/ })).toHaveCount(0);
-	await page.getByRole('row', { name: /Ben Carter/ }).getByRole('button', { name: 'Open' }).click();
+	await page.getByRole('button', { name: 'Ben Carter' }).click();
 	await expect(page.getByRole('dialog', { name: 'Ben Carter' })).toContainText('ben@example.com');
 });
 

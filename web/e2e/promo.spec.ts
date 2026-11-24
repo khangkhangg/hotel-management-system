@@ -8,7 +8,7 @@ test('a manager adds, sees and removes a promo code', async ({ page }) => {
 	await page.request.get('/api/test/login?email=daniel@hotel.com');
 	await page.goto('/promo-codes');
 	await expect(page.getByText('No codes yet.')).toBeVisible();
-	await page.getByRole('button', { name: 'New code' }).first().click();
+	await page.getByRole('button', { name: 'New code' }).click();
 	await page.getByLabel('Code', { exact: true }).fill('E2E10');
 	await page.getByLabel('Percent off (1 to 100)').fill('10');
 	await page.getByRole('button', { name: 'Add code' }).click();

@@ -5,77 +5,73 @@
 	import type { Guest } from '#lib/booking/types.ts';
 	import { t } from '#lib/i18n.ts';
 	import { session } from '#lib/session.svelte.ts';
-	import Dialog from '#lib/ui/Dialog.svelte';
-	import Field from '#lib/ui/Field.svelte';
+	import DataTable from '#lib/ui/DataTable.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
+	import SearchBox from '#lib/ui/SearchBox.svelte';
+	import SidePanel from '#lib/ui/SidePanel.svelte';
 	import StatusBadge from '#lib/ui/StatusBadge.svelte';
-	import Button from '#lib/ui/Button.svelte';
 
 	type Stay = { id: string; code: string; status: string; from: string; to: string; total: number; currency: string };
 
 	let q = $state('');
+	let searched = $state('');
 	let guests = $state<Guest[]>([]);
 	let loaded = $state(false);
 	let message = $state('');
 	let open = $state(false);
 	let profile = $state<{ guest: Guest; stays: Stay[] } | null>(null);
-	let timer: ReturnType<typeof setTimeout>;
 
-	async function search() {
+	async function search(term: string) {
 		try {
-			guests = await api.get<Guest[]>(`/api/guests?q=${encodeURIComponent(q)}`);
+			searched = term;
+			guests = await api.get<Guest[]>(`/api/guests?q=${encodeURIComponent(term)}`);
 			loaded = true;
 		} catch (e) {
 			message = errorText(e);
 		}
 	}
+
 	$effect(() => {
-		q; // search a moment after the last keystroke
-		clearTimeout(timer);
-		timer = setTimeout(search, 200);
-		return () => clearTimeout(timer);
+		search('');
 	});
 
 	async function show(id: string) {
-		profile = await api.get(`/api/guests/${id}`);
-		open = true;
+		try {
+			profile = await api.get(`/api/guests/${id}`);
+			open = true;
+		} catch (e) {
+			message = errorText(e);
+		}
 	}
+
+	// Revenue sees names only, so the API sends no contact details and the columns stay out.
 	const canContact = $derived(session.effectiveRole !== 'revenue');
+	const columns = $derived([
+		{ id: 'name', label: t('guests.name'), value: (g: Guest) => g.name, priority: 'main' as const },
+		...(canContact
+			? [
+					{ id: 'email', label: t('guests.col.email'), value: (g: Guest) => g.email ?? '', priority: 'detail' as const },
+					{ id: 'phone', label: t('guests.col.phone'), value: (g: Guest) => g.phone ?? '', priority: 'extra' as const }
+				]
+			: [])
+	]);
 </script>
 
 <svelte:head><title>{t('guests.title')} · {t('app.name')}</title></svelte:head>
 
 <PageHeader title={t('guests.title')} note={t('guests.note')} />
-<div class="search"><Field label={t('guests.search')} type="search" bind:value={q} /></div>
+<SearchBox label={t('guests.search')} bind:value={q} onsearch={search} />
 {#if message}<p class="notice danger" role="alert">{message}</p>{/if}
 
-{#if loaded && guests.length === 0}
-	<p class="muted">{t('guests.empty')}</p>
-{:else if guests.length}
-	<!-- svelte-ignore a11y_no_noninteractive_tabindex -- a scrolling table must be reachable by keyboard -->
-	<div class="table-scroll" role="region" aria-label={t('guests.title')} tabindex="0">
-		<table class="data-table">
-			<thead>
-				<tr>
-					<th scope="col">{t('guests.name')}</th>
-					{#if canContact}<th scope="col">{t('booking.email')}</th><th scope="col">{t('booking.phone')}</th>{/if}
-					<th scope="col"><span class="visually-hidden">{t('staff.col.actions')}</span></th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each guests as g (g.id)}
-					<tr>
-						<th scope="row">{g.name}</th>
-						{#if canContact}<td>{g.email ?? ''}</td><td>{g.phone ?? ''}</td>{/if}
-						<td class="actions"><Button variant="quiet" onclick={() => show(g.id)}>{t('guests.open')}</Button></td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
-	</div>
+{#if loaded}
+	<DataTable label={t('guests.title')} rows={guests} {columns} rowKey={(g) => g.id} onopen={(g) => show(g.id)}>
+		{#snippet empty()}
+			<p class="muted">{searched ? t('guests.noMatch', { q: searched }) : t('guests.empty')}</p>
+		{/snippet}
+	</DataTable>
 {/if}
 
-<Dialog title={profile?.guest.name ?? t('guests.title')} wide bind:open>
+<SidePanel title={profile?.guest.name ?? t('guests.title')} bind:open>
 	{#if profile}
 		{#if profile.guest.email || profile.guest.phone}<p class="muted">{profile.guest.email} {profile.guest.phone}</p>{/if}
 		{#if profile.guest.notes}<p class="muted">{profile.guest.notes}</p>{/if}
@@ -95,12 +91,9 @@
 			</ul>
 		{/if}
 	{/if}
-</Dialog>
+</SidePanel>
 
 <style>
-	.search {
-		max-inline-size: var(--form-width);
-	}
 	h3,
 	p {
 		margin: 0;
@@ -122,5 +115,8 @@
 		align-items: center;
 		gap: var(--gap-related);
 		font: var(--font-body);
+	}
+	.muted {
+		color: var(--color-text-muted);
 	}
 </style>

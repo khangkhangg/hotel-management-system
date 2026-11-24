@@ -550,7 +550,7 @@
 	"promo.maxUses": "Most uses (optional)",
 	"promo.add": "Add code",
 	"promo.codes": "Your codes",
-	"promo.none": "No codes yet. Add one to take money off a stay on your booking page.",
+	"promo.none": "No codes yet. Use New code to take money off a stay on your booking page.",
 	"promo.percentOff": "{value} percent off",
 	"promo.amountOff": "{value} off",
 	"promo.used": "Used {used} of {max}",
@@ -723,5 +723,8 @@
 	"lost.col.where": "Found",
 	"lost.col.owner": "Given back to",
 	"lost.col.status": "Status",
-	"lost.col.actions": "Actions"
+	"lost.col.actions": "Actions",
+	"guests.noMatch": "No guest matches \"{q}\". Check the spelling or search by phone or email.",
+	"guests.col.email": "Email",
+	"guests.col.phone": "Phone"
 }

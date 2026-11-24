@@ -130,7 +130,6 @@
 	{/snippet}
 	{#snippet empty()}
 		<p class="muted">{t('promo.none')}</p>
-		<Button icon="plus" onclick={() => (panel = true)}>{t('promo.new')}</Button>
 	{/snippet}
 </DataTable>
 

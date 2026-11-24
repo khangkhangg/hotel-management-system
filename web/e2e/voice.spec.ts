@@ -6,7 +6,7 @@ test.use({ reducedMotion: 'reduce' });
 test('a manager logs a lost item and marks it returned, and the front desk can only look', async ({ page }) => {
 	await page.request.get('/api/test/login?email=daniel@hotel.com');
 	await page.goto('/lost-and-found');
-	await page.getByRole('button', { name: 'Log an item' }).first().click();
+	await page.getByRole('button', { name: 'Log an item' }).click();
 	await page.getByLabel('What is it').fill('Blue umbrella');
 	await page.getByLabel('Where it was found').fill('Room 101');
 	await page.getByRole('button', { name: 'Log item' }).click();

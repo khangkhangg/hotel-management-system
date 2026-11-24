@@ -100,4 +100,9 @@
 		align-items: center;
 		gap: var(--gap-tight);
 	}
-	</style>
+		@media (min-width: 640px) {
+		.topbar {
+			padding-inline: var(--space-6);
+		}
+	}
+</style>

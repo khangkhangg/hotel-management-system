@@ -162,7 +162,6 @@
 	main {
 		box-sizing: border-box;
 		max-inline-size: var(--content-max-width);
-		margin-inline: auto;
 		padding: var(--space-4);
 	}
 	@media (min-width: 640px) {

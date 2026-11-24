@@ -106,7 +106,6 @@
 	{/snippet}
 	{#snippet empty()}
 		<p class="muted">{t('lost.none')}</p>
-		{#if canEdit}<Button icon="plus" onclick={() => (adding = true)}>{t('lost.new')}</Button>{/if}
 	{/snippet}
 </DataTable>
 

@@ -299,3 +299,50 @@ Purpose: find a room, see the full price and know the rules before paying.
 | Each room card states the cancellation rule in a sentence, from the rate plan's own terms (API tested) | Ana's fear is not knowing what cancelling costs. The card said only "Flexible", which is a name, not a rule. |
 | The sentence is translated in all 9 draft languages | The guest page is multilingual. The drafts wait for native review like the rest. |
 | Not done | Room photos and descriptions beside each room (the sample hotel has none), and a total with taxes broken down. |
+
+## Round 4: design system pass (2026-11-24, /khang-design-audit)
+
+Method: docs/design-system.md and the khang-design-audit skill. Baseline before changes: 146 unit tests, svelte-check clean, 90 Playwright tests, ai-design-check 3 findings (2 locale-aware-case, 1 no-exclamation-copy). Screens done so far: Promo codes, Lost and found, Guests, and the shell edge. Screens still on the old pattern are listed at the end.
+
+### Promo codes as manager at 1280
+Purpose: let the manager give guests a discount code for the booking page.
+Role and actions: manager. Add a code, switch it on or off, remove it.
+Findings:
+1. The new-code form sits under the list, with 7 fields in one row (A, slows the task).
+2. Codes were a list of boxes, so status, uses and rules were hard to compare (A).
+3. The empty state said "No codes yet." and nothing else (D).
+Changes:
+1. A "New code" button in the header opens a side panel with the form - Why: the list stays in view and the page stays short.
+2. Codes are a table with discount, rules, uses and an On or Off badge - Why: a manager can see which codes are live at one look.
+3. The saved row is marked and the panel asks before discarding typed values - Why: the person sees where the new code went and never loses typing by accident.
+4. The empty state says to use New code - Why: it names the next step without a second identical button.
+Not done: search shows only above 6 codes. Dates in rules show as typed (ISO), not as local dates.
+
+### Lost and found as manager, housekeeping and front desk at 1280
+Purpose: keep a record of what guests left behind, and who got it back.
+Role and actions: housekeeping logs and hands over. Manager and owner the same. Front desk only looks.
+Findings:
+1. Every item showed two inline fields for the owner's name and contact, even when nothing was being handed over (A).
+2. The log form sat under the list (A).
+Changes:
+1. "Log an item" opens a side panel, shown only to roles that may log - Why: the front desk never sees a button it cannot use.
+2. "Hand over" on a shelf item opens a panel for who collected it, with "Mark returned" and a quieter "Mark thrown away" - Why: closing an item is a decision, so it gets its own space and the destructive choice is not the primary button.
+3. Table with item, place and day, status - Why: scanning what is on the shelf is the main job.
+Not done: a photo for each item needs file storage.
+
+### Guests as front desk and revenue at 1280
+Purpose: find a guest and see their stays.
+Findings:
+1. The detail opened in a wide centered dialog, covering the list (A).
+2. The search box was a plain field, and an empty result gave no hint (A, D).
+Changes:
+1. Detail opens in the side panel - Why: the list and the search stay in view.
+2. Search says what was searched when nothing matches - Why: the person knows whether to fix a spelling or try a phone number.
+3. Revenue still gets no email or phone columns - Why: privacy rule, unchanged.
+Not done: stays count and last stay in the table need an API change.
+
+### Shell edge at 1280
+Findings: the page title in the top bar sat 8px to the left of the page content, and content was centered while the title was not (C, looks).
+Changes: content is left aligned and the top bar uses the same side padding - Why: the title and the page now start on one edge, as rule 5 asks.
+Not done: other screens still to move to the table and panel pattern are Arrivals, Payments, Activity, Yield rules, Rates, Rate plans, Chain plans, Staff, Rooms, Issues, Channels, Pricing and Reviews. Phone and tablet checked only by the Playwright axe and fit tests at 390, 744 and 1280, not by eye.
+
