@@ -10,6 +10,7 @@
 	import { session } from '#lib/session.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import AttentionPanel from '#lib/alerts/AttentionPanel.svelte';
+	import DataTable from '#lib/ui/DataTable.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 	import StatusBadge from '#lib/ui/StatusBadge.svelte';
 
@@ -22,8 +23,16 @@
 	const departures = $derived(data.stays.filter((s) => s.to === today && s.status === 'checked_in'));
 	const inHouse = $derived(data.stays.filter((s) => s.status === 'checked_in' && s.from <= today && s.to > today));
 	const panelId = $derived(page.url.searchParams.get('reservation'));
-	const statusWord = (v: string) => { const w = v.replace('_', ' '); return w.charAt(0).toUpperCase() + w.slice(1); };
+	const statusWord = (v: string) => { const w = v.replace('_', ' '); return w.charAt(0).toLocaleUpperCase('en') + w.slice(1); };
 	const roomNumber = (s: Stay) => data.rooms.find((r) => r.id === s.roomId)?.number;
+
+	const columns = [
+		{ id: 'guest', label: t('arrivals.guest'), value: (s: Stay) => s.guestName, priority: 'main' as const },
+		{ id: 'room', label: t('arrivals.room'), value: (s: Stay) => roomNumber(s) ?? '', priority: 'detail' as const },
+		{ id: 'status', label: t('arrivals.status'), value: (s: Stay) => statusWord(s.status), priority: 'status' as const },
+		{ id: 'total', label: t('arrivals.total'), value: (s: Stay) => formatMoney(s.total, s.currency), priority: 'extra' as const, align: 'end' as const },
+		{ id: 'actions', label: t('staff.col.actions'), value: () => '', priority: 'detail' as const, align: 'end' as const, hideLabel: true }
+	];
 
 	async function load() {
 		try {
@@ -59,44 +68,28 @@
 {#each [{ key: 'arrivals', rows: arrivals }, { key: 'departures', rows: departures }] as group (group.key)}
 	<section class="stack-tight" aria-label={t(`arrivals.${group.key}`)}>
 		<h2>{t(`arrivals.${group.key}`)}</h2>
-		{#if loaded && group.rows.length === 0}
-			<p class="muted">{t(`arrivals.no.${group.key}`)}</p>
-		{:else if group.rows.length}
-			<!-- svelte-ignore a11y_no_noninteractive_tabindex -- a scrolling table must be reachable by keyboard -->
-			<div class="table-scroll" role="region" aria-label={t('arrivals.title')} tabindex="0">
-				<table class="data-table">
-					<thead>
-						<tr>
-							<th scope="col">{t('arrivals.guest')}</th>
-							<th scope="col">{t('arrivals.room')}</th>
-							<th scope="col">{t('arrivals.status')}</th>
-							<th scope="col" class="num">{t('arrivals.total')}</th>
-							<th scope="col"><span class="visually-hidden">{t('staff.col.actions')}</span></th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each group.rows as s (s.id)}
-							<tr>
-								<th scope="row">{s.guestName} <small class="muted">{s.code}</small></th>
-								<td>{#if roomNumber(s)}{roomNumber(s)}{:else}<StatusBadge tone="warning">{t('arrivals.noRoom')}</StatusBadge>{/if}</td>
-								<td><StatusBadge tone={s.status === 'checked_in' ? 'success' : 'info'}>{statusWord(s.status)}</StatusBadge></td>
-								<td class="num">{formatMoney(s.total, s.currency)}</td>
-								<td class="actions">
-									<span class="row-actions">
-										{#if group.key === 'arrivals'}
-											{#if s.roomId}<Button onclick={() => act(s, 'check-in')}>{t('panel.checkIn')}</Button>{:else}<Button variant="secondary" onclick={() => open(s.reservationId)}>{t('panel.assign')}</Button>{/if}
-										{:else}
-											<Button onclick={() => act(s, 'check-out')}>{t('panel.checkOut')}</Button>
-										{/if}
-										<Button variant="quiet" onclick={() => open(s.reservationId)}>{t('arrivals.open')}</Button>
-									</span>
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
-			</div>
-		{/if}
+		<DataTable label={t(`arrivals.${group.key}`)} rows={group.rows} {columns} rowKey={(s) => s.id} onopen={(s) => open(s.reservationId)}>
+			{#snippet cell(s, column)}
+				{#if column.id === 'room'}
+					{#if roomNumber(s)}{roomNumber(s)}{:else}<StatusBadge tone="warning">{t('arrivals.noRoom')}</StatusBadge>{/if}
+				{:else if column.id === 'status'}
+					<StatusBadge tone={s.status === 'checked_in' ? 'success' : 'info'}>{statusWord(s.status)}</StatusBadge>
+				{:else if column.id === 'actions'}
+					<span class="row-actions">
+						{#if group.key === 'arrivals'}
+							{#if s.roomId}<Button onclick={() => act(s, 'check-in')}>{t('panel.checkIn')}</Button>{:else}<Button variant="secondary" onclick={() => open(s.reservationId)}>{t('panel.assign')}</Button>{/if}
+						{:else}
+							<Button onclick={() => act(s, 'check-out')}>{t('panel.checkOut')}</Button>
+						{/if}
+					</span>
+				{:else}
+					{column.value(s)}
+				{/if}
+			{/snippet}
+			{#snippet empty()}
+				{#if loaded}<p class="muted">{t(`arrivals.no.${group.key}`)}</p>{/if}
+			{/snippet}
+		</DataTable>
 	</section>
 {/each}
 
@@ -106,8 +99,5 @@
 	h2 {
 		margin: 0;
 		font: var(--font-heading);
-	}
-	small {
-		font: var(--font-caption);
 	}
 </style>

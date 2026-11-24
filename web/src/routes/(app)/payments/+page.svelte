@@ -2,12 +2,15 @@
 	import { api, errorText } from '#lib/api.ts';
 	import { addDays } from '#lib/booking/dates.ts';
 	import { formatMoney } from '#lib/booking/money.ts';
+	import { goto } from '$app/navigation';
 	import { t } from '#lib/i18n.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
+	import DataTable from '#lib/ui/DataTable.svelte';
 	import Section from '#lib/ui/Section.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 	import StatTile from '#lib/ui/StatTile.svelte';
+	import StatusBadge from '#lib/ui/StatusBadge.svelte';
 
 	type Pay = { id: string; reservationId: string; code: string; guestName: string; method: string; amount: number; status: string; currency: string; createdAt: string };
 	type Waiting = { id: string; reservationId: string; code: string; guestName: string; amount: number; reason: string; currency: string };
@@ -42,6 +45,20 @@
 			message = errorText(e);
 		}
 	}
+	const word = (v: string) => { const w = v.replace('_', ' '); return w.charAt(0).toLocaleUpperCase('en') + w.slice(1); };
+	const refundColumns = [
+		{ id: 'guest', label: t('arrivals.guest'), value: (r: Waiting) => `${r.guestName} (${r.code})`, priority: 'main' as const },
+		{ id: 'amount', label: t('panel.amount'), value: (r: Waiting) => formatMoney(r.amount, r.currency), priority: 'status' as const, align: 'end' as const },
+		{ id: 'reason', label: t('payments.reason'), value: (r: Waiting) => r.reason, priority: 'detail' as const },
+		{ id: 'actions', label: t('staff.col.actions'), value: () => '', priority: 'detail' as const, align: 'end' as const, hideLabel: true }
+	];
+	const paymentColumns = [
+		{ id: 'guest', label: t('arrivals.guest'), value: (p: Pay) => p.guestName, priority: 'main' as const },
+		{ id: 'amount', label: t('panel.amount'), value: (p: Pay) => formatMoney(p.amount, p.currency), priority: 'status' as const, align: 'end' as const },
+		{ id: 'method', label: t('panel.method'), value: (p: Pay) => `${methodWords[p.method] ?? p.method} · ${p.code}`, priority: 'detail' as const },
+		{ id: 'time', label: t('payments.time'), value: (p: Pay) => time(p.createdAt), priority: 'extra' as const },
+		{ id: 'status', label: t('arrivals.status'), value: (p: Pay) => word(p.status), priority: 'extra' as const }
+	];
 	const time = (iso: string) => new Intl.DateTimeFormat('en', { timeStyle: 'short' }).format(new Date(iso));
 </script>
 
@@ -59,52 +76,36 @@
 
 {#if loaded}
 	<Section title={t('payments.waiting')}>
-		{#if data.pendingRefunds.length === 0}
-			<p class="muted">{t('payments.noRefunds')}</p>
-		{:else}
-			<ul class="waiting">
-				{#each data.pendingRefunds as r (r.id)}
-					<li>
-						<span>{r.guestName} ({r.code}) {formatMoney(r.amount, r.currency)} {r.reason}</span>
-						{#if canApprove}<span class="row-actions"><Button onclick={() => decide(r, 'approve')}>{t('payments.approve')}</Button><Button variant="secondary" onclick={() => decide(r, 'reject')}>{t('payments.reject')}</Button></span>{/if}
-					</li>
-				{/each}
-			</ul>
-		{/if}
+		<DataTable label={t('payments.waiting')} rows={data.pendingRefunds} columns={refundColumns} rowKey={(r) => r.id}>
+			{#snippet cell(r, column)}
+				{#if column.id === 'actions'}
+					{#if canApprove}
+						<span class="row-actions">
+							<Button onclick={() => decide(r, 'approve')}>{t('payments.approve')}</Button>
+							<Button variant="secondary" onclick={() => decide(r, 'reject')}>{t('payments.reject')}</Button>
+						</span>
+					{/if}
+				{:else}
+					{column.value(r)}
+				{/if}
+			{/snippet}
+			{#snippet empty()}<p class="muted">{t('payments.noRefunds')}</p>{/snippet}
+		</DataTable>
+	</Section>
+
+	<Section title={t('payments.list')}>
+		<DataTable label={t('payments.list')} rows={data.payments} columns={paymentColumns} rowKey={(p) => p.id} onopen={(p) => goto(`/calendar?reservation=${p.reservationId}`)}>
+			{#snippet cell(p, column)}
+				{#if column.id === 'status'}
+					<StatusBadge tone={p.status === 'paid' ? 'success' : 'neutral'}>{column.value(p)}</StatusBadge>
+				{:else}
+					{column.value(p)}
+				{/if}
+			{/snippet}
+			{#snippet empty()}<p class="muted">{t('payments.empty')}</p>{/snippet}
+		</DataTable>
 	</Section>
 {/if}
-
-<Section title={t('payments.list')}>
-{#if loaded && data.payments.length === 0}
-	<p class="muted">{t('payments.empty')}</p>
-{:else if data.payments.length}
-	<!-- svelte-ignore a11y_no_noninteractive_tabindex -- a scrolling table must be reachable by keyboard -->
-	<div class="table-scroll" role="region" aria-label={t('payments.title')} tabindex="0">
-		<table class="data-table">
-			<thead>
-				<tr>
-					<th scope="col">{t('payments.time')}</th>
-					<th scope="col">{t('arrivals.guest')}</th>
-					<th scope="col">{t('panel.method')}</th>
-					<th scope="col" class="num">{t('panel.amount')}</th>
-					<th scope="col">{t('arrivals.status')}</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each data.payments as p (p.id)}
-					<tr>
-						<td>{time(p.createdAt)}</td>
-						<th scope="row"><a href="/calendar?reservation={p.reservationId}">{p.guestName}</a> <small class="muted">{p.code}</small></th>
-						<td>{methodWords[p.method] ?? p.method}</td>
-						<td class="num">{formatMoney(p.amount, p.currency)}</td>
-						<td>{p.status.replace('_', ' ')}</td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
-	</div>
-{/if}
-</Section>
 
 <style>
 	.tiles {
@@ -112,24 +113,8 @@
 		grid-template-columns: repeat(auto-fill, minmax(var(--field-min), 1fr));
 		gap: var(--gap-group);
 	}
-	.waiting {
-		list-style: none;
+	.muted {
 		margin: 0;
-		padding: 0;
-		display: flex;
-		flex-direction: column;
-		gap: var(--gap-related);
-		font: var(--font-body);
-	}
-	.waiting li {
-		display: flex;
-		flex-wrap: wrap;
-		justify-content: space-between;
-		align-items: center;
-		gap: var(--gap-related);
-		padding: var(--space-3);
-		border: var(--border-width) solid var(--color-border);
-		border-radius: var(--radius-md);
-		background: var(--color-surface);
+		color: var(--color-text-muted);
 	}
 </style>

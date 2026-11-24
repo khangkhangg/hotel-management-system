@@ -7,7 +7,8 @@
 	import { roleLabels, type Role } from '#lib/nav.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
-	import Field from '#lib/ui/Field.svelte';
+	import FilterChips from '#lib/ui/FilterChips.svelte';
+	import SearchBox from '#lib/ui/SearchBox.svelte';
 	import FormGrid from '#lib/ui/FormGrid.svelte';
 	import Select from '#lib/ui/Select.svelte';
 
@@ -19,13 +20,13 @@
 	let person = $state('');
 	let search = $state('');
 	let staff = $state<{ id: string; label: string }[]>([]);
-	let timer: ReturnType<typeof setTimeout>;
-	const typed = () => {
-		clearTimeout(timer);
-		timer = setTimeout(() => load(false), 300);
-	};
 	let loaded = $state(false);
 	let message = $state('');
+
+	const chips = $derived([
+		...(person ? [{ id: 'person', label: t('activity.chip.person', { name: staff.find((x) => x.id === person)?.label ?? '' }) }] : []),
+		...(action ? [{ id: 'action', label: t('activity.chip.action', { name: actionOptions.find((o) => o.id === action)?.label ?? '' }) }] : [])
+	]);
 
 	async function load(more: boolean) {
 		message = '';
@@ -62,10 +63,11 @@
 <PageHeader title={t('activity.title')} note={t('activity.note')} />
 
 <FormGrid>
-	<div oninput={typed}><Field label={t('activity.search')} type="search" bind:value={search} placeholder={t('activity.searchHint')} /></div>
+	<SearchBox label={t('activity.search')} placeholder={t('activity.searchHint')} bind:value={search} onsearch={() => load(false)} />
 	{#if staff.length > 1}<Select label={t('activity.person')} options={staff} bind:value={person} onchange={() => load(false)} />{/if}
 	<Select label={t('activity.filter')} options={actionOptions} bind:value={action} onchange={() => load(false)} />
 </FormGrid>
+<FilterChips {chips} onremove={(id) => { if (id === 'person') person = ''; else action = ''; load(false); }} onclear={() => { person = action = ''; load(false); }} />
 
 {#if message}<p class="notice danger" role="alert">{message}</p>{/if}
 

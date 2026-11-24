@@ -346,3 +346,20 @@ Findings: the page title in the top bar sat 8px to the left of the page content,
 Changes: content is left aligned and the top bar uses the same side padding - Why: the title and the page now start on one edge, as rule 5 asks.
 Not done: other screens still to move to the table and panel pattern are Arrivals, Payments, Activity, Yield rules, Rates, Rate plans, Chain plans, Staff, Rooms, Issues, Channels, Pricing and Reviews. Phone and tablet checked only by the Playwright axe and fit tests at 390, 744 and 1280, not by eye.
 
+### Round 4b: Neo check of the finished screens, and Arrivals, Payments, Activity
+A separate agent walked Promo codes, Lost and found, Guests and the shell in the Neo browser at 1797px against the skill checklist, and reported 13 failures. Arrivals and Payments moved to the table, and Activity got the search box and filter chips.
+Fixed:
+1. Remove promo code deleted on one click - now asks, names the code and says it cannot be undone. Why: a mistaken click loses a code guests may be using.
+2. Mark thrown away sat beside Mark returned and acted at once - now asks first, and the discard panel's "Discard" is the quiet button while "Keep editing" is primary. Why: the loud button should be the safe one.
+3. Panel opened with focus on Close - the cursor now starts in the first field. Why: typing can start at once.
+4. Promo panel gave no example of the discount - it now shows what a 100 USD stay costs after the code. Why: money effect shown before saving.
+5. Guests: no "Clear search" on an empty result, the search box had no visible text, email and phone ran together, status words were lowercase, the stay link used the browser default - all fixed.
+6. Lost and found: place and date were one column - now two.
+Not fixed (needs work of its own):
+1. Success messages are banners that push the table down. Needs a Toast component (design system: 5 seconds, Undo where possible).
+2. Guest panel is not the two column label and value layout, and money is not first for front desk.
+3. Guests as revenue shows a no-access page, so the "names without contact" columns were not looked at in the browser (the Playwright API test covers it).
+4. Sidebar of manager has no Promo codes, front desk no Lost and found: they sit behind the Overview links by the role menu design. Decide if that is right.
+5. The "Viewing as" yellow banner pushes the page down.
+6. Phone, tablet, right-to-left and long text were not looked at by eye.
+

@@ -44,7 +44,7 @@
 			.then(([a, b]) => {
 				types = a;
 				plans = b;
-				plan = plan || (b.some((x) => x.id === page.url.searchParams.get('plan')) ? page.url.searchParams.get('plan')! : b[0]?.id) || '';
+				plan = plan || (b.some((x) => x.id === page.url.searchParams.get('plan')) ? (page.url.searchParams.get('plan') ?? '') : b[0]?.id) || '';
 			})
 			.catch((e) => (message = errorText(e)));
 	});

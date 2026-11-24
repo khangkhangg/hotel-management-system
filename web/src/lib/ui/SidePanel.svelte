@@ -15,6 +15,8 @@
 		if (open && !dialog.open) {
 			if (typeof dialog.showModal === 'function') dialog.showModal();
 			else dialog.setAttribute('open', '');
+			// The cursor starts in the first field, not on Close.
+			queueMicrotask(() => dialog?.querySelector<HTMLElement>('.body input, .body select, .body textarea')?.focus());
 		} else if (!open && dialog.open) {
 			if (typeof dialog.close === 'function') dialog.close();
 			else dialog.removeAttribute('open');
@@ -51,8 +53,8 @@
 	{#if asking}
 		<div class="ask" role="alert">
 			<p>{t('panel.discardPrompt')}</p>
-			<Button variant="secondary" onclick={() => (asking = false)}>{t('common.keepEditing')}</Button>
-			<Button onclick={finish}>{t('common.discard')}</Button>
+			<Button onclick={() => (asking = false)}>{t('common.keepEditing')}</Button>
+			<Button variant="secondary" onclick={finish}>{t('common.discard')}</Button>
 		</div>
 	{/if}
 	<div class="body">{@render children()}</div>

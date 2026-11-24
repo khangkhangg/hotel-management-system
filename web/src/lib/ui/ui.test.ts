@@ -261,6 +261,12 @@ describe('SidePanel', () => {
 		expect(screen.getByText('Fields')).toBeInTheDocument();
 	});
 
+	test('puts the cursor in the first field when it opens', async () => {
+		const field = createRawSnippet(() => ({ render: () => '<input aria-label="Code" />' }));
+		render(SidePanel, { title: 'New promo code', open: true, children: field });
+		await vi.waitFor(() => expect(screen.getByLabelText('Code')).toHaveFocus());
+	});
+
 	test('closes at once when nothing was changed', async () => {
 		const onclose = vi.fn();
 		render(SidePanel, { title: 'New promo code', open: true, onclose, children: text('Fields') });
@@ -289,6 +295,11 @@ describe('SearchBox', () => {
 		await userEvent.type(screen.getByRole('searchbox', { name: 'Search guests' }), 'lan');
 		await vi.waitFor(() => expect(onsearch).toHaveBeenLastCalledWith('lan'));
 		expect(onsearch).toHaveBeenCalledTimes(1);
+	});
+
+	test('shows its label as the placeholder so the box is not unnamed', () => {
+		render(SearchBox, { label: 'Search guests' });
+		expect(screen.getByRole('searchbox')).toHaveAttribute('placeholder', 'Search guests');
 	});
 
 	test('clears with one button that only shows when there is text', async () => {

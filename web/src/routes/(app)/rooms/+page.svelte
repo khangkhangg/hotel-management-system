@@ -61,7 +61,7 @@
 			message = errorText(e);
 		}
 	}
-	const statusWord = (v: string) => { const w = v.replace('_', ' '); return w.charAt(0).toUpperCase() + w.slice(1); };
+	const statusWord = (v: string) => { const w = v.replace('_', ' '); return w.charAt(0).toLocaleUpperCase('en') + w.slice(1); };
 	const count = (v: string) => rooms.filter((r) => r.status === v).length;
 	const setStatus = (r: Room, status: string) => run(() => api.patch(`/api/rooms/${r.id}/status`, { status }));
 	const setTask = (task: Task, status: string) => run(() => api.patch(`/api/housekeeping/tasks/${task.id}`, { status }));

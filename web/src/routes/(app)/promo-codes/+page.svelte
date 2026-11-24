@@ -5,6 +5,7 @@
 	import { session } from '#lib/session.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import DataTable from '#lib/ui/DataTable.svelte';
+	import Dialog from '#lib/ui/Dialog.svelte';
 	import Field from '#lib/ui/Field.svelte';
 	import FormGrid from '#lib/ui/FormGrid.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
@@ -20,6 +21,7 @@
 	let codes = $state<Code[]>([]);
 	let query = $state('');
 	let panel = $state(false);
+	let removing = $state<Code | null>(null);
 	let marked = $state('');
 	let code = $state('');
 	let kind = $state('percent');
@@ -58,6 +60,7 @@
 		}
 	}
 
+	const example = $derived(kind === 'percent' ? t('promo.exampleP', { pct: Number(value) || 0, price: formatMoney(10000, currency), after: formatMoney(Math.round(10000 * (1 - (Number(value) || 0) / 100)), currency) }) : t('promo.exampleA', { off: formatMoney(parseMoney(value, currency) || 0, currency) }));
 	const dirty = $derived(code.trim() !== '' || arriveFrom !== '' || arriveTo !== '' || maxUses !== '');
 
 	function reset() {
@@ -81,18 +84,18 @@
 				panel = false;
 				reset();
 				await load();
-				marked = codes.find((c) => c.code.toUpperCase() === name.toUpperCase())?.id ?? '';
+				marked = codes.find((c) => c.code.toLocaleUpperCase('en') === name.toLocaleUpperCase('en'))?.id ?? '';
 			},
 			t('promo.added')
 		);
 	};
 
 	const toggle = (c: Code) => run(() => api.put(`/api/promo-codes/${c.id}`, { ...c, active: !c.active }), t('promo.changed'));
-	const remove = (c: Code) => run(() => api.delete(`/api/promo-codes/${c.id}`), t('promo.removed'));
+	const remove = (c: Code) => run(async () => { await api.delete(`/api/promo-codes/${c.id}`); removing = null; }, t('promo.removed'));
 	const worth = (c: Code) => (c.kind === 'percent' ? t('promo.percentOff', { value: c.value }) : t('promo.amountOff', { value: formatMoney(c.value, currency) }));
 	const rules = (c: Code) => [c.minNights > 1 ? t('promo.rule.nights', { n: c.minNights }) : '', c.arriveFrom ? t('promo.rule.from', { date: c.arriveFrom }) : '', c.arriveTo ? t('promo.rule.until', { date: c.arriveTo }) : ''].filter(Boolean).join(', ') || t('promo.rule.any');
 
-	const shown = $derived(codes.filter((c) => c.code.toLowerCase().includes(query.trim().toLowerCase())));
+	const shown = $derived(codes.filter((c) => c.code.toLocaleLowerCase('en').includes(query.trim().toLocaleLowerCase('en'))));
 	const columns = [
 		{ id: 'code', label: t('promo.code'), value: (c: Code) => c.code, priority: 'main' as const },
 		{ id: 'worth', label: t('promo.col.discount'), value: worth, priority: 'detail' as const },
@@ -120,7 +123,7 @@
 		{:else if column.id === 'actions'}
 			<span class="row">
 				<Button variant="secondary" disabled={busy} onclick={() => toggle(c)}>{c.active ? t('promo.switchOff') : t('promo.switchOn')}</Button>
-				<Button variant="quiet" disabled={busy} onclick={() => remove(c)}>{t('promo.remove')}</Button>
+				<Button variant="quiet" disabled={busy} onclick={() => (removing = c)}>{t('promo.remove')}</Button>
 			</span>
 		{:else if column.id === 'code'}
 			<strong>{c.code}</strong>
@@ -133,12 +136,24 @@
 	{/snippet}
 </DataTable>
 
+{#if removing}
+	{@const target = removing}
+	<Dialog title={t('promo.removeTitle', { code: target.code })} open={true} onclose={() => (removing = null)}>
+		<p>{t('promo.removeBody')}</p>
+		{#snippet actions()}
+			<Button variant="secondary" disabled={busy} onclick={() => remove(target)}>{t('promo.removeConfirm')}</Button>
+			<Button onclick={() => (removing = null)}>{t('promo.keep')}</Button>
+		{/snippet}
+	</Dialog>
+{/if}
+
 <SidePanel title={t('promo.new')} bind:open={panel} {dirty} onclose={reset}>
 	<form id="promo-form" onsubmit={add}>
 		<FormGrid>
 			<Field label={t('promo.code')} placeholder="SPRING10" bind:value={code} />
 			<Select label={t('promo.kind')} options={[{ id: 'percent', label: t('promo.kind.percent') }, { id: 'amount', label: t('promo.kind.amount') }]} value={kind} onchange={(id) => (kind = id)} />
 			<Field label={kind === 'percent' ? t('promo.valuePercent') : t('promo.valueAmount', { currency })} inputmode="decimal" bind:value />
+			<p class="hint">{example}</p>
 			<Field label={t('promo.minNights')} inputmode="numeric" bind:value={minNights} />
 			<Field label={t('promo.arriveFrom')} type="date" bind:value={arriveFrom} />
 			<Field label={t('promo.arriveTo')} type="date" bind:value={arriveTo} />
@@ -155,6 +170,12 @@
 		display: inline-flex;
 		flex-wrap: wrap;
 		gap: var(--gap-related);
+	}
+	.hint {
+		grid-column: 1 / -1;
+		margin: 0;
+		color: var(--color-text-muted);
+		font: var(--font-caption);
 	}
 	.muted {
 		margin: 0 0 var(--gap-related);

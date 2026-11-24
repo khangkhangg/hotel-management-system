@@ -5,6 +5,7 @@
 	import { session } from '#lib/session.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import DataTable from '#lib/ui/DataTable.svelte';
+	import Dialog from '#lib/ui/Dialog.svelte';
 	import Field from '#lib/ui/Field.svelte';
 	import FormGrid from '#lib/ui/FormGrid.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
@@ -22,6 +23,7 @@
 	let foundOn = $state(new Date().toISOString().slice(0, 10));
 	let adding = $state(false);
 	let closing = $state<Item | null>(null);
+	let discarding = $state(false);
 	let ownerName = $state('');
 	let ownerContact = $state('');
 	let marked = $state('');
@@ -75,7 +77,8 @@
 
 	const columns = [
 		{ id: 'item', label: t('lost.col.item'), value: (i: Item) => i.description, priority: 'main' as const },
-		{ id: 'where', label: t('lost.col.where'), value: (i: Item) => `${i.location ? `${i.location} · ` : ''}${formatDay(i.foundOn)}`, priority: 'detail' as const },
+		{ id: 'place', label: t('lost.col.place'), value: (i: Item) => i.location, priority: 'detail' as const },
+		{ id: 'where', label: t('lost.col.where'), value: (i: Item) => formatDay(i.foundOn), priority: 'extra' as const },
 		{ id: 'owner', label: t('lost.col.owner'), value: (i: Item) => i.ownerName, priority: 'extra' as const },
 		{ id: 'status', label: t('lost.col.status'), value: (i: Item) => t(`lost.status.${i.status}`), priority: 'status' as const },
 		{ id: 'actions', label: t('lost.col.actions'), value: () => '', priority: 'detail' as const, align: 'end' as const, hideLabel: true }
@@ -130,10 +133,19 @@
 			<Field label={t('lost.ownerContact')} bind:value={ownerContact} />
 		</FormGrid>
 		{#snippet actions()}
-			<Button variant="quiet" disabled={busy} onclick={() => close(item, 'discarded')}>{t('lost.markDiscarded')}</Button>
+			<Button variant="quiet" disabled={busy} onclick={() => (discarding = true)}>{t('lost.markDiscarded')}</Button>
 			<Button disabled={busy} onclick={() => close(item, 'returned')}>{t('lost.markReturned')}</Button>
 		{/snippet}
 	</SidePanel>
+	{#if discarding}
+		<Dialog title={t('lost.discardTitle', { item: item.description })} open={true} onclose={() => (discarding = false)}>
+			<p>{t('lost.discardBody')}</p>
+			{#snippet actions()}
+				<Button variant="secondary" disabled={busy} onclick={() => { discarding = false; close(item, 'discarded'); }}>{t('lost.discardConfirm')}</Button>
+				<Button onclick={() => (discarding = false)}>{t('lost.keep')}</Button>
+			{/snippet}
+		</Dialog>
+	{/if}
 {/if}
 
 <style>

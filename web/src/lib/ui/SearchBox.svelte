@@ -17,7 +17,7 @@
 
 <div class="search" role="search">
 	<span class="glyph"><Icon name="search" /></span>
-	<input type="search" aria-label={label} {placeholder} {value} oninput={(event) => change(event.currentTarget.value)} />
+	<input type="search" aria-label={label} placeholder={placeholder ?? label} {value} oninput={(event) => change(event.currentTarget.value)} />
 	{#if value}
 		<span class="clear"><Button variant="quiet" icon="close" iconOnly onclick={() => change('')}>{t('search.clear')}</Button></span>
 	{/if}

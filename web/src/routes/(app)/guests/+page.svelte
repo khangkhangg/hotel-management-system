@@ -5,6 +5,7 @@
 	import type { Guest } from '#lib/booking/types.ts';
 	import { t } from '#lib/i18n.ts';
 	import { session } from '#lib/session.svelte.ts';
+	import Button from '#lib/ui/Button.svelte';
 	import DataTable from '#lib/ui/DataTable.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 	import SearchBox from '#lib/ui/SearchBox.svelte';
@@ -44,6 +45,11 @@
 		}
 	}
 
+	const word = (v: string) => {
+		const w = v.replace('_', ' ');
+		return w.charAt(0).toLocaleUpperCase('en') + w.slice(1);
+	};
+
 	// Revenue sees names only, so the API sends no contact details and the columns stay out.
 	const canContact = $derived(session.effectiveRole !== 'revenue');
 	const columns = $derived([
@@ -67,13 +73,15 @@
 	<DataTable label={t('guests.title')} rows={guests} {columns} rowKey={(g) => g.id} onopen={(g) => show(g.id)}>
 		{#snippet empty()}
 			<p class="muted">{searched ? t('guests.noMatch', { q: searched }) : t('guests.empty')}</p>
+			{#if searched}<Button variant="secondary" onclick={() => { q = ''; search(''); }}>{t('search.clear')}</Button>{/if}
 		{/snippet}
 	</DataTable>
 {/if}
 
 <SidePanel title={profile?.guest.name ?? t('guests.title')} bind:open>
 	{#if profile}
-		{#if profile.guest.email || profile.guest.phone}<p class="muted">{profile.guest.email} {profile.guest.phone}</p>{/if}
+		{#if profile.guest.email}<p class="muted">{profile.guest.email}</p>{/if}
+		{#if profile.guest.phone}<p class="muted">{profile.guest.phone}</p>{/if}
 		{#if profile.guest.notes}<p class="muted">{profile.guest.notes}</p>{/if}
 		<h3>{t('guests.stays')}</h3>
 		{#if profile.stays.length === 0}
@@ -84,7 +92,7 @@
 					<li>
 						<a href="/calendar?reservation={s.id}">{s.code}</a>
 						<span>{formatDay(s.from)} to {formatDay(s.to)}</span>
-						<StatusBadge tone={s.status === 'checked_out' ? 'neutral' : 'info'}>{s.status.replace('_', ' ')}</StatusBadge>
+						<StatusBadge tone={s.status === 'checked_out' ? 'neutral' : 'info'}>{word(s.status)}</StatusBadge>
 						<span class="muted">{formatMoney(s.total, s.currency)}</span>
 					</li>
 				{/each}
@@ -115,6 +123,10 @@
 		align-items: center;
 		gap: var(--gap-related);
 		font: var(--font-body);
+	}
+	.stays a {
+		color: var(--color-action-ink);
+		font: var(--font-body-strong);
 	}
 	.muted {
 		color: var(--color-text-muted);
