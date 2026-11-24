@@ -3,9 +3,9 @@
 	import { toasts } from './toast.svelte.ts';
 </script>
 
-<div class="toaster" role="status" aria-live="polite">
+<div class="toaster" aria-live="polite">
 	{#each toasts.items as toast (toast.id)}
-		<div class="toast">
+		<div class="toast" role="status">
 			<span>{toast.message}</span>
 			{#if toast.undo}
 				{@const undo = toast.undo}

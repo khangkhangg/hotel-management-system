@@ -10,13 +10,13 @@ test('a manager logs a lost item and marks it returned, and the front desk can o
 	await page.getByLabel('What is it').fill('Blue umbrella');
 	await page.getByLabel('Where it was found').fill('Room 101');
 	await page.getByRole('button', { name: 'Log item' }).click();
-	await expect(page.getByRole('status')).toHaveText('The item is logged.');
+	await expect(page.getByRole('status').filter({ hasText: 'The item is logged.' })).toBeVisible();
 	await expect(page.getByText('Blue umbrella')).toBeVisible();
 	expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 	await page.getByRole('button', { name: 'Hand over' }).click();
 	await page.getByLabel('Given back to').fill('Kim Park');
 	await page.getByRole('button', { name: 'Mark returned' }).click();
-	await expect(page.getByRole('status')).toHaveText('The item is marked returned.');
+	await expect(page.getByRole('status').filter({ hasText: 'The item is marked returned.' })).toBeVisible();
 
 	await page.request.get('/api/test/login?email=mai@hotel.com');
 	await page.goto('/lost-and-found');
