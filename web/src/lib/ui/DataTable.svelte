@@ -2,7 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import Icon from './Icon.svelte';
 
-	type Column = { id: string; label: string; value: (row: T) => string; priority?: 'main' | 'status' | 'detail' | 'extra'; align?: 'start' | 'end'; sortable?: boolean };
+	type Column = { id: string; label: string; value: (row: T) => string; priority?: 'main' | 'status' | 'detail' | 'extra'; align?: 'start' | 'end'; sortable?: boolean; hideLabel?: boolean };
 	type Props = {
 		label: string;
 		rows: T[];
@@ -33,6 +33,8 @@
 									{column.label}
 									{#if sortBy === column.id}<Icon name={sortDir === 'asc' ? 'up' : 'down'} />{/if}
 								</button>
+							{:else if column.hideLabel}
+								<span class="visually-hidden">{column.label}</span>
 							{:else}
 								{column.label}
 							{/if}

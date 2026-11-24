@@ -4,17 +4,23 @@
 	import { t } from '#lib/i18n.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
-	import FormGrid from '#lib/ui/FormGrid.svelte';
-	import Section from '#lib/ui/Section.svelte';
+	import DataTable from '#lib/ui/DataTable.svelte';
 	import Field from '#lib/ui/Field.svelte';
+	import FormGrid from '#lib/ui/FormGrid.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
+	import SearchBox from '#lib/ui/SearchBox.svelte';
 	import Select from '#lib/ui/Select.svelte';
+	import SidePanel from '#lib/ui/SidePanel.svelte';
+	import StatusBadge from '#lib/ui/StatusBadge.svelte';
 
 	type Code = { id: string; code: string; kind: string; value: number; minNights: number; arriveFrom: string; arriveTo: string; maxUses: number | null; used: number; active: boolean };
 
 	const currency = $derived(session.currency);
 
 	let codes = $state<Code[]>([]);
+	let query = $state('');
+	let panel = $state(false);
+	let marked = $state('');
 	let code = $state('');
 	let kind = $state('percent');
 	let value = $state('10');
@@ -52,6 +58,15 @@
 		}
 	}
 
+	const dirty = $derived(code.trim() !== '' || arriveFrom !== '' || arriveTo !== '' || maxUses !== '');
+
+	function reset() {
+		code = arriveFrom = arriveTo = maxUses = '';
+		kind = 'percent';
+		value = '10';
+		minNights = '1';
+	}
+
 	const add = (event: SubmitEvent) => {
 		event.preventDefault();
 		const amount = kind === 'percent' ? Number(value) : parseMoney(value, currency);
@@ -59,18 +74,15 @@
 			message = t('promo.badValue');
 			return;
 		}
+		const name = code.trim();
 		return run(
-			() =>
-				api.post('/api/promo-codes', {
-					code,
-					kind,
-					value: amount,
-					minNights: Number(minNights) || 1,
-					arriveFrom,
-					arriveTo,
-					maxUses: maxUses ? Number(maxUses) : null,
-					active: true
-				}),
+			async () => {
+				await api.post('/api/promo-codes', { code: name, kind, value: amount, minNights: Number(minNights) || 1, arriveFrom, arriveTo, maxUses: maxUses ? Number(maxUses) : null, active: true });
+				panel = false;
+				reset();
+				await load();
+				marked = codes.find((c) => c.code.toUpperCase() === name.toUpperCase())?.id ?? '';
+			},
 			t('promo.added')
 		);
 	};
@@ -78,85 +90,75 @@
 	const toggle = (c: Code) => run(() => api.put(`/api/promo-codes/${c.id}`, { ...c, active: !c.active }), t('promo.changed'));
 	const remove = (c: Code) => run(() => api.delete(`/api/promo-codes/${c.id}`), t('promo.removed'));
 	const worth = (c: Code) => (c.kind === 'percent' ? t('promo.percentOff', { value: c.value }) : t('promo.amountOff', { value: formatMoney(c.value, currency) }));
+	const rules = (c: Code) => [c.minNights > 1 ? t('promo.rule.nights', { n: c.minNights }) : '', c.arriveFrom ? t('promo.rule.from', { date: c.arriveFrom }) : '', c.arriveTo ? t('promo.rule.until', { date: c.arriveTo }) : ''].filter(Boolean).join(', ') || t('promo.rule.any');
+
+	const shown = $derived(codes.filter((c) => c.code.toLowerCase().includes(query.trim().toLowerCase())));
+	const columns = [
+		{ id: 'code', label: t('promo.code'), value: (c: Code) => c.code, priority: 'main' as const },
+		{ id: 'worth', label: t('promo.col.discount'), value: worth, priority: 'detail' as const },
+		{ id: 'rules', label: t('promo.col.rules'), value: rules, priority: 'extra' as const },
+		{ id: 'used', label: t('promo.col.used'), value: (c: Code) => t('promo.usedShort', { used: c.used, max: c.maxUses ?? '∞' }), priority: 'extra' as const, align: 'end' as const },
+		{ id: 'status', label: t('promo.col.status'), value: (c: Code) => (c.active ? t('promo.on') : t('promo.off')), priority: 'status' as const },
+		{ id: 'actions', label: t('promo.col.actions'), value: () => '', priority: 'detail' as const, align: 'end' as const, hideLabel: true }
+	];
 </script>
 
 <svelte:head><title>{t('promo.title')} · {t('app.name')}</title></svelte:head>
 
-<PageHeader title={t('promo.title')} note={t('promo.note')} />
+<PageHeader title={t('promo.title')} note={t('promo.note')}>
+	{#snippet primary()}<Button icon="plus" onclick={() => (panel = true)}>{t('promo.new')}</Button>{/snippet}
+</PageHeader>
 {#if message}<p class="notice danger" role="alert">{message}</p>{/if}
 {#if ok}<p class="notice success" role="status">{ok}</p>{/if}
 
-<Section title={t('promo.codes')}>
-	{#if codes.length === 0}
-		<p class="muted">{t('promo.none')}</p>
-	{:else}
-		<ul class="codes">
-			{#each codes as c (c.id)}
-				<li class:off={!c.active}>
-					<div>
-						<strong>{c.code}</strong>
-						<span class="muted">{worth(c)} · {t('promo.used', { used: c.used, max: c.maxUses ?? '∞' })}{c.active ? '' : ` · ${t('promo.off')}`}</span>
-					</div>
-					<div class="row">
-						<Button variant="secondary" disabled={busy} onclick={() => toggle(c)}>{c.active ? t('promo.switchOff') : t('promo.switchOn')}</Button>
-						<Button variant="quiet" disabled={busy} onclick={() => remove(c)}>{t('promo.remove')}</Button>
-					</div>
-				</li>
-			{/each}
-		</ul>
-	{/if}
-</Section>
+{#if codes.length > 6}<SearchBox label={t('promo.search')} bind:value={query} />{/if}
 
-<Section title={t('promo.new')}>
-<form class="stack" onsubmit={add}>
-	<FormGrid>
-	<Field label={t('promo.code')} placeholder="SPRING10" bind:value={code} />
-	<Select label={t('promo.kind')} options={[{ id: 'percent', label: t('promo.kind.percent') }, { id: 'amount', label: t('promo.kind.amount') }]} value={kind} onchange={(id) => (kind = id)} />
-	<Field label={kind === 'percent' ? t('promo.valuePercent') : t('promo.valueAmount', { currency })} inputmode="decimal" bind:value />
-	<Field label={t('promo.minNights')} inputmode="numeric" bind:value={minNights} />
-	<Field label={t('promo.arriveFrom')} type="date" bind:value={arriveFrom} />
-	<Field label={t('promo.arriveTo')} type="date" bind:value={arriveTo} />
-	<Field label={t('promo.maxUses')} inputmode="numeric" bind:value={maxUses} />
-	</FormGrid>
-	<div class="row"><Button type="submit" disabled={busy}>{t('promo.add')}</Button></div>
-</form>
-</Section>
+<DataTable label={t('promo.codes')} rows={shown} {columns} rowKey={(c) => c.id} {marked}>
+	{#snippet cell(c, column)}
+		{#if column.id === 'status'}
+			<StatusBadge tone={c.active ? 'success' : 'neutral'}>{column.value(c)}</StatusBadge>
+		{:else if column.id === 'actions'}
+			<span class="row">
+				<Button variant="secondary" disabled={busy} onclick={() => toggle(c)}>{c.active ? t('promo.switchOff') : t('promo.switchOn')}</Button>
+				<Button variant="quiet" disabled={busy} onclick={() => remove(c)}>{t('promo.remove')}</Button>
+			</span>
+		{:else if column.id === 'code'}
+			<strong>{c.code}</strong>
+		{:else}
+			{column.value(c)}
+		{/if}
+	{/snippet}
+	{#snippet empty()}
+		<p class="muted">{t('promo.none')}</p>
+		<Button icon="plus" onclick={() => (panel = true)}>{t('promo.new')}</Button>
+	{/snippet}
+</DataTable>
+
+<SidePanel title={t('promo.new')} bind:open={panel} {dirty} onclose={reset}>
+	<form id="promo-form" onsubmit={add}>
+		<FormGrid>
+			<Field label={t('promo.code')} placeholder="SPRING10" bind:value={code} />
+			<Select label={t('promo.kind')} options={[{ id: 'percent', label: t('promo.kind.percent') }, { id: 'amount', label: t('promo.kind.amount') }]} value={kind} onchange={(id) => (kind = id)} />
+			<Field label={kind === 'percent' ? t('promo.valuePercent') : t('promo.valueAmount', { currency })} inputmode="decimal" bind:value />
+			<Field label={t('promo.minNights')} inputmode="numeric" bind:value={minNights} />
+			<Field label={t('promo.arriveFrom')} type="date" bind:value={arriveFrom} />
+			<Field label={t('promo.arriveTo')} type="date" bind:value={arriveTo} />
+			<Field label={t('promo.maxUses')} inputmode="numeric" bind:value={maxUses} />
+		</FormGrid>
+	</form>
+	{#snippet actions()}
+		<Button type="submit" form="promo-form" disabled={busy}>{t('promo.add')}</Button>
+	{/snippet}
+</SidePanel>
 
 <style>
-	p {
-		margin: 0;
-	}
-	.codes {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		display: flex;
-		flex-direction: column;
-		gap: var(--gap-related);
-	}
-	.codes li {
-		display: flex;
-		flex-wrap: wrap;
-		justify-content: space-between;
-		align-items: center;
-		gap: var(--gap-related);
-		padding: var(--space-3);
-		border: var(--border-width) solid var(--color-border);
-		border-radius: var(--radius-md);
-	}
-	.codes li > div:first-child {
-		display: flex;
-		flex-direction: column;
-	}
-	.off strong {
-		color: var(--color-text-muted);
-	}
 	.row {
-		display: flex;
+		display: inline-flex;
 		flex-wrap: wrap;
 		gap: var(--gap-related);
 	}
 	.muted {
+		margin: 0 0 var(--gap-related);
 		color: var(--color-text-muted);
 	}
 </style>

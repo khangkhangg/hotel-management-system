@@ -1,12 +1,15 @@
 <script lang="ts">
 	import { api, errorText } from '#lib/api.ts';
+	import { formatDay } from '#lib/booking/dates.ts';
 	import { t } from '#lib/i18n.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
-	import FormGrid from '#lib/ui/FormGrid.svelte';
-	import Section from '#lib/ui/Section.svelte';
+	import DataTable from '#lib/ui/DataTable.svelte';
 	import Field from '#lib/ui/Field.svelte';
+	import FormGrid from '#lib/ui/FormGrid.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
+	import SidePanel from '#lib/ui/SidePanel.svelte';
+	import StatusBadge from '#lib/ui/StatusBadge.svelte';
 
 	type Item = { id: string; description: string; location: string; foundOn: string; status: string; ownerName: string; ownerContact: string; note: string };
 
@@ -17,8 +20,11 @@
 	let description = $state('');
 	let location = $state('');
 	let foundOn = $state(new Date().toISOString().slice(0, 10));
-	let returning = $state<Record<string, { name: string; contact: string }>>({});
-	let loaded = $state(false);
+	let adding = $state(false);
+	let closing = $state<Item | null>(null);
+	let ownerName = $state('');
+	let ownerContact = $state('');
+	let marked = $state('');
 	let message = $state('');
 	let ok = $state('');
 	let busy = $state(false);
@@ -26,8 +32,6 @@
 	async function load() {
 		try {
 			items = await api.get<Item[]>('/api/lost-items');
-			returning = Object.fromEntries(items.map((i) => [i.id, { name: i.ownerName, contact: i.ownerContact }]));
-			loaded = true;
 		} catch (e) {
 			message = errorText(e);
 		}
@@ -51,91 +55,91 @@
 		}
 	}
 
+	const reset = () => (description = location = '');
+
 	const add = (event: SubmitEvent) => {
 		event.preventDefault();
 		return run(async () => {
 			await api.post('/api/lost-items', { description, location, foundOn });
-			description = location = '';
+			adding = false;
+			reset();
 		}, t('lost.added'));
 	};
 
 	const close = (i: Item, status: 'returned' | 'discarded') =>
-		run(() => api.put(`/api/lost-items/${i.id}`, { ...i, status, ownerName: returning[i.id]?.name ?? '', ownerContact: returning[i.id]?.contact ?? '' }), t(status === 'returned' ? 'lost.returned' : 'lost.discarded'));
+		run(async () => {
+			await api.put(`/api/lost-items/${i.id}`, { ...i, status, ownerName, ownerContact });
+			marked = i.id;
+			closing = null;
+		}, status === 'returned' ? t('lost.returned') : t('lost.discarded'));
+
+	const columns = [
+		{ id: 'item', label: t('lost.col.item'), value: (i: Item) => i.description, priority: 'main' as const },
+		{ id: 'where', label: t('lost.col.where'), value: (i: Item) => `${i.location ? `${i.location} · ` : ''}${formatDay(i.foundOn)}`, priority: 'detail' as const },
+		{ id: 'owner', label: t('lost.col.owner'), value: (i: Item) => i.ownerName, priority: 'extra' as const },
+		{ id: 'status', label: t('lost.col.status'), value: (i: Item) => t(`lost.status.${i.status}`), priority: 'status' as const },
+		{ id: 'actions', label: t('lost.col.actions'), value: () => '', priority: 'detail' as const, align: 'end' as const, hideLabel: true }
+	];
 </script>
 
 <svelte:head><title>{t('lost.title')} · {t('app.name')}</title></svelte:head>
 
-<PageHeader title={t('lost.title')} note={t('lost.note')} />
+<PageHeader title={t('lost.title')} note={t('lost.note')}>
+	{#snippet primary()}{#if canEdit}<Button icon="plus" onclick={() => (adding = true)}>{t('lost.new')}</Button>{/if}{/snippet}
+</PageHeader>
 {#if message}<p class="notice danger" role="alert">{message}</p>{/if}
 {#if ok}<p class="notice success" role="status">{ok}</p>{/if}
 
-{#if loaded}
-	<Section title={t('lost.items')}>
-		{#if items.length === 0}
-			<p class="muted">{t('lost.none')}</p>
+<DataTable label={t('lost.items')} rows={items} {columns} rowKey={(i) => i.id} {marked}>
+	{#snippet cell(i, column)}
+		{#if column.id === 'status'}
+			<StatusBadge tone={i.status === 'stored' ? 'warning' : i.status === 'returned' ? 'success' : 'neutral'}>{column.value(i)}</StatusBadge>
+		{:else if column.id === 'actions'}
+			{#if i.status === 'stored' && canEdit}
+				<Button variant="secondary" disabled={busy} onclick={() => ((closing = i), (ownerName = ''), (ownerContact = ''))}>{t('lost.handOver')}</Button>
+			{/if}
+		{:else if column.id === 'item'}
+			<strong>{i.description}</strong>
 		{:else}
-			<ul class="items">
-				{#each items as i (i.id)}
-					<li class:off={i.status !== 'stored'}>
-						<strong>{i.description}</strong>
-						<span class="muted">{i.location ? `${i.location} · ` : ''}{i.foundOn} · {t(`lost.status.${i.status}`)}{i.ownerName ? ` · ${i.ownerName}` : ''}</span>
-						{#if i.status === 'stored' && canEdit}
-							<Field label={t('lost.ownerName')} bind:value={returning[i.id].name} />
-							<Field label={t('lost.ownerContact')} bind:value={returning[i.id].contact} />
-							<div class="row">
-								<Button variant="secondary" disabled={busy} onclick={() => close(i, 'returned')}>{t('lost.markReturned')}</Button>
-								<Button variant="quiet" disabled={busy} onclick={() => close(i, 'discarded')}>{t('lost.markDiscarded')}</Button>
-							</div>
-						{/if}
-					</li>
-				{/each}
-			</ul>
+			{column.value(i)}
 		{/if}
-	</Section>
-{/if}
+	{/snippet}
+	{#snippet empty()}
+		<p class="muted">{t('lost.none')}</p>
+		{#if canEdit}<Button icon="plus" onclick={() => (adding = true)}>{t('lost.new')}</Button>{/if}
+	{/snippet}
+</DataTable>
 
-{#if canEdit}
-	<Section title={t('lost.new')}>
-	<form class="stack" onsubmit={add}>
+<SidePanel title={t('lost.new')} bind:open={adding} dirty={description !== '' || location !== ''} onclose={reset}>
+	<form id="lost-form" onsubmit={add}>
 		<FormGrid>
-		<Field label={t('lost.description')} bind:value={description} />
-		<Field label={t('lost.location')} bind:value={location} />
-		<Field label={t('lost.foundOn')} type="date" bind:value={foundOn} />
+			<Field label={t('lost.description')} bind:value={description} />
+			<Field label={t('lost.location')} bind:value={location} />
+			<Field label={t('lost.foundOn')} type="date" bind:value={foundOn} />
 		</FormGrid>
-		<div class="row"><Button type="submit" disabled={busy}>{t('lost.add')}</Button></div>
 	</form>
-	</Section>
+	{#snippet actions()}
+		<Button type="submit" form="lost-form" disabled={busy}>{t('lost.add')}</Button>
+	{/snippet}
+</SidePanel>
+
+{#if closing}
+	{@const item = closing}
+	<SidePanel title={t('lost.handOverTitle', { item: item.description })} open={true} dirty={ownerName !== '' || ownerContact !== ''} onclose={() => (closing = null)}>
+		<FormGrid>
+			<Field label={t('lost.ownerName')} bind:value={ownerName} />
+			<Field label={t('lost.ownerContact')} bind:value={ownerContact} />
+		</FormGrid>
+		{#snippet actions()}
+			<Button variant="quiet" disabled={busy} onclick={() => close(item, 'discarded')}>{t('lost.markDiscarded')}</Button>
+			<Button disabled={busy} onclick={() => close(item, 'returned')}>{t('lost.markReturned')}</Button>
+		{/snippet}
+	</SidePanel>
 {/if}
 
 <style>
-	p {
-		margin: 0;
-	}
-	.items {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		display: flex;
-		flex-direction: column;
-		gap: var(--gap-related);
-	}
-	.items li {
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
-		padding: var(--space-3);
-		border: var(--border-width) solid var(--color-border);
-		border-radius: var(--radius-md);
-	}
-	.off strong {
-		color: var(--color-text-muted);
-	}
-	.row {
-		display: flex;
-		flex-wrap: wrap;
-		gap: var(--gap-related);
-	}
 	.muted {
+		margin: 0 0 var(--gap-related);
 		color: var(--color-text-muted);
 	}
 </style>

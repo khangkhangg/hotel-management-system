@@ -51,7 +51,7 @@
 		align-items: center;
 		justify-content: center;
 		gap: var(--space-1);
-		min-block-size: var(--topbar-height);
+		min-block-size: var(--bottom-bar-height);
 		padding-inline: var(--space-1);
 		color: var(--color-text-subtle);
 		font: var(--font-caption);

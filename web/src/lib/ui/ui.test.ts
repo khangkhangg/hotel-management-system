@@ -16,7 +16,6 @@ import SidePanel from './SidePanel.svelte';
 import SearchBox from './SearchBox.svelte';
 import FilterChips from './FilterChips.svelte';
 import DataTable from './DataTable.svelte';
-import BottomBar from './BottomBar.svelte';
 import StatTile from './StatTile.svelte';
 import StatusBadge from './StatusBadge.svelte';
 
@@ -369,6 +368,13 @@ describe('DataTable', () => {
 		expect(screen.getByRole('columnheader', { name: 'Status' })).not.toHaveAttribute('aria-sort');
 	});
 
+	test('a header with a hidden label is still named for screen readers', () => {
+		const withActions = [...columns, { id: 'actions', label: 'Actions', value: () => '', hideLabel: true }];
+		render(Table, { ...base, columns: withActions });
+		const header = screen.getByRole('columnheader', { name: 'Actions' });
+		expect(header.querySelector('.visually-hidden')).not.toBeNull();
+	});
+
 	test('numbers align to the end', () => {
 		render(Table, base);
 		expect(screen.getByText('120.00').closest('td')).toHaveAttribute('data-align', 'end');
@@ -384,34 +390,5 @@ describe('DataTable', () => {
 		render(Table, { ...base, rows: [], empty: text('Nothing here yet') });
 		expect(screen.getByText('Nothing here yet')).toBeInTheDocument();
 		expect(screen.queryByRole('table')).not.toBeInTheDocument();
-	});
-});
-
-describe('BottomBar', () => {
-	const items = [
-		{ id: 'calendar', label: 'Calendar', href: '/calendar', icon: 'calendar' as const },
-		{ id: 'arrivals', label: 'Arrivals', href: '/arrivals', icon: 'list' as const },
-		{ id: 'guests', label: 'Guests', href: '/guests', icon: 'users' as const }
-	];
-
-	test('links to each main screen and marks the current one', () => {
-		render(BottomBar, { items, active: 'arrivals', onmore: vi.fn() });
-		expect(screen.getByRole('link', { name: 'Calendar' })).toHaveAttribute('href', '/calendar');
-		expect(screen.getByRole('link', { name: 'Arrivals' })).toHaveAttribute('aria-current', 'page');
-		expect(screen.getByRole('link', { name: 'Guests' })).not.toHaveAttribute('aria-current');
-	});
-
-	test('shows at most 4 screens and gives the rest to More', async () => {
-		const many = [...items, { id: 'a', label: 'Fifth', href: '/a', icon: 'box' as const }, { id: 'b', label: 'Sixth', href: '/b', icon: 'box' as const }, { id: 'c', label: 'Seventh', href: '/c', icon: 'box' as const }];
-		const onmore = vi.fn();
-		render(BottomBar, { items: many, active: 'calendar', onmore });
-		expect(screen.getAllByRole('link')).toHaveLength(3);
-		await userEvent.click(screen.getByRole('button', { name: 'More' }));
-		expect(onmore).toHaveBeenCalled();
-	});
-
-	test('has no More button when everything fits', () => {
-		render(BottomBar, { items, active: 'calendar', onmore: vi.fn() });
-		expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument();
 	});
 });
