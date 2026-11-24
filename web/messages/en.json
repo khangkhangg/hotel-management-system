@@ -740,5 +740,16 @@
 	"lost.discardBody": "It is marked as thrown away and leaves the shelf list. This cannot be undone.",
 	"lost.discardConfirm": "Throw away",
 	"lost.keep": "Keep it",
-	"lost.col.place": "Place"
+	"lost.col.place": "Place",
+	"yield.on": "On",
+	"yield.col.when": "When",
+	"yield.col.status": "Status",
+	"yield.col.actions": "Actions",
+	"yield.col.night": "Night",
+	"yield.col.direct": "Booking page",
+	"yield.col.channel": "Booking sites",
+	"yield.removeTitle": "Remove this rule?",
+	"yield.removeBody": "Booking sites go back to their normal rooms and price: {rule}. This cannot be undone.",
+	"yield.removeConfirm": "Remove rule",
+	"yield.keep": "Keep rule"
 }

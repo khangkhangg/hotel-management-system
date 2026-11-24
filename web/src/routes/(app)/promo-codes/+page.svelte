@@ -4,6 +4,7 @@
 	import { t } from '#lib/i18n.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
+	import { toasts } from '#lib/ui/toast.svelte.ts';
 	import DataTable from '#lib/ui/DataTable.svelte';
 	import Dialog from '#lib/ui/Dialog.svelte';
 	import Field from '#lib/ui/Field.svelte';
@@ -31,7 +32,6 @@
 	let arriveTo = $state('');
 	let maxUses = $state('');
 	let message = $state('');
-	let ok = $state('');
 	let busy = $state(false);
 
 	async function load() {
@@ -47,12 +47,12 @@
 	});
 
 	async function run(f: () => Promise<void>, done: string) {
-		message = ok = '';
+		message = '';
 		busy = true;
 		try {
 			await f();
 			await load();
-			ok = done;
+			toasts.show(done);
 		} catch (e) {
 			message = errorText(e);
 		} finally {
@@ -112,7 +112,6 @@
 	{#snippet primary()}<Button icon="plus" onclick={() => (panel = true)}>{t('promo.new')}</Button>{/snippet}
 </PageHeader>
 {#if message}<p class="notice danger" role="alert">{message}</p>{/if}
-{#if ok}<p class="notice success" role="status">{ok}</p>{/if}
 
 {#if codes.length > 6}<SearchBox label={t('promo.search')} bind:value={query} />{/if}
 

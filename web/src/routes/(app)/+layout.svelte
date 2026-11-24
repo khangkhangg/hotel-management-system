@@ -9,6 +9,7 @@
 	import { allowed, homeFor, itemsFor, roleLabels } from '#lib/nav.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import BottomBar from '#lib/shell/BottomBar.svelte';
+	import Toaster from '#lib/ui/Toaster.svelte';
 	import Sidebar from '#lib/shell/Sidebar.svelte';
 	import TopBar from '#lib/shell/TopBar.svelte';
 	import Button from '#lib/ui/Button.svelte';
@@ -117,6 +118,7 @@
 			</main>
 		</div>
 		<BottomBar {items} />
+		<Toaster />
 	</div>
 {/if}
 

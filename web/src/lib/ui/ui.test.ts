@@ -15,6 +15,8 @@ import Segmented from './Segmented.svelte';
 import SidePanel from './SidePanel.svelte';
 import SearchBox from './SearchBox.svelte';
 import FilterChips from './FilterChips.svelte';
+import Toaster from './Toaster.svelte';
+import { toasts } from './toast.svelte.ts';
 import DataTable from './DataTable.svelte';
 import StatTile from './StatTile.svelte';
 import StatusBadge from './StatusBadge.svelte';
@@ -401,5 +403,33 @@ describe('DataTable', () => {
 		render(Table, { ...base, rows: [], empty: text('Nothing here yet') });
 		expect(screen.getByText('Nothing here yet')).toBeInTheDocument();
 		expect(screen.queryByRole('table')).not.toBeInTheDocument();
+	});
+});
+
+describe('Toaster', () => {
+	afterEach(() => toasts.clear());
+
+	test('shows a message in a status region and removes it after its time', async () => {
+		render(Toaster);
+		toasts.show('The code is added.', { ms: 30 });
+		expect(await screen.findByRole('status')).toHaveTextContent('The code is added.');
+		await vi.waitFor(() => expect(screen.queryByText('The code is added.')).not.toBeInTheDocument());
+	});
+
+	test('Undo runs its action and closes the message', async () => {
+		const run = vi.fn();
+		render(Toaster);
+		toasts.show('The code is removed.', { ms: 5000, undo: { label: 'Undo', run } });
+		await userEvent.click(await screen.findByRole('button', { name: 'Undo' }));
+		expect(run).toHaveBeenCalledTimes(1);
+		expect(screen.queryByText('The code is removed.')).not.toBeInTheDocument();
+	});
+
+	test('keeps at most 3 messages so they never pile up', async () => {
+		render(Toaster);
+		for (const m of ['one', 'two', 'three', 'four']) toasts.show(m, { ms: 5000 });
+		await screen.findByText('four');
+		expect(screen.queryByText('one')).not.toBeInTheDocument();
+		expect(screen.getByText('two')).toBeInTheDocument();
 	});
 });

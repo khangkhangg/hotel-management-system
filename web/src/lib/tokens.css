@@ -142,6 +142,7 @@
 	--layer-header: 4;
 	--layer-popover: 5;
 	--layer-panel: 10;
+	--layer-toast: 11;
 
 	/* Elevation. Cards use borders; shadows are for things that float. */
 	--shadow-float: 0 8px 24px rgb(23 32 29 / 0.14);

@@ -4,6 +4,7 @@
 	import { t } from '#lib/i18n.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
+	import { toasts } from '#lib/ui/toast.svelte.ts';
 	import DataTable from '#lib/ui/DataTable.svelte';
 	import Dialog from '#lib/ui/Dialog.svelte';
 	import Field from '#lib/ui/Field.svelte';
@@ -28,7 +29,6 @@
 	let ownerContact = $state('');
 	let marked = $state('');
 	let message = $state('');
-	let ok = $state('');
 	let busy = $state(false);
 
 	async function load() {
@@ -44,12 +44,12 @@
 	});
 
 	async function run(f: () => Promise<void>, done: string) {
-		message = ok = '';
+		message = '';
 		busy = true;
 		try {
 			await f();
 			await load();
-			ok = done;
+			toasts.show(done);
 		} catch (e) {
 			message = errorText(e);
 		} finally {
@@ -91,7 +91,6 @@
 	{#snippet primary()}{#if canEdit}<Button icon="plus" onclick={() => (adding = true)}>{t('lost.new')}</Button>{/if}{/snippet}
 </PageHeader>
 {#if message}<p class="notice danger" role="alert">{message}</p>{/if}
-{#if ok}<p class="notice success" role="status">{ok}</p>{/if}
 
 <DataTable label={t('lost.items')} rows={items} {columns} rowKey={(i) => i.id} {marked}>
 	{#snippet cell(i, column)}
