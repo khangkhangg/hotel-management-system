@@ -18,6 +18,7 @@
 	const today = session.today;
 	let data = $state<{ payments: Pay[]; pendingRefunds: Waiting[]; totals: Record<string, number> }>({ payments: [], pendingRefunds: [], totals: {} });
 	let loaded = $state(false);
+	let yesterday = $state<number | null>(null);
 	let message = $state('');
 	const methodWords: Record<string, string> = { cash: 'Cash', card_terminal: 'Card terminal', bank_transfer: 'Bank transfer', other: 'Other' };
 	const currency = $derived(data.payments[0]?.currency ?? 'USD');
@@ -28,6 +29,9 @@
 		try {
 			data = await api.get(`/api/payments?from=${today}&to=${addDays(today, 1)}`);
 			loaded = true;
+			// The headline number says what it is compared with.
+			const before = await api.get<typeof data>(`/api/payments?from=${addDays(today, -1)}&to=${today}`);
+			yesterday = Object.values(before.totals).reduce((a, b) => a + b, 0);
 		} catch (e) {
 			message = errorText(e);
 		}
@@ -68,7 +72,7 @@
 {#if message}<p class="notice danger" role="alert">{message}</p>{/if}
 
 <div class="tiles">
-	<StatTile label={t('payments.takenToday')} value={formatMoney(total, currency)} note={t('payments.count', { n: data.payments.length })} />
+	<StatTile label={t('payments.takenToday')} value={formatMoney(total, currency)} note={yesterday === null ? t('payments.count', { n: data.payments.length }) : `${t('payments.count', { n: data.payments.length })} · ${t('payments.vsYesterday', { amount: formatMoney(yesterday, currency) })}`} />
 	{#each Object.entries(data.totals) as [method, amount] (method)}
 		<StatTile label={methodWords[method] ?? method} value={formatMoney(amount, currency)} note={t('payments.today')} />
 	{/each}

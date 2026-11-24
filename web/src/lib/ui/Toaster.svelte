@@ -1,9 +1,23 @@
 <script lang="ts">
 	import Button from './Button.svelte';
 	import { toasts } from './toast.svelte.ts';
+
+	// In the top layer, so a message is seen above an open side panel and its dimmed page.
+	let region = $state<HTMLDivElement>();
+	$effect(() => {
+		if (!region) return;
+		try {
+			const open = region.matches(':popover-open');
+			if (toasts.items.length && !open) region.showPopover();
+			else if (!toasts.items.length && open) region.hidePopover();
+		} catch {
+			// No popover support: the region becomes a plain fixed box.
+			region.removeAttribute('popover');
+		}
+	});
 </script>
 
-<div class="toaster" aria-live="polite">
+<div class="toaster" popover="manual" bind:this={region} aria-live="polite">
 	{#each toasts.items as toast (toast.id)}
 		<div class="toast" role="status">
 			<span>{toast.message}</span>
@@ -23,6 +37,12 @@
 
 <style>
 	.toaster {
+		margin: 0;
+		padding: 0;
+		border: 0;
+		background: transparent;
+		overflow: visible;
+		inset: auto;
 		position: fixed;
 		inset-inline-end: var(--space-4);
 		inset-block-end: var(--space-4);

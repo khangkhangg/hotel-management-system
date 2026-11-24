@@ -9,7 +9,7 @@
 	import { session } from '#lib/session.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import Checkbox from '#lib/ui/Checkbox.svelte';
-	import Dialog from '#lib/ui/Dialog.svelte';
+	import SidePanel from '#lib/ui/SidePanel.svelte';
 	import Field from '#lib/ui/Field.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 	import Select from '#lib/ui/Select.svelte';
@@ -137,7 +137,7 @@
 	</div>
 {/if}
 
-<Dialog title={t('rates.set')} bind:open>
+<SidePanel title={t('rates.set')} bind:open>
 	<form id="rate-form" class="stack" onsubmit={save}>
 		<div class="pair">
 			<Field label={t('rates.from')} type="date" bind:value={from} />
@@ -153,7 +153,7 @@
 		<Button variant="quiet" onclick={() => (open = false)}>{t('common.cancel')}</Button>
 		<Button type="submit" form="rate-form" disabled={price.trim() === ''}>{t('rates.save')}</Button>
 	{/snippet}
-</Dialog>
+</SidePanel>
 
 <style>
 	.pick {

@@ -50,13 +50,13 @@
 		load();
 	});
 
-	async function run(f: () => Promise<void>, done: string) {
+	async function run(f: () => Promise<void>, done: string, undo?: () => void) {
 		message = '';
 		busy = true;
 		try {
 			await f();
 			await load();
-			toasts.show(done);
+			toasts.show(done, undo ? { undo: { label: t('common.undo'), run: undo } } : {});
 		} catch (e) {
 			message = errorText(e);
 		} finally {
@@ -99,7 +99,12 @@
 		}
 	}
 
-	const toggle = (r: Rule) => run(() => api.put(`/api/yield-rules/${r.id}`, { ...r, active: !r.active }), t('yield.changed'));
+	const toggle = (r: Rule) =>
+		run(
+			() => api.put(`/api/yield-rules/${r.id}`, { ...r, active: !r.active }),
+			t('yield.changed'),
+			() => run(() => api.put(`/api/yield-rules/${r.id}`, r), t('yield.changed'))
+		);
 	const remove = (r: Rule) =>
 		run(async () => {
 			await api.delete(`/api/yield-rules/${r.id}`);

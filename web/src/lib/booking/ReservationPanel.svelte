@@ -6,6 +6,8 @@
 	import { session } from '#lib/session.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import Dialog from '#lib/ui/Dialog.svelte';
+	import SidePanel from '#lib/ui/SidePanel.svelte';
+	import { toasts } from '#lib/ui/toast.svelte.ts';
 	import Field from '#lib/ui/Field.svelte';
 	import Select from '#lib/ui/Select.svelte';
 	import StatusBadge from '#lib/ui/StatusBadge.svelte';
@@ -30,7 +32,7 @@
 	let folio = $state<Folio | null>(null);
 	let rooms = $state<Room[]>([]);
 	let message = $state('');
-	let ok = $state('');
+	let cancelling = $state(false);
 	let pick = $state<Record<string, string>>({});
 	let method = $state('cash');
 	let amount = $state('');
@@ -61,10 +63,10 @@
 	}
 
 	async function run(path: string, body?: unknown, done = '') {
-		message = ok = '';
+		message = '';
 		try {
 			await api.post(`/api/reservations/${id}/${path}`, body);
-			ok = done;
+			toasts.show(done);
 			await load(id!);
 			onchange?.();
 		} catch (e) {
@@ -79,10 +81,10 @@
 
 	async function sellExtra(event: SubmitEvent) {
 		event.preventDefault();
-		message = ok = '';
+		message = '';
 		try {
 			await api.post(`/api/reservations/${id}/extras`, { extraId, quantity: Number(extraQty) });
-			ok = t('panel.extraAdded');
+			toasts.show(t('panel.extraAdded'));
 			extraQty = '1';
 			await load(id!);
 			onchange?.();
@@ -93,7 +95,7 @@
 
 	async function takePayment(event: SubmitEvent) {
 		event.preventDefault();
-		message = ok = '';
+		message = '';
 		const cents = parseMoney(amount, res?.currency ?? 'USD');
 		if (cents === null) {
 			message = t('panel.badAmount');
@@ -102,7 +104,7 @@
 		try {
 			await api.post(`/api/folios/${folio!.folioId}/payments`, { method, amount: cents, note });
 			amount = note = '';
-			ok = t('panel.paymentTaken');
+			toasts.show(t('panel.paymentTaken'));
 			await load(id!);
 			onchange?.();
 		} catch (e) {
@@ -111,10 +113,10 @@
 	}
 
 	async function refund(paymentId: string, cents: number) {
-		message = ok = '';
+		message = '';
 		try {
 			const r = await api.post<{ status: string }>(`/api/payments/${paymentId}/refunds`, { amount: cents, reason });
-			ok = r.status === 'done' ? t('panel.refunded') : t('panel.refundWaits');
+			toasts.show(r.status === 'done' ? t('panel.refunded') : t('panel.refundWaits'));
 			reason = '';
 			await load(id!);
 		} catch (e) {
@@ -127,9 +129,8 @@
 	const canMoney = $derived(session.effectiveRole !== 'revenue');
 </script>
 
-<Dialog title={res ? `${res.guest.name} · ${res.code}` : t('panel.loading')} wide bind:open onclose={onclose}>
+<SidePanel title={res ? `${res.guest.name} · ${res.code}` : t('panel.loading')} wide bind:open onclose={onclose}>
 	{#if message}<p class="notice danger" role="alert">{message}</p>{/if}
-	{#if ok}<p class="notice success" role="status">{ok}</p>{/if}
 
 	{#if res}
 		<section class="block" aria-label={t('panel.booking')}>
@@ -149,20 +150,26 @@
 						<div class="assign">
 							<Select label={t('panel.chooseRoom')} options={[{ id: '', label: t('panel.noRoomYet') }, ...typeRooms(room.roomTypeId)]} bind:value={pick[room.id]} />
 							<Button variant="secondary" disabled={!pick[room.id]} onclick={() => run('assign', { roomId: pick[room.id], reservationRoomId: room.id }, t('panel.assigned'))}>{t('panel.assign')}</Button>
+							{#if !pick[room.id]}<small class="muted">{t('panel.pickRoomFirst')}</small>{/if}
 						</div>
 					{/if}
 				</div>
 			{/each}
 			{#if (res.status === 'confirmed' || res.status === 'pending') && id}<CancelRisk {id} />{/if}
 			<p class="actions">
-				{#if res.status === 'confirmed'}
-					<Button onclick={() => run('check-in', undefined, t('panel.checkedIn'))}>{t('panel.checkIn')}</Button>
-					<Button variant="secondary" onclick={() => run('no-show', undefined, t('panel.noShown'))}>{t('panel.noShow')}</Button>
-				{/if}
+				{#if res.status === 'confirmed'}<Button onclick={() => run('check-in', undefined, t('panel.checkedIn'))}>{t('panel.checkIn')}</Button>{/if}
 				{#if res.status === 'pending'}<Button onclick={() => run('confirm-payment', undefined, t('panel.paymentConfirmed'))}>{t('panel.confirmPayment')}</Button>{/if}
 				{#if res.status === 'checked_in'}<Button onclick={() => run('check-out', undefined, t('panel.checkedOut'))}>{t('panel.checkOut')}</Button>{/if}
-				{#if res.status === 'confirmed' || res.status === 'pending'}<Button variant="quiet" onclick={() => run('cancel', undefined, t('panel.cancelled'))}>{t('panel.cancel')}</Button>{/if}
 			</p>
+			{#if res.status === 'confirmed' || res.status === 'pending'}
+				<div class="apart">
+					<h3>{t('panel.otherActions')}</h3>
+					<p class="actions">
+						{#if res.status === 'confirmed'}<Button variant="quiet" onclick={() => run('no-show', undefined, t('panel.noShow'))}>{t('panel.noShow')}</Button>{/if}
+						<Button variant="quiet" onclick={() => (cancelling = true)}>{t('panel.cancel')}</Button>
+					</p>
+				</div>
+			{/if}
 		</section>
 
 		{#if folio && canMoney}
@@ -219,7 +226,17 @@
 
 		<Thread reservationId={res.id} {version} />
 	{/if}
-</Dialog>
+</SidePanel>
+
+{#if cancelling}
+	<Dialog title={t('panel.cancelTitle')} open={true} onclose={() => (cancelling = false)}>
+		<p>{t('panel.cancelBody')}</p>
+		{#snippet actions()}
+			<Button variant="secondary" onclick={() => { cancelling = false; run('cancel', undefined, t('panel.cancelled')); }}>{t('panel.cancelConfirm')}</Button>
+			<Button onclick={() => (cancelling = false)}>{t('panel.keepBooking')}</Button>
+		{/snippet}
+	</Dialog>
+{/if}
 
 <style>
 	.block {
@@ -255,6 +272,10 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--gap-tight);
+	}
+	.apart {
+		padding-block-start: var(--gap-related);
+		border-block-start: var(--border-width) solid var(--color-divider);
 	}
 	.assign {
 		display: grid;

@@ -42,7 +42,7 @@ test('a front desk person books a room, assigns it, checks in, takes payment and
 	await expect(p.getByRole('row', { name: /Balance due/ })).toContainText('$0.00');
 
 	await p.getByRole('button', { name: 'Check out' }).click();
-	await expect(p.getByText('Checked out. The room is marked dirty.')).toBeVisible();
+	await expect(page.getByText('Checked out. The room is marked dirty.')).toBeVisible();
 	await expect(p.getByText('checked the guest out')).toBeVisible();
 });
 

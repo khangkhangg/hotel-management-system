@@ -18,6 +18,10 @@ test('a manager adds a yield rule, switches it off and removes it', async ({ pag
 	expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
 	await page.getByRole('button', { name: /^Switch off/ }).click();
 	await expect(page.getByText('Switched off')).toBeVisible();
+	await page.getByRole('button', { name: 'Undo' }).click();
+	await expect(page.getByRole('cell', { name: 'On', exact: true })).toBeVisible();
+	await page.getByRole('button', { name: /^Switch off/ }).click();
+	await expect(page.getByText('Switched off')).toBeVisible();
 	await page.getByRole('button', { name: /^Remove Show at most/ }).click();
 	await page.getByRole('button', { name: 'Remove rule' }).click();
 	await expect(page.getByText('No rules yet')).toBeVisible();

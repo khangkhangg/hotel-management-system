@@ -3,7 +3,7 @@
 	import { api, ApiError, errorText } from '#lib/api.ts';
 	import { t } from '#lib/i18n.ts';
 	import Button from '#lib/ui/Button.svelte';
-	import Dialog from '#lib/ui/Dialog.svelte';
+	import SidePanel from '#lib/ui/SidePanel.svelte';
 	import Field from '#lib/ui/Field.svelte';
 	import Select from '#lib/ui/Select.svelte';
 	import { addDays } from './dates.ts';
@@ -86,7 +86,7 @@
 	}
 </script>
 
-<Dialog title={t('booking.new')} bind:open>
+<SidePanel title={t('booking.new')} bind:open>
 	<form id="booking-form" class="stack" onsubmit={save}>
 		{#if message}<p class="notice danger" role="alert">{message}</p>{/if}
 		<div class="pair">
@@ -119,7 +119,7 @@
 		<Button variant="quiet" onclick={() => (open = false)}>{t('common.cancel')}</Button>
 		<Button type="submit" form="booking-form" disabled={saving || !quote?.available || name.trim() === ''}>{t('booking.create')}</Button>
 	{/snippet}
-</Dialog>
+</SidePanel>
 
 <style>
 	.pair {

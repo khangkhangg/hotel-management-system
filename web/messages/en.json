@@ -755,5 +755,15 @@
 	"chain.col.rule": "Terms",
 	"staff.neverSignedIn": "Not yet",
 	"promo.switchOffNamed": "Switch off {name}",
-	"nav.more": "More screens"
+	"nav.more": "More screens",
+	"panel.otherActions": "Other actions",
+	"panel.cancelTitle": "Cancel this booking?",
+	"panel.cancelBody": "The room goes back on sale and the guest is told. Any refund is decided on the payments screen. This cannot be undone.",
+	"panel.cancelConfirm": "Cancel booking",
+	"panel.keepBooking": "Keep booking",
+	"panel.pickRoomFirst": "Choose a room to assign.",
+	"activity.count": "{n} entries shown",
+	"activity.moreBelow": "Load more below for older ones.",
+	"payments.vsYesterday": "yesterday {amount}",
+	"common.undo": "Undo"
 }

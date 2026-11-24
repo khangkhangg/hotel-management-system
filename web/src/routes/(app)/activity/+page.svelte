@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { api, errorText } from '#lib/api.ts';
 	import { actionOptions, describeChange, describeEntry, type Entry } from '#lib/activity.ts';
+	import { formatDay } from '#lib/booking/dates.ts';
 	import { formatWhen } from '#lib/format.ts';
 	import { t } from '#lib/i18n.ts';
 	import { roleLabels, type Role } from '#lib/nav.ts';
@@ -22,6 +23,13 @@
 	let staff = $state<{ id: string; label: string }[]>([]);
 	let loaded = $state(false);
 	let message = $state('');
+
+	// Entries are grouped by the day they happened, so a long log can be scanned.
+	const groups = $derived.by(() => {
+		const byDay = new Map<string, Entry[]>();
+		for (const e of entries) byDay.set(e.at.slice(0, 10), [...(byDay.get(e.at.slice(0, 10)) ?? []), e]);
+		return [...byDay].map(([day, items]) => ({ day, label: formatDay(day), items }));
+	});
 
 	const chips = $derived([
 		...(person ? [{ id: 'person', label: t('activity.chip.person', { name: staff.find((x) => x.id === person)?.label ?? '' }) }] : []),
@@ -67,6 +75,7 @@
 	{#if staff.length > 1}<Select label={t('activity.person')} options={staff} bind:value={person} onchange={() => load(false)} />{/if}
 	<Select label={t('activity.filter')} options={actionOptions} bind:value={action} onchange={() => load(false)} />
 </FormGrid>
+{#if loaded}<p class="count">{t('activity.count', { n: entries.length })}{cursor ? ` ${t('activity.moreBelow')}` : ''}</p>{/if}
 <FilterChips {chips} onremove={(id) => { if (id === 'person') person = ''; else action = ''; load(false); }} onclear={() => { person = action = ''; load(false); }} />
 
 {#if message}<p class="notice danger" role="alert">{message}</p>{/if}
@@ -74,8 +83,10 @@
 {#if loaded && entries.length === 0}
 	<p class="muted">{action || person || search ? t('activity.noMatch') : t('activity.empty')}</p>
 {:else}
-	<ol class="list">
-		{#each entries as entry (entry.id)}
+	{#each groups as group (group.day)}
+		<h2 class="day">{group.label}</h2>
+		<ol class="list">
+		{#each group.items as entry (entry.id)}
 			<li>
 				<p class="line">
 					<span class="actor">{entry.actor.name || t('activity.system')}</span>
@@ -90,7 +101,8 @@
 				{#if entry.reason}<p class="change">{entry.reason}</p>{/if}
 			</li>
 		{/each}
-	</ol>
+		</ol>
+	{/each}
 	{#if cursor}<div><Button variant="secondary" onclick={() => load(true)}>{t('activity.more')}</Button></div>{/if}
 {/if}
 
@@ -119,6 +131,15 @@
 	.line {
 		font: var(--font-body);
 		color: var(--color-text);
+	}
+	.day {
+		margin: 0;
+		font: var(--font-heading);
+	}
+	.count {
+		margin: 0;
+		color: var(--color-text-muted);
+		font: var(--font-caption);
 	}
 	.actor {
 		font: var(--font-control);

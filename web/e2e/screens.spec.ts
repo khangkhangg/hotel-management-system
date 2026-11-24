@@ -63,7 +63,7 @@ test('payments show what was taken today', async ({ page }) => {
 	const panel = page.getByRole('dialog').filter({ has: page.getByText('Activity and team notes') });
 	await panel.getByLabel('Amount').fill('50');
 	await panel.getByRole('button', { name: 'Take payment' }).click();
-	await expect(panel.getByText('Payment recorded.')).toBeVisible();
+	await expect(page.getByText('Payment recorded.')).toBeVisible();
 	await page.goto('/payments');
 	await expect(page.getByRole('row', { name: /Ben Carter/ })).toContainText('$50.00');
 	await expect(page.getByText('Taken today', { exact: true })).toBeVisible();

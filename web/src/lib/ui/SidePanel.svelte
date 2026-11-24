@@ -3,8 +3,8 @@
 	import { t } from '#lib/i18n.ts';
 	import Button from './Button.svelte';
 
-	type Props = { title: string; open?: boolean; dirty?: boolean; onclose?: () => void; children: Snippet; actions?: Snippet };
-	let { title, open = $bindable(false), dirty = false, onclose, children, actions }: Props = $props();
+	type Props = { title: string; wide?: boolean; open?: boolean; dirty?: boolean; onclose?: () => void; children: Snippet; actions?: Snippet };
+	let { title, wide = false, open = $bindable(false), dirty = false, onclose, children, actions }: Props = $props();
 	let dialog = $state<HTMLDialogElement>();
 	let asking = $state(false);
 	const titleId = $props.id();
@@ -38,6 +38,7 @@
 </script>
 
 <dialog
+	class:wide
 	bind:this={dialog}
 	aria-labelledby={titleId}
 	onclose={finish}
@@ -80,6 +81,9 @@
 		background: var(--color-surface);
 		color: var(--color-text);
 		box-shadow: var(--shadow-float);
+	}
+	dialog.wide {
+		inline-size: min(var(--drawer-width), 100%);
 	}
 	dialog[open] {
 		display: flex;

@@ -46,13 +46,13 @@
 		load();
 	});
 
-	async function run(f: () => Promise<void>, done: string) {
+	async function run(f: () => Promise<void>, done: string, undo?: () => void) {
 		message = '';
 		busy = true;
 		try {
 			await f();
 			await load();
-			toasts.show(done);
+			toasts.show(done, undo ? { undo: { label: t('common.undo'), run: undo } } : {});
 		} catch (e) {
 			message = errorText(e);
 		} finally {
@@ -90,7 +90,12 @@
 		);
 	};
 
-	const toggle = (c: Code) => run(() => api.put(`/api/promo-codes/${c.id}`, { ...c, active: !c.active }), t('promo.changed'));
+	const toggle = (c: Code) =>
+		run(
+			() => api.put(`/api/promo-codes/${c.id}`, { ...c, active: !c.active }),
+			t('promo.changed'),
+			() => run(() => api.put(`/api/promo-codes/${c.id}`, c), t('promo.changed'))
+		);
 	const remove = (c: Code) => run(async () => { await api.delete(`/api/promo-codes/${c.id}`); removing = null; }, t('promo.removed'));
 	const worth = (c: Code) => (c.kind === 'percent' ? t('promo.percentOff', { value: c.value }) : t('promo.amountOff', { value: formatMoney(c.value, currency) }));
 	const rules = (c: Code) => [c.minNights > 1 ? t('promo.rule.nights', { n: c.minNights }) : '', c.arriveFrom ? t('promo.rule.from', { date: c.arriveFrom }) : '', c.arriveTo ? t('promo.rule.until', { date: c.arriveTo }) : ''].filter(Boolean).join(', ') || t('promo.rule.any');

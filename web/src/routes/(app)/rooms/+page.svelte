@@ -4,7 +4,7 @@
 	import { t } from '#lib/i18n.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
-	import Dialog from '#lib/ui/Dialog.svelte';
+	import SidePanel from '#lib/ui/SidePanel.svelte';
 	import Field from '#lib/ui/Field.svelte';
 	import { cleaningOrder } from '#lib/housekeeping.ts';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
@@ -140,7 +140,7 @@
 	{/each}
 {/if}
 
-<Dialog title={t('rooms.addType')} bind:open={typeOpen}>
+<SidePanel title={t('rooms.addType')} bind:open={typeOpen}>
 	<form id="type-form" class="stack" onsubmit={addType}>
 		<Field label={t('rooms.typeName')} bind:value={typeName} />
 		<Field label={t('rooms.baseGuests')} inputmode="numeric" bind:value={base} />
@@ -150,9 +150,9 @@
 		<Button variant="quiet" onclick={() => (typeOpen = false)}>{t('common.cancel')}</Button>
 		<Button type="submit" form="type-form" disabled={typeName.trim() === ''}>{t('rooms.createType')}</Button>
 	{/snippet}
-</Dialog>
+</SidePanel>
 
-<Dialog title={t('rooms.addRoom')} bind:open={roomOpen}>
+<SidePanel title={t('rooms.addRoom')} bind:open={roomOpen}>
 	<form id="room-form" class="stack" onsubmit={addRoom}>
 		<Select label={t('booking.roomType')} options={types.map((x) => ({ id: x.id, label: x.name }))} bind:value={roomType} />
 		<Field label={t('rooms.number')} bind:value={number} />
@@ -162,7 +162,7 @@
 		<Button variant="quiet" onclick={() => (roomOpen = false)}>{t('common.cancel')}</Button>
 		<Button type="submit" form="room-form" disabled={number.trim() === ''}>{t('rooms.createRoom')}</Button>
 	{/snippet}
-</Dialog>
+</SidePanel>
 
 <style>
 	h2 {
