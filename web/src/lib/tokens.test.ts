@@ -101,7 +101,7 @@ test('a brand override changes the action colour and no status colour', () => {
 	expect(roots('--color-action').has('--brand')).toBe(true);
 	expect(roots('--color-action-hover').has('--brand')).toBe(true);
 	for (const tone of ['success', 'warning', 'danger', 'info', 'neutral']) {
-		for (const part of ['bg', 'fg', 'dot']) {
+		for (const part of ['bg', 'fg', 'dot', 'border']) {
 			const name = `--color-status-${tone}-${part}`;
 			expect(map.has(name), name).toBe(true);
 			expect(roots(name).has('--brand'), `${name} must not depend on the brand`).toBe(false);
@@ -135,11 +135,49 @@ test('every value the design spec fixes exists', () => {
 		'--space-1': '4px', '--space-2': '8px', '--space-3': '12px', '--space-4': '16px', '--space-6': '24px', '--space-8': '32px',
 		'--radius-sm': '4px', '--radius-md': '8px', '--radius-lg': '12px',
 		'--control-height': '44px',
-		'--palette-page': '#F4F5F3', '--palette-surface': '#FFFFFF', '--palette-border': '#E2E5E1', '--palette-border-strong': '#8B9590',
-		'--palette-text': '#17201D', '--palette-text-muted': '#56615C', '--brand': '#1F5F4F',
+		'--palette-page': '#FDFBFA', '--palette-surface': '#FFFFFF', '--palette-border': '#EBEBEB', '--palette-border-strong': '#8F8F8F',
+		'--palette-text': '#101828', '--palette-text-muted': '#666666', '--brand': '#1F5F4F', '--radius-xl': '16px', '--line-height-xs': '18px', '--row-height-compact': '40px', '--row-height-comfortable': '52px', '--bottom-bar-height': '56px', '--side-panel-width': '30rem', '--duration-toast': '5000ms', '--duration-skeleton': '1200ms',
 		'--duration-screen': '200ms', '--duration-fast': '150ms', '--ease-standard': 'cubic-bezier(0.2, 0, 0, 1)',
 		'--breakpoint-tablet': '640px', '--breakpoint-desktop': '1024px', '--sidebar-width': '240px', '--rail-width': '68px'
 	};
 	for (const [name, value] of Object.entries(want)) expect(map.get(name), name).toBe(value);
 	expect(map.get('--font-family')).toContain('IBM Plex Sans');
+});
+
+test('shape meanings follow the design system', () => {
+	const map = declared(tokens);
+	const want: Record<string, string> = { '--radius-control': 'var(--radius-lg)', '--radius-card': 'var(--radius-xl)', '--radius-panel': 'var(--radius-xl)', '--radius-badge': 'var(--radius-full)' };
+	for (const [name, value] of Object.entries(want)) expect(map.get(name), name).toBe(value);
+});
+
+test('compact density shortens rows and nothing else', () => {
+	const css = stripComments(tokens);
+	expect(css).toMatch(/:root\s*\{[\s\S]*--row-height:\s*var\(--row-height-comfortable\)/);
+	expect(css).toMatch(/\[data-density="compact"\]\s*\{\s*--row-height:\s*var\(--row-height-compact\);\s*\}/);
+});
+
+test('a marked row follows the hotel brand', () => {
+	expect(stripComments(tokens)).toMatch(/--color-row-marked:\s*var\(--brand-wash\)/);
+});
+
+const channel = (v: number) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4);
+const luminance = (hex: string) => {
+	const [r, g, b] = [1, 3, 5].map((i) => channel(parseInt(hex.slice(i, i + 2), 16)));
+	return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (a: string, b: string) => {
+	const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+	return (hi + 0.05) / (lo + 0.05);
+};
+
+test('text colours reach 4.5:1 on every surface they sit on', () => {
+	const map = declared(tokens);
+	const hex = (name: string) => map.get(name) ?? '';
+	const surfaces = ['page', 'surface', 'surface-muted', 'surface-sunken'];
+	const low: string[] = [];
+	for (const text of ['text', 'text-subtle', 'text-muted'])
+		for (const s of surfaces) if (contrast(hex(`--palette-${text}`), hex(`--palette-${s}`)) < 4.5) low.push(`${text} on ${s}`);
+	for (const tone of ['success', 'warning', 'danger', 'info'])
+		if (contrast(hex(`--palette-${tone}-fg`), hex(`--palette-${tone}-bg`)) < 4.5) low.push(`${tone} fg on bg`);
+	expect(low).toEqual([]);
 });

@@ -15,36 +15,40 @@
 	/* ---------- Layer 1: raw values ---------- */
 
 	/* Neutral palette */
-	--palette-page: #F4F5F3;
+	--palette-page: #FDFBFA;
 	--palette-surface: #FFFFFF;
-	--palette-surface-muted: #ECEEEB;
-	--palette-surface-sunken: #E3E7E3;
-	--palette-border: #E2E5E1;
-	--palette-divider: #EDEFEC;
-	--palette-border-strong: #8B9590;
-	--palette-border-soft: #C9CFCA;
-	--palette-text: #17201D;
-	--palette-text-subtle: #3F4A45;
-	--palette-text-muted: #56615C;
+	--palette-surface-muted: #F6F4F3;
+	--palette-surface-sunken: #F0F0F0;
+	--palette-border: #EBEBEB;
+	--palette-divider: #F0F0F0;
+	--palette-border-strong: #8F8F8F;
+	--palette-border-soft: #C0C0C0;
+	--palette-text: #101828;
+	--palette-text-subtle: #404040;
+	--palette-text-muted: #666666;
 	--palette-text-inverse: #FFFFFF;
-	--palette-ink: #17201D;
+	--palette-ink: #101828;
 
 	/* Brand. Replace this one value to rebrand a hotel. The values derived from it are declared below. */
 	--brand: #1F5F4F;
 
 	/* Status palette. Never derived from the brand. */
-	--palette-success-bg: #E1F2EA;
+	--palette-success-bg: #ECFDF3;
 	--palette-success-fg: #14553F;
 	--palette-success-dot: #1E8A63;
-	--palette-warning-bg: #FBEFD2;
+	--palette-warning-bg: #FFFBEB;
 	--palette-warning-fg: #7A4A00;
 	--palette-warning-dot: #B87A00;
-	--palette-danger-bg: #FBE5E1;
+	--palette-danger-bg: #FFF0F0;
 	--palette-danger-fg: #8A2A1E;
 	--palette-danger-dot: #C9422F;
-	--palette-info-bg: #E2ECFB;
+	--palette-info-bg: #EEF4FF;
 	--palette-info-fg: #1D4C8F;
 	--palette-info-dot: #3B78D8;
+	--palette-success-border: #BFFCD9;
+	--palette-warning-border: #FBEEB1;
+	--palette-danger-border: #FFE0E1;
+	--palette-info-border: #DDE7FD;
 	--palette-neutral-dot: #7C8782;
 
 	/* Placeholder photo tints, used until a hotel uploads its own photos */
@@ -60,7 +64,7 @@
 	--font-size-md: 16px;
 	--font-size-lg: 20px;
 	--font-size-xl: 28px;
-	--line-height-xs: 16px;
+	--line-height-xs: 18px;
 	--line-height-sm: 20px;
 	--line-height-md: 24px;
 	--line-height-lg: 28px;
@@ -82,6 +86,7 @@
 	--radius-sm: 4px;
 	--radius-md: 8px;
 	--radius-lg: 12px;
+	--radius-xl: 16px;
 	--radius-full: 999px;
 	--border-width: 1px;
 	--border-width-strong: 2px;
@@ -104,6 +109,10 @@
 	--dot-size: 8px;
 	--bar-height: 4px;
 	--meter-height: 8px;
+	--row-height-compact: 40px;
+	--row-height-comfortable: 52px;
+	--bottom-bar-height: 56px;
+	--side-panel-width: 30rem;
 	--sidebar-width: 240px;
 	--rail-width: 68px;
 	--topbar-height: 64px;
@@ -121,6 +130,8 @@
 	--duration-screen: 200ms;
 	--duration-slide: 250ms;
 	--duration-fade: 300ms;
+	--duration-toast: 5000ms;
+	--duration-skeleton: 1200ms;
 	--duration-reduced: 1ms;
 	--ease-standard: cubic-bezier(0.2, 0, 0, 1);
 	--ease-out: ease-out;
@@ -155,6 +166,11 @@
 	--color-text-subtle: var(--palette-text-subtle);
 	--color-text-muted: var(--palette-text-muted);
 	--color-text-inverse: var(--palette-text-inverse);
+	--radius-control: var(--radius-lg);
+	--radius-card: var(--radius-xl);
+	--radius-panel: var(--radius-xl);
+	--radius-badge: var(--radius-full);
+	--row-height: var(--row-height-comfortable);
 	--color-ink: var(--palette-ink);
 
 	/* Action text and focus do not depend on the brand */
@@ -171,18 +187,23 @@
 	/* Status */
 	--color-status-success-bg: var(--palette-success-bg);
 	--color-status-success-fg: var(--palette-success-fg);
+	--color-status-success-border: var(--palette-success-border);
 	--color-status-success-dot: var(--palette-success-dot);
 	--color-status-warning-bg: var(--palette-warning-bg);
 	--color-status-warning-fg: var(--palette-warning-fg);
+	--color-status-warning-border: var(--palette-warning-border);
 	--color-status-warning-dot: var(--palette-warning-dot);
 	--color-status-danger-bg: var(--palette-danger-bg);
 	--color-status-danger-fg: var(--palette-danger-fg);
+	--color-status-danger-border: var(--palette-danger-border);
 	--color-status-danger-dot: var(--palette-danger-dot);
 	--color-status-info-bg: var(--palette-info-bg);
 	--color-status-info-fg: var(--palette-info-fg);
+	--color-status-info-border: var(--palette-info-border);
 	--color-status-info-dot: var(--palette-info-dot);
 	--color-status-neutral-bg: var(--palette-surface-muted);
 	--color-status-neutral-fg: var(--palette-text-subtle);
+	--color-status-neutral-border: var(--palette-border);
 	--color-status-neutral-dot: var(--palette-neutral-dot);
 
 	/* Trend colours for figures: up is good, down is bad */
@@ -223,9 +244,15 @@
 	--brand-tint: color-mix(in oklch, var(--brand) 16%, white);
 	--brand-wash: color-mix(in oklch, var(--brand) 7%, white);
 
+	--color-row-marked: var(--brand-wash);
 	--color-action: var(--brand);
 	--color-action-hover: var(--brand-strong);
 	--color-action-tint: var(--brand-tint);
 	--color-action-ink: var(--brand-ink);
 	--color-action-wash: var(--brand-wash);
+}
+
+/* Density is a per-person setting. Set data-density="compact" on the root. */
+[data-density="compact"] {
+	--row-height: var(--row-height-compact);
 }
