@@ -697,5 +697,12 @@
 	"reports.last30": "Last 30 days",
 	"reports.quick": "Quick ranges",
 	"rate-plans.setRates": "Set rates",
-	"siteContent.preview": "See the page as a guest"
+	"siteContent.preview": "See the page as a guest",
+	"common.close": "Close",
+	"common.keepEditing": "Keep editing",
+	"common.discard": "Discard",
+	"panel.discardPrompt": "Discard your changes?",
+	"search.clear": "Clear search",
+	"filters.remove": "Remove {label}",
+	"filters.clearAll": "Clear all"
 }

@@ -12,6 +12,9 @@ import HoverCard from './HoverCard.svelte';
 import Icon, { iconNames } from './Icon.svelte';
 import PageHeader from './PageHeader.svelte';
 import Segmented from './Segmented.svelte';
+import SidePanel from './SidePanel.svelte';
+import SearchBox from './SearchBox.svelte';
+import FilterChips from './FilterChips.svelte';
 import StatTile from './StatTile.svelte';
 import StatusBadge from './StatusBadge.svelte';
 
@@ -247,5 +250,79 @@ describe('Dialog', () => {
 		render(Dialog, { title: 'Invite user', open: true, onclose, children: text('Body') });
 		await userEvent.click(screen.getByRole('button', { name: 'Close' }));
 		expect(onclose).toHaveBeenCalled();
+	});
+});
+
+describe('SidePanel', () => {
+	test('is named by its title and shows its content', () => {
+		render(SidePanel, { title: 'New promo code', open: true, children: text('Fields') });
+		expect(screen.getByRole('dialog', { name: 'New promo code' })).toBeInTheDocument();
+		expect(screen.getByText('Fields')).toBeInTheDocument();
+	});
+
+	test('closes at once when nothing was changed', async () => {
+		const onclose = vi.fn();
+		render(SidePanel, { title: 'New promo code', open: true, onclose, children: text('Fields') });
+		await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+		expect(onclose).toHaveBeenCalledTimes(1);
+	});
+
+	test('asks before it throws away changes', async () => {
+		const onclose = vi.fn();
+		render(SidePanel, { title: 'New promo code', open: true, dirty: true, onclose, children: text('Fields') });
+		await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+		expect(onclose).not.toHaveBeenCalled();
+		expect(screen.getByText('Discard your changes?')).toBeInTheDocument();
+		await userEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
+		expect(screen.queryByText('Discard your changes?')).not.toBeInTheDocument();
+		await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+		await userEvent.click(screen.getByRole('button', { name: 'Discard' }));
+		expect(onclose).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe('SearchBox', () => {
+	test('reports what was typed once the person pauses', async () => {
+		const onsearch = vi.fn();
+		render(SearchBox, { label: 'Search guests', delay: 10, onsearch });
+		await userEvent.type(screen.getByRole('searchbox', { name: 'Search guests' }), 'lan');
+		await vi.waitFor(() => expect(onsearch).toHaveBeenLastCalledWith('lan'));
+		expect(onsearch).toHaveBeenCalledTimes(1);
+	});
+
+	test('clears with one button that only shows when there is text', async () => {
+		const onsearch = vi.fn();
+		render(SearchBox, { label: 'Search guests', delay: 0, value: 'lan', onsearch });
+		await userEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+		await vi.waitFor(() => expect(onsearch).toHaveBeenLastCalledWith(''));
+		expect(screen.queryByRole('button', { name: 'Clear search' })).not.toBeInTheDocument();
+	});
+});
+
+describe('FilterChips', () => {
+	const chips = [
+		{ id: 'status', label: 'Status: Paid' },
+		{ id: 'staff', label: 'Staff: Lan' }
+	];
+
+	test('each active filter can be removed by name', async () => {
+		const onremove = vi.fn();
+		render(FilterChips, { chips, onremove, onclear: vi.fn() });
+		await userEvent.click(screen.getByRole('button', { name: 'Remove Status: Paid' }));
+		expect(onremove).toHaveBeenCalledWith('status');
+	});
+
+	test('Clear all shows from two filters up', async () => {
+		const onclear = vi.fn();
+		const { rerender } = render(FilterChips, { chips, onremove: vi.fn(), onclear });
+		await userEvent.click(screen.getByRole('button', { name: 'Clear all' }));
+		expect(onclear).toHaveBeenCalled();
+		await rerender({ chips: [chips[0]], onremove: vi.fn(), onclear });
+		expect(screen.queryByRole('button', { name: 'Clear all' })).not.toBeInTheDocument();
+	});
+
+	test('shows nothing when no filter is set', () => {
+		const { container } = render(FilterChips, { chips: [], onremove: vi.fn(), onclear: vi.fn() });
+		expect(container.querySelector('ul')).toBeNull();
 	});
 });
