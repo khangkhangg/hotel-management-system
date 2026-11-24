@@ -388,3 +388,22 @@ Finding: Yield rules, Issues, Promo codes, Lost and found and others were reacha
 Decision (the sidebar item from round 4c): the sidebar keeps the 5 main items, which are also the phone bottom bar, and adds a "More screens" list below them, grouped as Hotel, Prices and money, and Online and guests. It shows when the sidebar is open (desktop, and the phone menu), the marked screen scrolls into view, and it is hidden in the narrow rail. Housekeeping has no extra screens, so it shows none. Why: every screen a person may open has a visible way in, and the marked item tells them where they are.
 Also fixed: the channels accessibility test failed in full runs because the page was still fading in when the contrast check ran. It now runs without animation, as the other specs do.
 
+### Round 4e: booking panel and the rest of the open list
+Done:
+1. The booking detail (ReservationPanel) and the forms for New booking, Set rates, Add room type and Add room open in the side panel, not a centered dialog. Why: forms never cover the page the person was working on.
+2. In the booking panel, "Cancel booking" and "Mark as no-show" sit in an "Other actions" block under a divider, and Cancel asks first and says it cannot be undone. Why: the destructive choice is not next to Check in.
+3. "Assign room" says "Choose a room to assign." while disabled.
+4. Activity groups entries by day and shows how many are on screen. A system entry no longer repeats "The system" twice, and the search box no longer cuts its placeholder.
+5. The Payments tile says what it is compared with (yesterday's total), and a lone tile fills the row on a phone.
+6. Switching a promo code or yield rule on or off shows a toast with Undo.
+7. Toasts sit in the browser's top layer, so they show above an open side panel. The panel on a phone now fills the width (a browser rule left a strip of the dimmed page).
+8. Looked at by eye in Playwright screenshots at 390 and 744px: Promo codes and its panel, Guests, Arrivals, Payments, Lost and found, Yield rules, Activity, Staff.
+Still open:
+1. At 744px the owner's "Viewing as" select squeezes the hotel name in the top bar to "Main ...".
+2. Undo covers on/off switches only. Remove and cancel have no restore call in the API.
+3. "Take payment" has no stated reason when disabled with an empty amount (the amount now starts filled, so it is rare).
+4. The attention panel and the arrivals table both offer "Assign room" for the same guest.
+5. Right-to-left and long German or Finnish text were not looked at.
+6. The Staff "Deactivate" sits beside "Reset sign-in". It asks first, so no menu was built.
+7. The shell test at 390px failed once in a full run and passed on rerun (timing).
+

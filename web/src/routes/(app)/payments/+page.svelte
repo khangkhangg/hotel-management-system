@@ -114,7 +114,7 @@
 <style>
 	.tiles {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(var(--field-min), 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(var(--field-min), 1fr));
 		gap: var(--gap-group);
 	}
 	.muted {

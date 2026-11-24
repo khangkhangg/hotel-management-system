@@ -73,6 +73,7 @@
 		flex-direction: column;
 		block-size: 100dvh;
 		max-block-size: 100dvh;
+		max-inline-size: none;
 		inline-size: min(var(--side-panel-width), 100%);
 		padding: 0;
 		border: var(--border-width) solid var(--color-border);

@@ -61,7 +61,8 @@
 	});
 
 	const who = (e: Entry) => {
-		const role = e.actor.role.startsWith('system:') ? t('activity.system') : (roleLabels[e.actor.role as Role] ?? e.actor.role);
+		if (e.actor.role.startsWith('system:')) return '';
+		const role = roleLabels[e.actor.role as Role] ?? e.actor.role;
 		return e.viewAs ? `${role}, viewing as ${roleLabels[e.viewAs as Role] ?? e.viewAs}` : role;
 	};
 </script>
@@ -71,7 +72,7 @@
 <PageHeader title={t('activity.title')} note={t('activity.note')} />
 
 <FormGrid>
-	<SearchBox label={t('activity.search')} placeholder={t('activity.searchHint')} bind:value={search} onsearch={() => load(false)} />
+	<SearchBox label={t('activity.search')} bind:value={search} onsearch={() => load(false)} />
 	{#if staff.length > 1}<Select label={t('activity.person')} options={staff} bind:value={person} onchange={() => load(false)} />{/if}
 	<Select label={t('activity.filter')} options={actionOptions} bind:value={action} onchange={() => load(false)} />
 </FormGrid>
