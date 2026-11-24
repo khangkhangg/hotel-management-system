@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/svelte';
 import userEvent from '@testing-library/user-event';
-import { createRawSnippet } from 'svelte';
+import { createRawSnippet, type Component } from 'svelte';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import AlertList from './AlertList.svelte';
 import Checkbox from './Checkbox.svelte';
@@ -15,6 +15,8 @@ import Segmented from './Segmented.svelte';
 import SidePanel from './SidePanel.svelte';
 import SearchBox from './SearchBox.svelte';
 import FilterChips from './FilterChips.svelte';
+import DataTable from './DataTable.svelte';
+import BottomBar from './BottomBar.svelte';
 import StatTile from './StatTile.svelte';
 import StatusBadge from './StatusBadge.svelte';
 
@@ -324,5 +326,92 @@ describe('FilterChips', () => {
 	test('shows nothing when no filter is set', () => {
 		const { container } = render(FilterChips, { chips: [], onremove: vi.fn(), onclear: vi.fn() });
 		expect(container.querySelector('ul')).toBeNull();
+	});
+});
+
+// DataTable is generic, so the test treats it as one that takes loose props.
+const Table = DataTable as unknown as Component<Record<string, unknown>>;
+
+describe('DataTable', () => {
+	type Row = { id: string; name: string; status: string; total: string };
+	const rows: Row[] = [
+		{ id: 'a', name: 'Anna Lee', status: 'Paid', total: '120.00' },
+		{ id: 'b', name: 'Ben Ho', status: 'Due', total: '80.00' }
+	];
+	const columns = [
+		{ id: 'name', label: 'Guest', value: (r: Row) => r.name, priority: 'main' as const, sortable: true },
+		{ id: 'status', label: 'Status', value: (r: Row) => r.status, priority: 'status' as const },
+		{ id: 'total', label: 'Total', value: (r: Row) => r.total, align: 'end' as const, priority: 'extra' as const }
+	];
+	const base = { label: 'Stays', rows, columns, rowKey: (r: Row) => r.id };
+
+	test('shows a header cell per column and a row per item', () => {
+		render(Table, base);
+		expect(screen.getByRole('table', { name: 'Stays' })).toBeInTheDocument();
+		expect(screen.getAllByRole('columnheader')).toHaveLength(3);
+		expect(screen.getAllByRole('row')).toHaveLength(3);
+		expect(screen.getByText('Ben Ho')).toBeInTheDocument();
+	});
+
+	test('opening a row is one button in its main cell', async () => {
+		const onopen = vi.fn();
+		render(Table, { ...base, onopen });
+		await userEvent.click(screen.getByRole('button', { name: 'Anna Lee' }));
+		expect(onopen).toHaveBeenCalledWith(rows[0]);
+	});
+
+	test('a sortable column is a button that says which way it sorts', async () => {
+		const onsort = vi.fn();
+		render(Table, { ...base, sortBy: 'name', sortDir: 'asc', onsort });
+		expect(screen.getByRole('columnheader', { name: 'Guest' })).toHaveAttribute('aria-sort', 'ascending');
+		await userEvent.click(screen.getByRole('button', { name: 'Guest' }));
+		expect(onsort).toHaveBeenCalledWith('name');
+		expect(screen.getByRole('columnheader', { name: 'Status' })).not.toHaveAttribute('aria-sort');
+	});
+
+	test('numbers align to the end', () => {
+		render(Table, base);
+		expect(screen.getByText('120.00').closest('td')).toHaveAttribute('data-align', 'end');
+	});
+
+	test('the saved row is marked', () => {
+		render(Table, { ...base, marked: 'b' });
+		expect(screen.getByText('Ben Ho').closest('tr')).toHaveAttribute('data-marked', 'true');
+		expect(screen.getByText('Anna Lee').closest('tr')).not.toHaveAttribute('data-marked');
+	});
+
+	test('with no rows it shows the empty state and no table', () => {
+		render(Table, { ...base, rows: [], empty: text('Nothing here yet') });
+		expect(screen.getByText('Nothing here yet')).toBeInTheDocument();
+		expect(screen.queryByRole('table')).not.toBeInTheDocument();
+	});
+});
+
+describe('BottomBar', () => {
+	const items = [
+		{ id: 'calendar', label: 'Calendar', href: '/calendar', icon: 'calendar' as const },
+		{ id: 'arrivals', label: 'Arrivals', href: '/arrivals', icon: 'list' as const },
+		{ id: 'guests', label: 'Guests', href: '/guests', icon: 'users' as const }
+	];
+
+	test('links to each main screen and marks the current one', () => {
+		render(BottomBar, { items, active: 'arrivals', onmore: vi.fn() });
+		expect(screen.getByRole('link', { name: 'Calendar' })).toHaveAttribute('href', '/calendar');
+		expect(screen.getByRole('link', { name: 'Arrivals' })).toHaveAttribute('aria-current', 'page');
+		expect(screen.getByRole('link', { name: 'Guests' })).not.toHaveAttribute('aria-current');
+	});
+
+	test('shows at most 4 screens and gives the rest to More', async () => {
+		const many = [...items, { id: 'a', label: 'Fifth', href: '/a', icon: 'box' as const }, { id: 'b', label: 'Sixth', href: '/b', icon: 'box' as const }, { id: 'c', label: 'Seventh', href: '/c', icon: 'box' as const }];
+		const onmore = vi.fn();
+		render(BottomBar, { items: many, active: 'calendar', onmore });
+		expect(screen.getAllByRole('link')).toHaveLength(3);
+		await userEvent.click(screen.getByRole('button', { name: 'More' }));
+		expect(onmore).toHaveBeenCalled();
+	});
+
+	test('has no More button when everything fits', () => {
+		render(BottomBar, { items, active: 'calendar', onmore: vi.fn() });
+		expect(screen.queryByRole('button', { name: 'More' })).not.toBeInTheDocument();
 	});
 });

@@ -704,5 +704,7 @@
 	"panel.discardPrompt": "Discard your changes?",
 	"search.clear": "Clear search",
 	"filters.remove": "Remove {label}",
-	"filters.clearAll": "Clear all"
+	"filters.clearAll": "Clear all",
+	"bottombar.more": "More",
+	"bottombar.label": "Main screens"
 }
