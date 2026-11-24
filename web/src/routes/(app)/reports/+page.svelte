@@ -5,6 +5,9 @@
 	import { session } from '#lib/session.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import Field from '#lib/ui/Field.svelte';
+	import FormGrid from '#lib/ui/FormGrid.svelte';
+	import Section from '#lib/ui/Section.svelte';
+	import { lastMonth, monthToDate } from '#lib/booking/span.ts';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 
 	let from = $state(addDays(session.today, -30));
@@ -12,6 +15,13 @@
 	let message = $state('');
 	let done = $state('');
 	let busy = $state(false);
+
+	const ranges = [
+		{ id: 'month', label: t('reports.thisMonth'), pick: () => ({ from: monthToDate(session.today).from, to: session.today }) },
+		{ id: 'last', label: t('reports.lastMonth'), pick: () => lastMonth(session.today) },
+		{ id: 'thirty', label: t('reports.last30'), pick: () => ({ from: addDays(session.today, -30), to: session.today }) }
+	];
+	const use = (r: (typeof ranges)[number]) => ({ from, to } = r.pick());
 
 	async function download(event: SubmitEvent) {
 		event.preventDefault();
@@ -38,34 +48,23 @@
 {#if message}<p class="notice danger" role="alert">{message}</p>{/if}
 {#if done}<p class="notice success" role="status">{done}</p>{/if}
 
-<form class="card" onsubmit={download}>
-	<h2>{t('reports.reservations')}</h2>
-	<p class="muted">{t('reports.reservationsNote')}</p>
-	<Field label={t('reports.from')} type="date" bind:value={from} />
-	<Field label={t('reports.to')} type="date" bind:value={to} />
-	<div><Button type="submit" disabled={busy || !from || !to || to < from}>{t('reports.download')}</Button></div>
-</form>
+<Section title={t('reports.reservations')} note={t('reports.reservationsNote')}>
+	<form class="stack" onsubmit={download}>
+		<div class="chips" role="group" aria-label={t('reports.quick')}>
+			{#each ranges as r (r.id)}<Button variant="secondary" onclick={() => use(r)}>{r.label}</Button>{/each}
+		</div>
+		<FormGrid>
+			<Field label={t('reports.from')} type="date" bind:value={from} />
+			<Field label={t('reports.to')} type="date" bind:value={to} />
+		</FormGrid>
+		<div><Button type="submit" disabled={busy || !from || !to || to < from}>{t('reports.download')}</Button></div>
+	</form>
+</Section>
 
 <style>
-	h2 {
-		margin: 0;
-		font: var(--font-heading);
-	}
-	p {
-		margin: 0;
-	}
-	.card {
+	.chips {
 		display: flex;
-		flex-direction: column;
+		flex-wrap: wrap;
 		gap: var(--gap-related);
-		max-inline-size: var(--page-width);
-		padding: var(--space-4);
-		border: var(--border-width) solid var(--color-border);
-		border-radius: var(--radius-md);
-		background: var(--color-surface);
-		font: var(--font-body);
-	}
-	.muted {
-		color: var(--color-text-muted);
 	}
 </style>

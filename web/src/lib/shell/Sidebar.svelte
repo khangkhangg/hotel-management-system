@@ -88,6 +88,7 @@
 		min-block-size: var(--control-height);
 	}
 	.brand {
+		flex: 1 1 auto;
 		display: flex;
 		flex-direction: column;
 		align-items: flex-start;
@@ -96,6 +97,7 @@
 		padding-block: var(--space-2);
 	}
 	.hotel {
+		max-inline-size: 100%;
 		font: var(--font-heading);
 		color: var(--color-text);
 		overflow: hidden;

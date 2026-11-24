@@ -110,19 +110,19 @@ test('a manager sets up a room type and a room; housekeeping works a cleaning ta
 	await other.close();
 });
 
-test('maintenance tickets can be opened and closed', async ({ page }) => {
+test('a problem can be reported and marked fixed', async ({ page }) => {
 	await loginAs(page, 'tuan@hotel.com');
 	await page.goto('/issues');
-	await page.getByRole('button', { name: 'New ticket' }).click();
-	const dialog = page.getByRole('dialog', { name: 'New ticket' });
+	await page.getByRole('button', { name: 'Report a problem' }).click();
+	const dialog = page.getByRole('dialog', { name: 'Report a problem' });
 	await dialog.getByLabel('Problem').fill('Tap drips in the bathroom');
-	await dialog.getByRole('button', { name: 'Open ticket' }).click();
-	await expect(page.getByText('Ticket opened.')).toBeVisible();
+	await dialog.getByRole('button', { name: 'Report problem' }).click();
+	await expect(page.getByText('Problem reported.')).toBeVisible();
 	const row = page.getByRole('row', { name: /Tap drips/ });
-	await row.getByRole('button', { name: 'Close ticket' }).click();
-	const close = page.getByRole('dialog', { name: /Close the ticket/ });
+	await row.getByRole('button', { name: 'Mark fixed' }).click();
+	const close = page.getByRole('dialog', { name: /Mark the problem/ });
 	await close.getByLabel('What was done').fill('Washer replaced');
-	await close.getByRole('button', { name: 'Close ticket' }).click();
+	await close.getByRole('button', { name: 'Mark fixed' }).click();
 	await expect(page.getByRole('row', { name: /Tap drips/ })).toContainText('Washer replaced');
 });
 

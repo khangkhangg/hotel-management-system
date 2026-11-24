@@ -155,3 +155,65 @@ Purpose: answer guests before they call.
 | --- | --- |
 | Empty text says where messages come from | "No guest has written yet" did not say how a message would arrive, so an empty list looked like a fault. |
 | Not done | Unread count in the menu, and a populated-list review (no message data in the sample hotel). |
+
+### Issues (housekeeping, manager)
+
+Purpose: report something broken in a room in a few seconds, and see what is still open.
+
+| Change | Why |
+| --- | --- |
+| "New ticket" became "Report a problem", "Close ticket" became "Mark fixed" | "Ticket" is help desk wording. Tuan reports a broken lamp, and says it that way. |
+| Empty text says nothing is broken and names the action | "No maintenance tickets" read as a missing feature. |
+
+### Rooms, cleaning list (housekeeping)
+
+| Change | Why |
+| --- | --- |
+| Rooms with a guest arriving today come first, finished rooms last | Tuan's fear is cleaning the room a guest is waiting for last. The list was in database order. |
+
+### Channels (revenue, manager, owner)
+
+Purpose: connect the hotel to booking sites and keep prices and stock right on them.
+
+| Change | Why |
+| --- | --- |
+| The 11 channel managers that need vendor approval sit in one closed group | Eleven closed rows pushed the real choices and the setup form far down the page, for options Rita cannot use today. |
+| Connection fields in a grid, the key hint on its own row | Three short codes were full-width boxes. |
+| Not done | A health summary (connected, last sync, failed pushes) at the top once a channel is connected. The sample hotel has none connected, so it could not be reviewed on screen. |
+
+### Sidebar brand (everyone)
+
+| Change | Why |
+| --- | --- |
+| Long hotel names shorten with an ellipsis | At a narrow width "Sample Hotel" ran under the collapse button, so the name and the button overlapped. |
+
+### Sync log (revenue, manager)
+
+| Change | Why |
+| --- | --- |
+| Empty text names Channels and says what will be listed | Rita could not tell if the log was broken or just unused. |
+
+### Price suggestions (revenue, manager)
+
+Purpose: decide which suggested prices to apply, knowing why.
+
+| Change | Why |
+| --- | --- |
+| Dates read "Nov 24", not "2026-11-24" | Machine dates are slower to scan, and the year is clear from context. |
+| Apply button shows how many are checked | After scrolling a long list, Rita needs to know what the button will do. |
+| Not done | Expected revenue effect per suggestion and for the whole set. Needs a forecast on the API. |
+
+### No access page (everyone)
+
+| Change | Why |
+| --- | --- |
+| Button "Go to your start screen" | The page said what was wrong but left a dead end. One click should return the person to work. |
+
+### Reports (manager, owner)
+
+Purpose: get records out for month-end accounting.
+
+| Change | Why |
+| --- | --- |
+| Buttons "This month", "Last month", "Last 30 days" | Accounting runs on whole months. Picking two dates by hand each time invited a wrong range. |
+| Dates side by side, page on Section and FormGrid | Two short fields were full-width, and the page had its own card style. |

@@ -6,6 +6,7 @@
 	import Button from '#lib/ui/Button.svelte';
 	import Dialog from '#lib/ui/Dialog.svelte';
 	import Field from '#lib/ui/Field.svelte';
+	import { cleaningOrder } from '#lib/housekeeping.ts';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 	import Select from '#lib/ui/Select.svelte';
 	import StatusBadge from '#lib/ui/StatusBadge.svelte';
@@ -95,7 +96,7 @@
 	<section class="stack-tight" aria-label={t('rooms.tasks')}>
 		<h2>{t('rooms.tasks')}</h2>
 		<ul class="tasks">
-			{#each tasks as task (task.id)}
+			{#each cleaningOrder(tasks) as task (task.id)}
 				<li class:done={task.status === 'done'}>
 					<span><strong>{t('rooms.room', { number: task.roomNumber })}</strong>, {t('rooms.floor', { floor: task.floor })}
 						{#if task.arrivalToday}<StatusBadge tone="info">{t('rooms.arrivalToday')}</StatusBadge>{/if}</span>

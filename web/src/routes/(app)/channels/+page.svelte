@@ -3,6 +3,7 @@
 	import { t } from '#lib/i18n.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import Checkbox from '#lib/ui/Checkbox.svelte';
+	import FormGrid from '#lib/ui/FormGrid.svelte';
 	import Field from '#lib/ui/Field.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 	import Select from '#lib/ui/Select.svelte';
@@ -160,7 +161,8 @@
 		{/each}
 		</div>
 		{#if partners.length}
-			<h3>{t('channels.partnerTitle')}</h3>
+			<details class="partners">
+			<summary>{t('channels.partnerTitle')}</summary>
 			<p class="muted">{t('channels.partnerNote')}</p>
 			{#each partners as p (p.id)}
 				<details class="partner">
@@ -168,6 +170,7 @@
 					<ol class="steps">{#each p.steps as s}<li>{s}</li>{/each}</ol>
 				</details>
 			{/each}
+		</details>
 		{/if}
 	</section>
 
@@ -179,12 +182,14 @@
 		<ol class="steps">
 			{#each profile.steps as s (s)}<li>{s}</li>{/each}
 		</ol>
+		<FormGrid>
 		{#if profile.fields.includes('hotelId')}<Field label={t('channels.hotelId')} bind:value={hotelId} />{/if}
 		{#if profile.fields.includes('baseUrl')}<Field label={t('channels.baseUrl')} placeholder="https://" bind:value={baseUrl} />{/if}
 		{#if profile.fields.includes('secret')}
 			<Field label={t('channels.secret')} bind:value={secretSetting} placeholder={saved ? t('channels.secretKept') : ''} />
-			<p class="muted">{profile.secretHint} {t('channels.secretNote')}</p>
+			<p class="muted wide">{profile.secretHint} {t('channels.secretNote')}</p>
 		{/if}
+		</FormGrid>
 		<div class="row">
 			<Button type="submit">{t('common.save')}</Button>
 			<Button variant="secondary" disabled={busy || !saved} onclick={test}>{t('channels.test')}</Button>
@@ -227,10 +232,6 @@
 
 <style>
 	h2,
-	h3 {
-		margin: 0;
-		font: var(--font-heading);
-	}
 	p {
 		margin: 0;
 	}
@@ -288,5 +289,9 @@
 	}
 	.muted {
 		color: var(--color-text-muted);
+	}
+	.partners > summary {
+		font: var(--font-heading);
+		cursor: pointer;
 	}
 </style>

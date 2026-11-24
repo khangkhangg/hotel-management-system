@@ -11,3 +11,10 @@ export function monthToDate(today: string) {
 	const prevLength = new Date(Date.UTC(prevY, prevM, 0)).getUTCDate();
 	return { from: first(y, m), to: addDays(today, 1), prevFrom, prevTo: addDays(prevFrom, Math.min(d, prevLength)) };
 }
+
+/** The whole month before today's, both days included. */
+export function lastMonth(today: string) {
+	const { prevFrom } = monthToDate(today);
+	const [y, m] = prevFrom.split('-').map(Number);
+	return { from: prevFrom, to: addDays(`${y}-${String(m).padStart(2, '0')}-01`, new Date(Date.UTC(y, m, 0)).getUTCDate() - 1) };
+}

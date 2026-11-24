@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { formatDay } from '#lib/booking/dates.ts';
 	import { api, errorText } from '#lib/api.ts';
 	import { formatMoney, parseMoney } from '#lib/booking/money.ts';
 	import { t } from '#lib/i18n.ts';
@@ -20,6 +21,7 @@
 
 	let suggestions = $state<Suggestion[]>([]);
 	let picked = $state<Record<string, boolean>>({});
+	const chosen = $derived(Object.values(picked).filter(Boolean).length);
 	let roomTypes = $state<RoomType[]>([]);
 	let limits = $state<Record<string, { floor: string; ceiling: string }>>({});
 	let competitors = $state<Competitor[]>([]);
@@ -137,7 +139,7 @@
 			<ul class="rows">
 				{#each groups as g (g.key)}
 					<li>
-						<Checkbox label={g.from === g.to ? `${g.from} · ${g.roomType}` : t('pricing.range', { from: g.from, to: g.to, roomType: g.roomType, count: g.nights.length })} bind:checked={picked[g.key]} />
+						<Checkbox label={g.from === g.to ? `${formatDay(g.from)} · ${g.roomType}` : t('pricing.range', { from: formatDay(g.from), to: formatDay(g.to), roomType: g.roomType, count: g.nights.length })} bind:checked={picked[g.key]} />
 						<p><strong>{formatMoney(g.current, currency)}</strong> → <strong>{formatMoney(g.price, currency)}</strong> <span class="muted">{t('pricing.occupancy', { percent: Math.round(g.nights[0].occupancy * 100) })}</span></p>
 						<ul class="reasons">
 							{#each g.reasons as r (r)}<li>{r}</li>{/each}
@@ -145,7 +147,7 @@
 					</li>
 				{/each}
 			</ul>
-			<div class="row"><Button disabled={busy} onclick={apply}>{t('pricing.apply')}</Button></div>
+			<div class="row"><Button disabled={busy} onclick={apply}>{t('pricing.apply')}{chosen ? ` (${chosen})` : ''}</Button></div>
 			<p class="muted">{t('pricing.applyNote')}</p>
 		{/if}
 	</section>

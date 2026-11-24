@@ -108,6 +108,7 @@
 					<div class="screen">
 						{#if denied}
 							<PageHeader title={t('access.denied.title')} note={t('access.denied.help')} />
+							<p><Button href={homeFor(role)}>{t('access.denied.back')}</Button></p>
 						{:else}
 							{@render children()}
 						{/if}

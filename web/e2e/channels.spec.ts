@@ -53,6 +53,7 @@ test('picking a country brings that market\u2019s channel managers forward, and 
 	await page.goto('/channels');
 	await expect(page.getByRole('radio', { name: /^Beds24/ })).toBeVisible();
 	await page.getByLabel('Where is your hotel?').selectOption('JP');
+	await page.getByText('Needs the vendor’s approval first').click();
 	await expect(page.getByText('TL-Lincoln', { exact: true })).toBeVisible();
 	await expect(page.getByText('Neppan', { exact: true })).toBeVisible();
 	await expect(page.getByText('STAAH', { exact: true })).toHaveCount(0);
