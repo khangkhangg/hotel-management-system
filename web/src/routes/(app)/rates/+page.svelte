@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { api, errorText } from '#lib/api.ts';
+	import { page } from '$app/state';
 	import { addDays, formatDay, rangeDays, weekday } from '#lib/booking/dates.ts';
 	import { formatMoney, parseMoney } from '#lib/booking/money.ts';
 	import { foldRuns } from '#lib/booking/runs.ts';
@@ -43,7 +44,7 @@
 			.then(([a, b]) => {
 				types = a;
 				plans = b;
-				plan = plan || b[0]?.id || '';
+				plan = plan || (b.some((x) => x.id === page.url.searchParams.get('plan')) ? page.url.searchParams.get('plan')! : b[0]?.id) || '';
 			})
 			.catch((e) => (message = errorText(e)));
 	});

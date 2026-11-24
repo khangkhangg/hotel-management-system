@@ -118,5 +118,9 @@
 	"guest.reviews": "Guest reviews",
 	"guest.reviewsCount.one": "{count} review",
 	"guest.reviewsCount.other": "{count} reviews",
-	"guest.reviewRating": "{rating} out of 5"
+	"guest.reviewRating": "{rating} out of 5",
+	"guest.cancel.free": "Free cancellation any time",
+	"guest.cancel.first_night": "No charge if you cancel {days} or more days before arrival. After that, the first night is charged.",
+	"guest.cancel.full": "No charge if you cancel {days} or more days before arrival. After that, the full stay is charged.",
+	"guest.cancel.percent": "No charge if you cancel {days} or more days before arrival. After that, {percent}% of the stay is charged."
 }

@@ -4,6 +4,8 @@
 	import { t } from '#lib/i18n.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
+	import FormGrid from '#lib/ui/FormGrid.svelte';
+	import Section from '#lib/ui/Section.svelte';
 	import Field from '#lib/ui/Field.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 	import Select from '#lib/ui/Select.svelte';
@@ -84,20 +86,7 @@
 {#if message}<p class="notice danger" role="alert">{message}</p>{/if}
 {#if ok}<p class="notice success" role="status">{ok}</p>{/if}
 
-<form class="card" onsubmit={add}>
-	<h2>{t('promo.new')}</h2>
-	<Field label={t('promo.code')} placeholder="SPRING10" bind:value={code} />
-	<Select label={t('promo.kind')} options={[{ id: 'percent', label: t('promo.kind.percent') }, { id: 'amount', label: t('promo.kind.amount') }]} value={kind} onchange={(id) => (kind = id)} />
-	<Field label={kind === 'percent' ? t('promo.valuePercent') : t('promo.valueAmount', { currency })} inputmode="decimal" bind:value />
-	<Field label={t('promo.minNights')} inputmode="numeric" bind:value={minNights} />
-	<Field label={t('promo.arriveFrom')} type="date" bind:value={arriveFrom} />
-	<Field label={t('promo.arriveTo')} type="date" bind:value={arriveTo} />
-	<Field label={t('promo.maxUses')} inputmode="numeric" bind:value={maxUses} />
-	<div class="row"><Button type="submit" disabled={busy}>{t('promo.add')}</Button></div>
-</form>
-
-<section class="card">
-	<h2>{t('promo.codes')}</h2>
+<Section title={t('promo.codes')}>
 	{#if codes.length === 0}
 		<p class="muted">{t('promo.none')}</p>
 	{:else}
@@ -116,26 +105,26 @@
 			{/each}
 		</ul>
 	{/if}
-</section>
+</Section>
+
+<Section title={t('promo.new')}>
+<form class="stack" onsubmit={add}>
+	<FormGrid>
+	<Field label={t('promo.code')} placeholder="SPRING10" bind:value={code} />
+	<Select label={t('promo.kind')} options={[{ id: 'percent', label: t('promo.kind.percent') }, { id: 'amount', label: t('promo.kind.amount') }]} value={kind} onchange={(id) => (kind = id)} />
+	<Field label={kind === 'percent' ? t('promo.valuePercent') : t('promo.valueAmount', { currency })} inputmode="decimal" bind:value />
+	<Field label={t('promo.minNights')} inputmode="numeric" bind:value={minNights} />
+	<Field label={t('promo.arriveFrom')} type="date" bind:value={arriveFrom} />
+	<Field label={t('promo.arriveTo')} type="date" bind:value={arriveTo} />
+	<Field label={t('promo.maxUses')} inputmode="numeric" bind:value={maxUses} />
+	</FormGrid>
+	<div class="row"><Button type="submit" disabled={busy}>{t('promo.add')}</Button></div>
+</form>
+</Section>
 
 <style>
-	h2 {
-		margin: 0;
-		font: var(--font-heading);
-	}
 	p {
 		margin: 0;
-	}
-	.card {
-		display: flex;
-		flex-direction: column;
-		gap: var(--gap-related);
-		max-inline-size: var(--page-width);
-		padding: var(--space-4);
-		border: var(--border-width) solid var(--color-border);
-		border-radius: var(--radius-md);
-		background: var(--color-surface);
-		font: var(--font-body);
 	}
 	.codes {
 		list-style: none;

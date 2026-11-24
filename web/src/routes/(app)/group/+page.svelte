@@ -82,7 +82,7 @@
 	}
 	.tiles {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(var(--card-min), 1fr));
+		grid-template-columns: repeat(auto-fill, minmax(var(--field-min), 1fr));
 		gap: var(--gap-related);
 	}
 	.scroll {

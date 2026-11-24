@@ -217,3 +217,85 @@ Purpose: get records out for month-end accounting.
 | --- | --- |
 | Buttons "This month", "Last month", "Last 30 days" | Accounting runs on whole months. Picking two dates by hand each time invited a wrong range. |
 | Dates side by side, page on Section and FormGrid | Two short fields were full-width, and the page had its own card style. |
+
+### Rate plans (revenue, manager)
+
+Purpose: see how each room type is sold, then set its prices.
+
+| Change | Why |
+| --- | --- |
+| "Set rates" on each row opens Rates with that plan chosen | The table was a dead end. The next step is always the prices of that plan. |
+
+### Yield rules (revenue)
+
+Purpose: hold back rooms or adjust prices on booking sites without touching the hotel's own page.
+
+| Change | Why |
+| --- | --- |
+| "Your rules" first, the new rule form second | What is already in force matters more than creating another, and a new rule should be written knowing what exists. |
+| Short fields in a grid, built on Section | One column of full-width inputs made a short form look long. |
+
+### Promo codes (owner, manager, revenue)
+
+Purpose: give guests a discount code, knowing which codes are live.
+
+| Change | Why |
+| --- | --- |
+| "Your codes" first, the new code form second | Before adding a code, the person should see which exist, so they do not duplicate or clash. |
+| Seven short fields in a grid | A column of seven full-width boxes made adding a code look like a long task. |
+
+### Reviews (owner, manager)
+
+| Change | Why |
+| --- | --- |
+| Empty text says how a review arrives (link in the booking email, after check-out) | An empty list gave the owner no way to tell whether reviews were switched off or just not written. |
+
+### Payouts (owner)
+
+Purpose: know what to expect in the bank, by day.
+
+| Change | Why |
+| --- | --- |
+| The same "This month, Last month, Last 30 days" buttons as Reports, from one shared component | The owner reconciles the bank by month, and one component keeps the two screens identical. |
+
+### Lost and found (housekeeping, front desk, manager)
+
+Purpose: front desk answers "did you find my charger?", housekeeping logs what turns up.
+
+| Change | Why |
+| --- | --- |
+| Items waiting first, the log form second | The desk looks up items far more often than it adds them, and often with a guest on the phone. |
+| Fields in a grid on Section | Three fields in one tall column, with the page's own card style. |
+
+### All properties (owner)
+
+| Change | Why |
+| --- | --- |
+| Tiles sized so all five sit in one row | The fifth tile ("Paid in") wrapped alone onto a second row. |
+| Not done | Compare "Paid in" with the 30 days before. Needs a second figure from the API. |
+
+### Site content (owner, manager)
+
+Purpose: make the booking page persuasive, since guests decide on its words and photos.
+
+| Change | Why |
+| --- | --- |
+| "See the page as a guest" in the page header | The owner edits blind otherwise. One click shows what a guest sees, so each edit can be checked. |
+| Not done | A completeness hint (tagline, description, photo missing), and the file chooser still shows the browser's own "Choose File" wording. |
+
+### Branding (owner)
+
+| Change | Why |
+| --- | --- |
+| Preview moved above the colour form | The owner picks a colour to see its effect. With the preview below a long form, the result was out of sight while choosing. |
+| Built on Section | The three blocks each had their own card style. |
+
+### Booking site, room choice (guest)
+
+Purpose: find a room, see the full price and know the rules before paying.
+
+| Change | Why |
+| --- | --- |
+| Each room card states the cancellation rule in a sentence, from the rate plan's own terms (API tested) | Ana's fear is not knowing what cancelling costs. The card said only "Flexible", which is a name, not a rule. |
+| The sentence is translated in all 9 draft languages | The guest page is multilingual. The drafts wait for native review like the rest. |
+| Not done | Room photos and descriptions beside each room (the sample hotel has none), and a total with taxes broken down. |

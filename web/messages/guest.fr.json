@@ -118,5 +118,9 @@
 	"guest.reviews": "Avis des clients",
 	"guest.reviewsCount.one": "{count} avis",
 	"guest.reviewsCount.other": "{count} avis",
-	"guest.reviewRating": "{rating} sur 5"
+	"guest.reviewRating": "{rating} sur 5",
+	"guest.cancel.free": "Annulation gratuite à tout moment",
+	"guest.cancel.first_night": "Sans frais si vous annulez {days} jours ou plus avant l'arrivée. Ensuite, la première nuit est facturée.",
+	"guest.cancel.full": "Sans frais si vous annulez {days} jours ou plus avant l'arrivée. Ensuite, le séjour complet est facturé.",
+	"guest.cancel.percent": "Sans frais si vous annulez {days} jours ou plus avant l'arrivée. Ensuite, {percent} % du séjour est facturé."
 }

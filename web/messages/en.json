@@ -612,7 +612,7 @@
 	"messages.hotel": "Hotel",
 	"reviews.title": "Guest reviews",
 	"reviews.note": "What guests wrote after their stay. Hide a review to take it off your booking page, or reply to it.",
-	"reviews.none": "No guest has reviewed a stay yet.",
+	"reviews.none": "No guest has reviewed a stay yet. Guests can review from the link in their booking email once they have checked out.",
 	"reviews.rating": "{rating} out of 5",
 	"reviews.hidden": "Hidden",
 	"reviews.hide": "Hide",
@@ -695,5 +695,7 @@
 	"reports.thisMonth": "This month",
 	"reports.lastMonth": "Last month",
 	"reports.last30": "Last 30 days",
-	"reports.quick": "Quick ranges"
+	"reports.quick": "Quick ranges",
+	"rate-plans.setRates": "Set rates",
+	"siteContent.preview": "See the page as a guest"
 }

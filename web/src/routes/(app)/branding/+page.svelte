@@ -5,6 +5,7 @@
 	import { t } from '#lib/i18n.ts';
 	import Button from '#lib/ui/Button.svelte';
 	import Field from '#lib/ui/Field.svelte';
+	import Section from '#lib/ui/Section.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 	import Segmented from '#lib/ui/Segmented.svelte';
 
@@ -86,8 +87,15 @@
 {#if ok}<p class="notice success" role="status">{ok}</p>{/if}
 
 {#if loaded}
-<form class="card" onsubmit={save}>
-	<h2>{t('branding.colour')}</h2>
+<Section title={t('branding.preview')}>
+	<div class="preview" data-brand-scope style:--brand={readable ? color : saved || brandPresets[0].color}>
+		{#if logo}<img class="logo" src={`/api/public/${slug}/photos/${logo}`} alt={t('branding.logoAlt')} />{/if}
+		<div class="row"><Button type="button">{t('branding.sampleButton')}</Button></div>
+	</div>
+</Section>
+
+<Section title={t('branding.colour')}>
+<form class="stack" onsubmit={save}>
 	<Segmented options={brandPresets.map((p) => ({ id: p.color, label: p.name }))} bind:value={color} />
 	<Field label={t('branding.code')} placeholder="#1F5F4F" bind:value={color} error={!valid ? t('branding.codeHelp') : readable ? undefined : t('branding.tooLight')} />
 	<p class="muted">{t('branding.contrast')}</p>
@@ -95,45 +103,22 @@
 		<Button type="submit" disabled={busy || !readable}>{t('common.save')}</Button>
 	</div>
 </form>
+</Section>
 
-<section class="card" aria-label={t('branding.preview')}>
-	<h2>{t('branding.preview')}</h2>
-	<div class="preview" data-brand-scope style:--brand={readable ? color : saved || brandPresets[0].color}>
-		{#if logo}<img class="logo" src={`/api/public/${slug}/photos/${logo}`} alt={t('branding.logoAlt')} />{/if}
-		<div class="row"><Button type="button">{t('branding.sampleButton')}</Button></div>
-	</div>
-</section>
-
-<section class="card">
-	<h2>{t('branding.logo')}</h2>
+<Section title={t('branding.logo')}>
 	<p class="muted">{t('branding.logoNote')}</p>
 	<label class="file">
 		<span>{t('branding.chooseLogo')}</span>
 		<input type="file" accept="image/png,image/jpeg,image/webp" onchange={upload} disabled={busy} />
 	</label>
 	{#if logo}<div class="row"><Button variant="secondary" disabled={busy} onclick={remove}>{t('branding.removeLogo')}</Button></div>{/if}
-</section>
+</Section>
 
 {/if}
 
 <style>
-	h2 {
-		margin: 0;
-		font: var(--font-heading);
-	}
 	p {
 		margin: 0;
-	}
-	.card {
-		display: flex;
-		flex-direction: column;
-		gap: var(--gap-related);
-		max-inline-size: var(--page-width);
-		padding: var(--space-4);
-		border: var(--border-width) solid var(--color-border);
-		border-radius: var(--radius-md);
-		background: var(--color-surface);
-		font: var(--font-body);
 	}
 	.preview {
 		display: flex;

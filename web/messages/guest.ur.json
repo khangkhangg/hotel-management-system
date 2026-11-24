@@ -118,5 +118,9 @@
 	"guest.reviews": "مہمانوں کے جائزے",
 	"guest.reviewsCount.one": "{count} جائزہ",
 	"guest.reviewsCount.other": "{count} جائزے",
-	"guest.reviewRating": "5 میں سے {rating}"
+	"guest.reviewRating": "5 میں سے {rating}",
+	"guest.cancel.free": "کسی بھی وقت مفت منسوخی",
+	"guest.cancel.first_night": "آمد سے {days} یا زیادہ دن پہلے منسوخ کرنے پر کوئی چارج نہیں۔ اس کے بعد پہلی رات کا چارج لگے گا۔",
+	"guest.cancel.full": "آمد سے {days} یا زیادہ دن پہلے منسوخ کرنے پر کوئی چارج نہیں۔ اس کے بعد پورے قیام کا چارج لگے گا۔",
+	"guest.cancel.percent": "آمد سے {days} یا زیادہ دن پہلے منسوخ کرنے پر کوئی چارج نہیں۔ اس کے بعد قیام کا {percent}% چارج لگے گا۔"
 }

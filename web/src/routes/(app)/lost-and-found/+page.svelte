@@ -3,6 +3,8 @@
 	import { t } from '#lib/i18n.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
+	import FormGrid from '#lib/ui/FormGrid.svelte';
+	import Section from '#lib/ui/Section.svelte';
 	import Field from '#lib/ui/Field.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 
@@ -67,19 +69,8 @@
 {#if message}<p class="notice danger" role="alert">{message}</p>{/if}
 {#if ok}<p class="notice success" role="status">{ok}</p>{/if}
 
-{#if canEdit}
-	<form class="card" onsubmit={add}>
-		<h2>{t('lost.new')}</h2>
-		<Field label={t('lost.description')} bind:value={description} />
-		<Field label={t('lost.location')} bind:value={location} />
-		<Field label={t('lost.foundOn')} type="date" bind:value={foundOn} />
-		<div class="row"><Button type="submit" disabled={busy}>{t('lost.add')}</Button></div>
-	</form>
-{/if}
-
 {#if loaded}
-	<section class="card">
-		<h2>{t('lost.items')}</h2>
+	<Section title={t('lost.items')}>
 		{#if items.length === 0}
 			<p class="muted">{t('lost.none')}</p>
 		{:else}
@@ -100,27 +91,25 @@
 				{/each}
 			</ul>
 		{/if}
-	</section>
+	</Section>
+{/if}
+
+{#if canEdit}
+	<Section title={t('lost.new')}>
+	<form class="stack" onsubmit={add}>
+		<FormGrid>
+		<Field label={t('lost.description')} bind:value={description} />
+		<Field label={t('lost.location')} bind:value={location} />
+		<Field label={t('lost.foundOn')} type="date" bind:value={foundOn} />
+		</FormGrid>
+		<div class="row"><Button type="submit" disabled={busy}>{t('lost.add')}</Button></div>
+	</form>
+	</Section>
 {/if}
 
 <style>
-	h2 {
-		margin: 0;
-		font: var(--font-heading);
-	}
 	p {
 		margin: 0;
-	}
-	.card {
-		display: flex;
-		flex-direction: column;
-		gap: var(--gap-related);
-		max-inline-size: var(--page-width);
-		padding: var(--space-4);
-		border: var(--border-width) solid var(--color-border);
-		border-radius: var(--radius-md);
-		background: var(--color-surface);
-		font: var(--font-body);
 	}
 	.items {
 		list-style: none;

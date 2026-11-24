@@ -118,5 +118,9 @@
 	"guest.reviews": "Avaliações de hóspedes",
 	"guest.reviewsCount.one": "{count} avaliação",
 	"guest.reviewsCount.other": "{count} avaliações",
-	"guest.reviewRating": "{rating} de 5"
+	"guest.reviewRating": "{rating} de 5",
+	"guest.cancel.free": "Cancelamento gratuito a qualquer momento",
+	"guest.cancel.first_night": "Sem custo se cancelar com {days} ou mais dias de antecedência. Depois, a primeira noite é cobrada.",
+	"guest.cancel.full": "Sem custo se cancelar com {days} ou mais dias de antecedência. Depois, a estadia completa é cobrada.",
+	"guest.cancel.percent": "Sem custo se cancelar com {days} ou mais dias de antecedência. Depois, {percent}% da estadia é cobrado."
 }

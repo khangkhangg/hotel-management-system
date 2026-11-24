@@ -249,6 +249,10 @@ func (h *handler) info(w http.ResponseWriter, r *http.Request) {
 		ID         uuid.UUID `json:"id"`
 		RoomTypeID uuid.UUID `json:"roomTypeId"`
 		Name       string    `json:"name"`
+		// Cancellation terms, so a guest sees the rule before choosing a room.
+		FreeCancelUntilDays int    `json:"freeCancelUntilDays"`
+		LateCancelPenalty   string `json:"lateCancelPenalty"`
+		LateCancelPercent   int    `json:"lateCancelPercent"`
 	}
 	out := struct {
 		Name          string             `json:"name"`
@@ -290,14 +294,14 @@ func (h *handler) info(w http.ResponseWriter, r *http.Request) {
 			out.RoomTypes = append(out.RoomTypes, t)
 		}
 		rows.Close()
-		rows, err = tx.Query(ctx, `select id, room_type_id, name from rate_plan where property_id = $1 order by name`, prop)
+		rows, err = tx.Query(ctx, `select id, room_type_id, name, coalesce(free_cancel_until_days, 0), late_cancel_penalty::text, coalesce(late_cancel_percent, 0)::int from rate_plan where property_id = $1 order by name`, prop)
 		if err != nil {
 			return err
 		}
 		defer rows.Close()
 		for rows.Next() {
 			var p ratePlan
-			if err := rows.Scan(&p.ID, &p.RoomTypeID, &p.Name); err != nil {
+			if err := rows.Scan(&p.ID, &p.RoomTypeID, &p.Name, &p.FreeCancelUntilDays, &p.LateCancelPenalty, &p.LateCancelPercent); err != nil {
 				return err
 			}
 			out.RatePlans = append(out.RatePlans, p)

@@ -122,5 +122,9 @@
 	"guest.reviewsCount.other": "{count} отзыва",
 	"guest.reviewRating": "{rating} из 5",
 	"guest.reviewsCount.few": "{count} отзыва",
-	"guest.reviewsCount.many": "{count} отзывов"
+	"guest.reviewsCount.many": "{count} отзывов",
+	"guest.cancel.free": "Бесплатная отмена в любое время",
+	"guest.cancel.first_night": "Без оплаты, если отмените за {days} или больше дней до приезда. Потом списывается первая ночь.",
+	"guest.cancel.full": "Без оплаты, если отмените за {days} или больше дней до приезда. Потом списывается вся стоимость проживания.",
+	"guest.cancel.percent": "Без оплаты, если отмените за {days} или больше дней до приезда. Потом списывается {percent}% стоимости проживания."
 }

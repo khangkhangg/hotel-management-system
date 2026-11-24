@@ -118,5 +118,9 @@
 	"guest.reviews": "मेहमानों की समीक्षाएँ",
 	"guest.reviewsCount.one": "{count} समीक्षा",
 	"guest.reviewsCount.other": "{count} समीक्षाएँ",
-	"guest.reviewRating": "5 में से {rating}"
+	"guest.reviewRating": "5 में से {rating}",
+	"guest.cancel.free": "किसी भी समय मुफ़्त रद्दीकरण",
+	"guest.cancel.first_night": "आगमन से {days} या अधिक दिन पहले रद्द करने पर कोई शुल्क नहीं। उसके बाद पहली रात का शुल्क लगेगा।",
+	"guest.cancel.full": "आगमन से {days} या अधिक दिन पहले रद्द करने पर कोई शुल्क नहीं। उसके बाद पूरे प्रवास का शुल्क लगेगा।",
+	"guest.cancel.percent": "आगमन से {days} या अधिक दिन पहले रद्द करने पर कोई शुल्क नहीं। उसके बाद प्रवास का {percent}% शुल्क लगेगा।"
 }

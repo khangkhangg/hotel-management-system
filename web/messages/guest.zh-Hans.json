@@ -118,5 +118,9 @@
 	"guest.reviews": "客人评价",
 	"guest.reviewsCount.one": "{count} 条评价",
 	"guest.reviewsCount.other": "{count} 条评价",
-	"guest.reviewRating": "{rating} 分（满分 5 分）"
+	"guest.reviewRating": "{rating} 分（满分 5 分）",
+	"guest.cancel.free": "可随时免费取消",
+	"guest.cancel.first_night": "在入住前 {days} 天或更早取消免费。之后将收取首晚房费。",
+	"guest.cancel.full": "在入住前 {days} 天或更早取消免费。之后将收取全部房费。",
+	"guest.cancel.percent": "在入住前 {days} 天或更早取消免费。之后将收取住宿费用的 {percent}%。"
 }

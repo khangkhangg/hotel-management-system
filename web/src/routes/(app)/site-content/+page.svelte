@@ -114,7 +114,9 @@
 
 <svelte:head><title>{t('siteContent.title')} · {t('app.name')}</title></svelte:head>
 
-<PageHeader title={t('siteContent.title')} note={t('siteContent.note')} />
+<PageHeader title={t('siteContent.title')} note={t('siteContent.note')}>
+	{#snippet primary()}{#if slug}<Button variant="secondary" href={`/book/${slug}`}>{t('siteContent.preview')}</Button>{/if}{/snippet}
+</PageHeader>
 {#if message}<p class="notice danger" role="alert">{message}</p>{/if}
 {#if ok}<p class="notice success" role="status">{ok}</p>{/if}
 

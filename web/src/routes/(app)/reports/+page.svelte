@@ -7,7 +7,7 @@
 	import Field from '#lib/ui/Field.svelte';
 	import FormGrid from '#lib/ui/FormGrid.svelte';
 	import Section from '#lib/ui/Section.svelte';
-	import { lastMonth, monthToDate } from '#lib/booking/span.ts';
+	import QuickRanges from '#lib/ui/QuickRanges.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 
 	let from = $state(addDays(session.today, -30));
@@ -15,13 +15,6 @@
 	let message = $state('');
 	let done = $state('');
 	let busy = $state(false);
-
-	const ranges = [
-		{ id: 'month', label: t('reports.thisMonth'), pick: () => ({ from: monthToDate(session.today).from, to: session.today }) },
-		{ id: 'last', label: t('reports.lastMonth'), pick: () => lastMonth(session.today) },
-		{ id: 'thirty', label: t('reports.last30'), pick: () => ({ from: addDays(session.today, -30), to: session.today }) }
-	];
-	const use = (r: (typeof ranges)[number]) => ({ from, to } = r.pick());
 
 	async function download(event: SubmitEvent) {
 		event.preventDefault();
@@ -50,9 +43,7 @@
 
 <Section title={t('reports.reservations')} note={t('reports.reservationsNote')}>
 	<form class="stack" onsubmit={download}>
-		<div class="chips" role="group" aria-label={t('reports.quick')}>
-			{#each ranges as r (r.id)}<Button variant="secondary" onclick={() => use(r)}>{r.label}</Button>{/each}
-		</div>
+		<QuickRanges onpick={(f, t2) => ((from = f), (to = t2))} />
 		<FormGrid>
 			<Field label={t('reports.from')} type="date" bind:value={from} />
 			<Field label={t('reports.to')} type="date" bind:value={to} />
@@ -62,9 +53,4 @@
 </Section>
 
 <style>
-	.chips {
-		display: flex;
-		flex-wrap: wrap;
-		gap: var(--gap-related);
-	}
 </style>

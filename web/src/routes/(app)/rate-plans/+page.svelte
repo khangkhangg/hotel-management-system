@@ -69,6 +69,7 @@
 					<th scope="col">{t('rate-plans.name')}</th>
 					<th scope="col">{t('booking.roomType')}</th>
 					<th scope="col">{t('rate-plans.cancellation')}</th>
+					<th scope="col"><span class="visually-hidden">{t('staff.col.actions')}</span></th>
 				</tr>
 			</thead>
 			<tbody>
@@ -77,6 +78,7 @@
 						<th scope="row">{p.name}</th>
 						<td>{types.find((x) => x.id === p.roomTypeId)?.name}</td>
 						<td>{p.lateCancelPenalty === 'none' ? t('rate-plans.freeAlways') : t('rate-plans.penalty', { penalty: p.lateCancelPenalty.replace('_', ' ') })}</td>
+						<td class="actions"><Button variant="quiet" href={`/rates?plan=${p.id}`}>{t('rate-plans.setRates')}</Button></td>
 					</tr>
 				{/each}
 			</tbody>

@@ -126,5 +126,9 @@
 	"guest.reviewsCount.zero": "{count} تقييم",
 	"guest.reviewsCount.two": "تقييمان",
 	"guest.reviewsCount.few": "{count} تقييمات",
-	"guest.reviewsCount.many": "{count} تقييمًا"
+	"guest.reviewsCount.many": "{count} تقييمًا",
+	"guest.cancel.free": "إلغاء مجاني في أي وقت",
+	"guest.cancel.first_night": "لا رسوم إذا ألغيت قبل الوصول بـ {days} أيام أو أكثر. بعد ذلك تُحتسب الليلة الأولى.",
+	"guest.cancel.full": "لا رسوم إذا ألغيت قبل الوصول بـ {days} أيام أو أكثر. بعد ذلك تُحتسب الإقامة كاملة.",
+	"guest.cancel.percent": "لا رسوم إذا ألغيت قبل الوصول بـ {days} أيام أو أكثر. بعد ذلك تُحتسب نسبة {percent}% من الإقامة."
 }

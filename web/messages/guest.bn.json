@@ -118,5 +118,9 @@
 	"guest.reviews": "অতিথিদের রিভিউ",
 	"guest.reviewsCount.one": "{count}টি রিভিউ",
 	"guest.reviewsCount.other": "{count}টি রিভিউ",
-	"guest.reviewRating": "৫-এর মধ্যে {rating}"
+	"guest.reviewRating": "৫-এর মধ্যে {rating}",
+	"guest.cancel.free": "যে কোনো সময় বিনামূল্যে বাতিল",
+	"guest.cancel.first_night": "আগমনের {days} বা তার বেশি দিন আগে বাতিল করলে কোনো চার্জ নেই। এরপর প্রথম রাতের চার্জ প্রযোজ্য।",
+	"guest.cancel.full": "আগমনের {days} বা তার বেশি দিন আগে বাতিল করলে কোনো চার্জ নেই। এরপর পুরো থাকার চার্জ প্রযোজ্য।",
+	"guest.cancel.percent": "আগমনের {days} বা তার বেশি দিন আগে বাতিল করলে কোনো চার্জ নেই। এরপর থাকার খরচের {percent}% প্রযোজ্য।"
 }

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { cancellationTerms } from '#lib/guest/cancellation.ts';
 	import { page } from '$app/state';
 	import { api, ApiError } from '#lib/api.ts';
 	import { formatMoney } from '#lib/booking/money.ts';
@@ -14,7 +15,7 @@
 		address: string;
 		payments: string[];
 		roomTypes: { id: string; name: string; baseGuests: number; maxGuests: number }[];
-		ratePlans: { id: string; roomTypeId: string; name: string }[];
+		ratePlans: { id: string; roomTypeId: string; name: string; freeCancelUntilDays: number; lateCancelPenalty: string; lateCancelPercent: number }[];
 		extras: { id: string; name: string; unit: string; price: number }[];
 		site: { color: string; logo: string; texts: Record<string, Record<string, string>>; amenities: string[]; photos: { id: string; caption: string }[] };
 		reviews: { count: number; average: number; recent: { rating: number; comment: string; name: string; reply: string; createdAt: string }[] };
@@ -335,6 +336,7 @@
 							<div>
 								<h2>{rt.name} <span class="muted">{p.name}</span></h2>
 								<p class="muted">{t('guest.upTo', { count: rt.maxGuests })} · {t('guest.nights', { count: nights })}</p>
+								<p class="muted">{t(cancellationTerms(p).key, cancellationTerms(p).params)}</p>
 							</div>
 							<div class="buy">
 								<p><strong>{money(q.total)}</strong> <span class="muted">{t('guest.withTaxes')}</span></p>

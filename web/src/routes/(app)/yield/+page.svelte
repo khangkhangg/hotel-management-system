@@ -2,6 +2,8 @@
 	import { api, errorText } from '#lib/api.ts';
 	import { t } from '#lib/i18n.ts';
 	import Button from '#lib/ui/Button.svelte';
+	import FormGrid from '#lib/ui/FormGrid.svelte';
+	import Section from '#lib/ui/Section.svelte';
 	import Field from '#lib/ui/Field.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 	import Select from '#lib/ui/Select.svelte';
@@ -88,35 +90,7 @@
 {#if message}<p class="notice danger" role="alert">{message}</p>{/if}
 {#if ok}<p class="notice success" role="status">{ok}</p>{/if}
 
-<form class="card" onsubmit={add}>
-	<h2>{t('yield.new')}</h2>
-	<Select label={t('yield.kind')} options={kinds.map((k) => ({ id: k, label: t(`yield.kind.${k}`) }))} value={kind} onchange={(id) => (kind = id)} />
-	<p class="muted">{t(`yield.help.${kind}`)}</p>
-	<Select label={t('yield.roomType')} options={[{ id: '', label: t('yield.allRooms') }, ...roomTypes.map((r) => ({ id: r.id, label: r.name }))]} value={roomTypeId} onchange={(id) => (roomTypeId = id)} />
-	<Field label={t(`yield.value.${kind}`)} inputmode="numeric" bind:value />
-	{#if kind === 'rate_adjust'}<Field label={t('yield.percent')} inputmode="numeric" bind:value={percent} />{/if}
-	<Field label={t('yield.from')} type="date" bind:value={from} />
-	<Field label={t('yield.to')} type="date" bind:value={to} />
-	<div class="row">
-		<Button type="submit" disabled={busy}>{t('yield.add')}</Button>
-		<Button variant="secondary" disabled={busy} onclick={showPreview}>{t('yield.preview')}</Button>
-	</div>
-	{#if preview}
-		{#if preview.length === 0}
-			<p class="muted" role="status">{t('yield.previewNone')}</p>
-		{:else}
-			<p role="status">{t('yield.previewCount', { count: preview.length })}</p>
-			<ul class="plain">
-				{#each preview.slice(0, 8) as p (p.date + p.roomType)}
-					<li>{t('yield.previewRow', { date: p.date, roomType: p.roomType, before: p.availableBefore, after: p.availableAfter, priceBefore: formatMoney(p.priceBefore, session.currency), priceAfter: formatMoney(p.priceAfter, session.currency) })}</li>
-				{/each}
-			</ul>
-		{/if}
-	{/if}
-</form>
-
-<section class="card">
-	<h2>{t('yield.rules')}</h2>
+<Section title={t('yield.rules')}>
 	{#if rules.length === 0}
 		<p class="muted">{t('yield.none')}</p>
 	{:else}
@@ -135,10 +109,39 @@
 			{/each}
 		</ul>
 	{/if}
-</section>
+</Section>
 
-<section class="card">
-	<h2>{t('yield.parity')}</h2>
+<Section title={t('yield.new')}>
+<form class="stack" onsubmit={add}>
+	<Select label={t('yield.kind')} options={kinds.map((k) => ({ id: k, label: t(`yield.kind.${k}`) }))} value={kind} onchange={(id) => (kind = id)} />
+	<p class="muted">{t(`yield.help.${kind}`)}</p>
+	<FormGrid>
+	<Select label={t('yield.roomType')} options={[{ id: '', label: t('yield.allRooms') }, ...roomTypes.map((r) => ({ id: r.id, label: r.name }))]} value={roomTypeId} onchange={(id) => (roomTypeId = id)} />
+	<Field label={t(`yield.value.${kind}`)} inputmode="numeric" bind:value />
+	{#if kind === 'rate_adjust'}<Field label={t('yield.percent')} inputmode="numeric" bind:value={percent} />{/if}
+	<Field label={t('yield.from')} type="date" bind:value={from} />
+	<Field label={t('yield.to')} type="date" bind:value={to} />
+	</FormGrid>
+	<div class="row">
+		<Button type="submit" disabled={busy}>{t('yield.add')}</Button>
+		<Button variant="secondary" disabled={busy} onclick={showPreview}>{t('yield.preview')}</Button>
+	</div>
+	{#if preview}
+		{#if preview.length === 0}
+			<p class="muted" role="status">{t('yield.previewNone')}</p>
+		{:else}
+			<p role="status">{t('yield.previewCount', { count: preview.length })}</p>
+			<ul class="plain">
+				{#each preview.slice(0, 8) as p (p.date + p.roomType)}
+					<li>{t('yield.previewRow', { date: p.date, roomType: p.roomType, before: p.availableBefore, after: p.availableAfter, priceBefore: formatMoney(p.priceBefore, session.currency), priceAfter: formatMoney(p.priceAfter, session.currency) })}</li>
+				{/each}
+			</ul>
+		{/if}
+	{/if}
+</form>
+</Section>
+
+<Section title={t('yield.parity')}>
 	{#if parity.length === 0}
 		<p class="muted">{t('yield.parityNone')}</p>
 	{:else}
@@ -155,26 +158,11 @@
 			{/each}
 		</ul>
 	{/if}
-</section>
+</Section>
 
 <style>
-	h2 {
-		margin: 0;
-		font: var(--font-heading);
-	}
 	p {
 		margin: 0;
-	}
-	.card {
-		display: flex;
-		flex-direction: column;
-		gap: var(--gap-related);
-		max-inline-size: var(--page-width);
-		padding: var(--space-4);
-		border: var(--border-width) solid var(--color-border);
-		border-radius: var(--radius-md);
-		background: var(--color-surface);
-		font: var(--font-body);
 	}
 	.rules {
 		list-style: none;

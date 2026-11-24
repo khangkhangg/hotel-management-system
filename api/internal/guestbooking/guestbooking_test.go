@@ -578,3 +578,11 @@ func TestThePublicListNamesOnlyHotelsThatHaveRooms(t *testing.T) {
 		t.Fatalf("a hotel with no rooms is listed: %s", body)
 	}
 }
+
+func TestThePublicPageStatesEachPlansCancellationTerms(t *testing.T) {
+	h := newHotel(t, 1)
+	r := h.w.Anon("GET", "/api/public/a1", "").Want(t, 200, `"freeCancelUntilDays":`, `"lateCancelPenalty":`)
+	if strings.Contains(r.Body, "bank_transfer") && strings.Contains(r.Body, "IBAN") {
+		t.Fatalf("the page leaks bank details: %s", r.Body)
+	}
+}

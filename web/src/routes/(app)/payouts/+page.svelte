@@ -2,6 +2,7 @@
 	import { api, errorText } from '#lib/api.ts';
 	import { formatMoney } from '#lib/booking/money.ts';
 	import { t } from '#lib/i18n.ts';
+	import QuickRanges from '#lib/ui/QuickRanges.svelte';
 	import Field from '#lib/ui/Field.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 
@@ -41,6 +42,7 @@
 
 <section class="card">
 	<div class="row">
+		<QuickRanges onpick={(f, t2) => ((from = f), (to = t2))} />
 		<Field label={t('payouts.from')} type="date" bind:value={from} />
 		<Field label={t('payouts.to')} type="date" bind:value={to} />
 	</div>
