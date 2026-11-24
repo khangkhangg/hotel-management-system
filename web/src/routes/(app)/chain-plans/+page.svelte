@@ -3,7 +3,11 @@
 	import { t } from '#lib/i18n.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
+	import DataTable from '#lib/ui/DataTable.svelte';
 	import Field from '#lib/ui/Field.svelte';
+	import FormGrid from '#lib/ui/FormGrid.svelte';
+	import SidePanel from '#lib/ui/SidePanel.svelte';
+	import { toasts } from '#lib/ui/toast.svelte.ts';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 	import Select from '#lib/ui/Select.svelte';
 
@@ -16,18 +20,26 @@
 	let roomTypes = $state<RoomType[]>([]);
 	let roomType = $state('');
 	let message = $state('');
-	let ok = $state('');
+	let open = $state(false);
 	let name = $state('');
 	let days = $state('');
 	let penalty = $state('none');
 	let percent = $state('');
 	let meal = $state('none');
 
+	let loaded = $state(false);
+	const columns = [
+		{ id: 'name', label: t('chain.name'), value: (x: Template) => x.name, priority: 'main' as const },
+		{ id: 'rule', label: t('chain.col.rule'), value: (x: Template) => rule(x), priority: 'detail' as const },
+		{ id: 'actions', label: t('staff.col.actions'), value: () => '', priority: 'detail' as const, align: 'end' as const, hideLabel: true }
+	];
+
 	async function load() {
 		try {
 			templates = await api.get<Template[]>('/api/rate-plan-templates');
 			roomTypes = await api.get<RoomType[]>('/api/room-types');
 			roomType = roomTypes[0]?.id ?? '';
+			loaded = true;
 		} catch (e) {
 			message = errorText(e);
 		}
@@ -39,7 +51,7 @@
 
 	async function create(event: SubmitEvent) {
 		event.preventDefault();
-		message = ok = '';
+		message = '';
 		try {
 			await api.post('/api/rate-plan-templates', {
 				name,
@@ -50,16 +62,17 @@
 			});
 			name = days = percent = '';
 			await load();
+			open = false;
 		} catch (e) {
 			message = errorText(e);
 		}
 	}
 
 	async function link(x: Template) {
-		message = ok = '';
+		message = '';
 		try {
 			await api.post(`/api/rate-plan-templates/${x.id}/link`, { roomTypeId: roomType });
-			ok = t('chain.linked', { name: x.name });
+			toasts.show(t('chain.linked', { name: x.name }));
 		} catch (e) {
 			message = errorText(e);
 		}
@@ -75,65 +88,45 @@
 
 <svelte:head><title>{t('chain.title')} · {t('app.name')}</title></svelte:head>
 
-<PageHeader title={t('chain.title')} note={t('chain.note')} />
+<PageHeader title={t('chain.title')} note={t('chain.note')}>
+	{#snippet primary()}{#if session.effectiveRole === 'owner'}<Button icon="plus" onclick={() => (open = true)}>{t('chain.new')}</Button>{/if}{/snippet}
+</PageHeader>
 {#if message}<p class="notice danger" role="alert">{message}</p>{/if}
-{#if ok}<p class="notice success" role="status">{ok}</p>{/if}
 
-{#if session.effectiveRole === 'owner'}
-	<form class="card" onsubmit={create}>
-		<h2>{t('chain.new')}</h2>
-		<Field label={t('chain.name')} bind:value={name} />
-		<Field label={t('chain.days')} inputmode="numeric" bind:value={days} />
-		<Select label={t('chain.latePenalty')} options={penalties.map((p) => ({ id: p, label: t(`chain.penalty.${p}`, { percent: '' }) }))} bind:value={penalty} />
-		{#if penalty === 'percent'}<Field label={t('chain.percent')} inputmode="numeric" bind:value={percent} />{/if}
-		<Field label={t('chain.meal')} bind:value={meal} />
-		<div><Button type="submit" disabled={!name.trim()}>{t('chain.add')}</Button></div>
+{#if loaded}
+	<Select label={t('chain.roomType')} options={roomTypes.map((r) => ({ id: r.id, label: r.name }))} value={roomType} onchange={(id) => (roomType = id)} />
+	<DataTable label={t('chain.title')} rows={templates} {columns} rowKey={(x) => x.id}>
+		{#snippet cell(x, column)}
+			{#if column.id === 'name'}
+				<strong>{x.name}</strong>
+			{:else if column.id === 'actions'}
+				<Button variant="secondary" disabled={!roomType} onclick={() => link(x)}>{t('chain.link')}</Button>
+			{:else}
+				{column.value(x)}
+			{/if}
+		{/snippet}
+		{#snippet empty()}<p class="muted">{t('chain.empty')}</p>{/snippet}
+	</DataTable>
+{/if}
+
+<SidePanel title={t('chain.new')} bind:open dirty={name.trim() !== '' || days !== ''}>
+	<form id="chain-form" onsubmit={create}>
+		<FormGrid>
+			<Field label={t('chain.name')} bind:value={name} />
+			<Field label={t('chain.days')} inputmode="numeric" bind:value={days} />
+			<Select label={t('chain.latePenalty')} options={penalties.map((p) => ({ id: p, label: t(`chain.penalty.${p}`, { percent: ' ' }) }))} bind:value={penalty} />
+			{#if penalty === 'percent'}<Field label={t('chain.percent')} inputmode="numeric" bind:value={percent} />{/if}
+			<Field label={t('chain.meal')} bind:value={meal} />
+		</FormGrid>
 	</form>
-{/if}
-
-{#if templates.length === 0}
-	<p class="muted">{t('chain.empty')}</p>
-{:else}
-	<Select label={t('chain.roomType')} options={roomTypes.map((r) => ({ id: r.id, label: r.name }))} bind:value={roomType} />
-	<ul class="list">
-		{#each templates as x (x.id)}
-			<li class="card">
-				<h3>{x.name}</h3>
-				<p class="muted">{rule(x)}</p>
-				<div><Button variant="secondary" disabled={!roomType} onclick={() => link(x)}>{t('chain.link')}</Button></div>
-			</li>
-		{/each}
-	</ul>
-{/if}
+	{#snippet actions()}
+		<Button type="submit" form="chain-form" disabled={!name.trim()}>{t('chain.add')}</Button>
+	{/snippet}
+</SidePanel>
 
 <style>
-	h2,
-	h3 {
-		margin: 0;
-		font: var(--font-heading);
-	}
-	p {
-		margin: 0;
-	}
-	.list {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(var(--card-min), 1fr));
-		gap: var(--gap-related);
-	}
-	.card {
-		display: flex;
-		flex-direction: column;
-		gap: var(--gap-related);
-		padding: var(--space-4);
-		border: var(--border-width) solid var(--color-border);
-		border-radius: var(--radius-md);
-		background: var(--color-surface);
-		font: var(--font-body);
-	}
 	.muted {
+		margin: 0;
 		color: var(--color-text-muted);
 	}
 </style>

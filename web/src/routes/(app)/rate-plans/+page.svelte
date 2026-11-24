@@ -3,7 +3,8 @@
 	import type { RatePlan, RoomType } from '#lib/booking/types.ts';
 	import { t } from '#lib/i18n.ts';
 	import Button from '#lib/ui/Button.svelte';
-	import Dialog from '#lib/ui/Dialog.svelte';
+	import DataTable from '#lib/ui/DataTable.svelte';
+	import SidePanel from '#lib/ui/SidePanel.svelte';
 	import Field from '#lib/ui/Field.svelte';
 	import PageHeader from '#lib/ui/PageHeader.svelte';
 	import Select from '#lib/ui/Select.svelte';
@@ -22,6 +23,13 @@
 		{ id: 'none', label: 'No penalty' },
 		{ id: 'first_night', label: 'First night' },
 		{ id: 'full', label: 'Full stay' }
+	];
+
+	const columns = [
+		{ id: 'name', label: t('rate-plans.name'), value: (p: RatePlan) => p.name, priority: 'main' as const },
+		{ id: 'room', label: t('booking.roomType'), value: (p: RatePlan) => types.find((x) => x.id === p.roomTypeId)?.name ?? '', priority: 'detail' as const },
+		{ id: 'cancel', label: t('rate-plans.cancellation'), value: (p: RatePlan) => (p.lateCancelPenalty === 'none' ? t('rate-plans.freeAlways') : t('rate-plans.penalty', { penalty: p.lateCancelPenalty.replace('_', ' ') })), priority: 'extra' as const },
+		{ id: 'actions', label: t('staff.col.actions'), value: () => '', priority: 'detail' as const, align: 'end' as const, hideLabel: true }
 	];
 
 	async function load() {
@@ -58,35 +66,22 @@
 </PageHeader>
 {#if message}<p class="notice danger" role="alert">{message}</p>{/if}
 
-{#if loaded && plans.length === 0}
-	<p class="muted">{t('rate-plans.empty')}</p>
-{:else if plans.length}
-	<!-- svelte-ignore a11y_no_noninteractive_tabindex -- a scrolling table must be reachable by keyboard -->
-	<div class="table-scroll" role="region" aria-label={t('rate-plans.title')} tabindex="0">
-		<table class="data-table">
-			<thead>
-				<tr>
-					<th scope="col">{t('rate-plans.name')}</th>
-					<th scope="col">{t('booking.roomType')}</th>
-					<th scope="col">{t('rate-plans.cancellation')}</th>
-					<th scope="col"><span class="visually-hidden">{t('staff.col.actions')}</span></th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each plans as p (p.id)}
-					<tr>
-						<th scope="row">{p.name}</th>
-						<td>{types.find((x) => x.id === p.roomTypeId)?.name}</td>
-						<td>{p.lateCancelPenalty === 'none' ? t('rate-plans.freeAlways') : t('rate-plans.penalty', { penalty: p.lateCancelPenalty.replace('_', ' ') })}</td>
-						<td class="actions"><Button variant="quiet" href={`/rates?plan=${p.id}`}>{t('rate-plans.setRates')}</Button></td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
-	</div>
+{#if loaded}
+	<DataTable label={t('rate-plans.title')} rows={plans} {columns} rowKey={(p) => p.id}>
+		{#snippet cell(p, column)}
+			{#if column.id === 'name'}
+				<strong>{p.name}</strong>
+			{:else if column.id === 'actions'}
+				<Button variant="quiet" href={`/rates?plan=${p.id}`}>{t('rate-plans.setRates')}</Button>
+			{:else}
+				{column.value(p)}
+			{/if}
+		{/snippet}
+		{#snippet empty()}<p class="muted">{t('rate-plans.empty')}</p>{/snippet}
+	</DataTable>
 {/if}
 
-<Dialog title={t('rate-plans.new')} bind:open>
+<SidePanel title={t('rate-plans.new')} bind:open dirty={name.trim() !== ''}>
 	<form id="plan-form" class="stack" onsubmit={save}>
 		<Select label={t('booking.roomType')} options={types.map((x) => ({ id: x.id, label: x.name }))} bind:value={roomType} />
 		<Field label={t('rate-plans.name')} bind:value={name} />
@@ -97,4 +92,4 @@
 		<Button variant="quiet" onclick={() => (open = false)}>{t('common.cancel')}</Button>
 		<Button type="submit" form="plan-form" disabled={name.trim() === ''}>{t('rate-plans.create')}</Button>
 	{/snippet}
-</Dialog>
+</SidePanel>
