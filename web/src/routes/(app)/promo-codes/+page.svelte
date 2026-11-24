@@ -121,8 +121,8 @@
 			<StatusBadge tone={c.active ? 'success' : 'neutral'}>{column.value(c)}</StatusBadge>
 		{:else if column.id === 'actions'}
 			<span class="row">
-				<Button variant="secondary" disabled={busy} onclick={() => toggle(c)}>{c.active ? t('promo.switchOff') : t('promo.switchOn')}</Button>
-				<Button variant="quiet" disabled={busy} onclick={() => (removing = c)}>{t('promo.remove')}</Button>
+				<Button variant="secondary" disabled={busy} onclick={() => toggle(c)}>{c.active ? t('promo.switchOff') : t('promo.switchOn')}<span class="visually-hidden"> {c.code}</span></Button>
+				<Button variant="quiet" disabled={busy} onclick={() => (removing = c)}>{t('promo.remove')}<span class="visually-hidden"> {c.code}</span></Button>
 			</span>
 		{:else if column.id === 'code'}
 			<strong>{c.code}</strong>

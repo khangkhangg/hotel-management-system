@@ -48,7 +48,7 @@
 		{ id: 'person', label: t('staff.col.person'), value: (r: Row) => r.name || r.email, priority: 'main' as const },
 		{ id: 'role', label: t('staff.col.role'), value: (r: Row) => roleLabels[r.role], priority: 'detail' as const },
 		{ id: 'property', label: t('staff.col.property'), value: (r: Row) => r.propertyName, priority: 'extra' as const },
-		{ id: 'last', label: t('staff.col.lastSignIn'), value: (r: Row) => (r.lastSignInAt ? formatWhen(r.lastSignInAt) : ''), priority: 'extra' as const },
+		{ id: 'last', label: t('staff.col.lastSignIn'), value: (r: Row) => (r.lastSignInAt ? formatWhen(r.lastSignInAt) : t('staff.neverSignedIn')), priority: 'extra' as const },
 		{ id: 'status', label: t('staff.col.status'), value: (r: Row) => statusLabels[r.status], priority: 'status' as const },
 		{ id: 'actions', label: t('staff.col.actions'), value: () => '', priority: 'detail' as const, align: 'end' as const, hideLabel: true }
 	];

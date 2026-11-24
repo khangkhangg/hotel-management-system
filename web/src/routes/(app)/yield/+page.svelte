@@ -137,8 +137,8 @@
 				<StatusBadge tone={r.active ? 'success' : 'neutral'}>{column.value(r)}</StatusBadge>
 			{:else if column.id === 'actions'}
 				<span class="row">
-					<Button variant="secondary" disabled={busy} onclick={() => toggle(r)}>{r.active ? t('yield.switchOff') : t('yield.switchOn')}</Button>
-					<Button variant="quiet" disabled={busy} onclick={() => (removing = r)}>{t('yield.remove')}</Button>
+					<Button variant="secondary" disabled={busy} onclick={() => toggle(r)}>{r.active ? t('yield.switchOff') : t('yield.switchOn')}<span class="visually-hidden"> {column.value(r)}</span></Button>
+					<Button variant="quiet" disabled={busy} onclick={() => (removing = r)}>{t('yield.remove')}<span class="visually-hidden"> {t(`yield.d.${r.kind}`, { value: r.value, percent: r.percent })}</span></Button>
 				</span>
 			{:else if column.id === 'rule'}
 				<strong>{column.value(r)}</strong>

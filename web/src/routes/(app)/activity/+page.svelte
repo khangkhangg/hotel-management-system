@@ -53,7 +53,7 @@
 	});
 
 	const who = (e: Entry) => {
-		const role = roleLabels[e.actor.role as Role] ?? e.actor.role;
+		const role = e.actor.role.startsWith('system:') ? t('activity.system') : (roleLabels[e.actor.role as Role] ?? e.actor.role);
 		return e.viewAs ? `${role}, viewing as ${roleLabels[e.viewAs as Role] ?? e.viewAs}` : role;
 	};
 </script>

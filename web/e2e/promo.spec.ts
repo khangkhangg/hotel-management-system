@@ -16,7 +16,7 @@ test('a manager adds, sees and removes a promo code', async ({ page }) => {
 	await expect(page.locator('tr[data-marked="true"]')).toContainText('E2E10');
 	await expect(page.getByRole('cell', { name: '10 percent off' })).toBeVisible();
 	expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-	await page.getByRole('button', { name: 'Remove', exact: true }).click();
+	await page.getByRole('button', { name: 'Remove E2E10' }).click();
 	await page.getByRole('button', { name: 'Remove code' }).click();
 	await expect(page.getByText('No codes yet.')).toBeVisible();
 });

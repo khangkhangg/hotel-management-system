@@ -14,11 +14,11 @@ test('a manager adds a yield rule, switches it off and removes it', async ({ pag
 	await expect(page.getByText('This rule would change nothing right now.')).toBeVisible(); // no booking site is connected here
 	await page.getByRole('button', { name: 'Add rule' }).click();
 	await expect(page.getByRole('status').filter({ hasText: 'The rule is added.' })).toBeVisible();
-	await expect(page.getByText('Show at most 2 rooms')).toBeVisible();
+	await expect(page.getByRole('cell', { name: 'Show at most 2 rooms', exact: true })).toBeVisible();
 	expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-	await page.getByRole('button', { name: 'Switch off' }).click();
+	await page.getByRole('button', { name: /^Switch off/ }).click();
 	await expect(page.getByText('Switched off')).toBeVisible();
-	await page.getByRole('button', { name: 'Remove', exact: true }).click();
+	await page.getByRole('button', { name: /^Remove Show at most/ }).click();
 	await page.getByRole('button', { name: 'Remove rule' }).click();
 	await expect(page.getByText('No rules yet')).toBeVisible();
 });

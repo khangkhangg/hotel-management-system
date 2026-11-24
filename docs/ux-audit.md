@@ -363,3 +363,23 @@ Not fixed (needs work of its own):
 5. The "Viewing as" yellow banner pushes the page down.
 6. Phone, tablet, right-to-left and long text were not looked at by eye.
 
+### Round 4c: Toast, more screens on the pattern, second Neo check
+New: Toast (bottom right, 3 at most, about 5 seconds, no layout shift). On the table and side panel pattern now: Yield rules, Issues, Staff, Rate plans, Chain plans, Arrivals, Payments. Activity has the shared search box and filter chips. Not changed on purpose: Rooms and Pricing (cards people compare), Rates (a grid), Channels (setup steps), Reviews (moderation list).
+A second agent walked Arrivals, Payments, Activity, Yield, Issues and Staff in Neo at 1797px and reported 15 failures. Fixed:
+1. Issues room list read "101 (undefined)" - Why: wrong data. The room type name is shown only when the API sends it.
+2. Take payment started empty - Why: the usual payment is what is owed. The amount now starts as the balance (new helper plainAmount, tested).
+3. Activity showed raw "system:alerts" - now "System".
+4. Row buttons had no names ("Switch off", "Remove") - they now carry the code or rule name for screen readers.
+5. Empty tables sat in a second bordered box inside a card - the empty message has no own border now.
+6. Staff "Last sign-in" was blank - now "Not yet".
+Not fixed, and why:
+1. Yield rules, Issues and Promo codes are not in the sidebar of their roles and nothing is highlighted on them. By the role menu design they sit behind the Overview links. Needs an owner decision: add a "More" entry to the sidebar, or keep.
+2. The booking detail (ReservationPanel) is still a centered dialog and loses focus after Escape. Converting it to the side panel touches the calendar, arrivals and the attention panel.
+3. Toast has no Undo yet, because remove and archive have no restore call in the API.
+4. Disabled buttons without a reason (Assign room, Take payment, Report problem). Needs wording for each.
+5. "Cancel booking" sits beside "Check in", and "Deactivate" beside "Reset sign-in". Needs a "More actions" menu component.
+6. Activity: no day groups or result count, and filters are selects with chips below. Needs a grouping decision.
+7. Manager rows in Activity show an IP and owner rows did not in the sample data. The API decides this by role (withWhere). Not confirmed as a leak.
+8. Payments "Taken today" tile has no comparison, because the page asks the API for today only.
+9. Channels spec (the sync log and channels accessibility test) failed in 2 of 3 full Playwright runs and passes alone. Cause not found.
+

@@ -113,7 +113,7 @@
 
 <SidePanel title={t('issues.new')} bind:open>
 	<form id="ticket-form" class="stack" onsubmit={create}>
-		<Select label={t('rooms.number')} options={rooms.map((r) => ({ id: r.id, label: `${r.number} (${r.roomTypeName})` }))} bind:value={room} />
+		<Select label={t('rooms.number')} options={rooms.map((r) => ({ id: r.id, label: `${r.number}${r.roomTypeName ? ` (${r.roomTypeName})` : ''}` }))} bind:value={room} />
 		<Field label={t('issues.problem')} bind:value={description} />
 		<p class="muted">{t('issues.blockHelp')}</p>
 		<div class="pair">

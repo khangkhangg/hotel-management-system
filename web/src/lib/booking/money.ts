@@ -21,3 +21,9 @@ export function parseMoney(text: string, currency: string): number | null {
 	const amount = digits === 0 ? whole : whole * 100 + fraction;
 	return amount > 0 ? amount : null;
 }
+
+/** An amount in the smallest unit, written the way a person types it into a field: 24000 USD is 240.00. */
+export function plainAmount(amount: number, currency: string): string {
+	return zeroDecimal.has(currency) ? String(amount) : (amount / 100).toFixed(2);
+}
+

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { api, errorText } from '#lib/api.ts';
 	import { formatDay } from './dates.ts';
-	import { formatMoney, parseMoney } from './money.ts';
+	import { formatMoney, parseMoney, plainAmount } from './money.ts';
 	import { t } from '#lib/i18n.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import Button from '#lib/ui/Button.svelte';
@@ -49,6 +49,8 @@
 		try {
 			res = await api.get<Reservation>(`/api/reservations/${reservation}`);
 			folio = await api.get<Folio>(`/api/reservations/${reservation}/folio`);
+			// The usual payment is what is still owed, so it starts filled in.
+			if (amount === '' && folio.balance > 0) amount = plainAmount(folio.balance, res.currency);
 			rooms = await api.get<Room[]>('/api/rooms');
 			extras = await api.get<Extra[]>('/api/extras').catch(() => []);
 			extraId = extras[0]?.id ?? '';

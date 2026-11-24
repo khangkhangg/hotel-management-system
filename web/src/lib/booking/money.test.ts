@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { formatMoney } from './money.ts';
+import { formatMoney, plainAmount } from './money.ts';
 
 test('formats minor units in the currency', () => {
 	expect(formatMoney(20000, 'USD')).toBe('$200.00');
@@ -29,4 +29,10 @@ test('text that is not a plain amount is refused, not guessed', () => {
 	for (const bad of ['', 'abc', '1,500', '1.234.5', '-5', '12.345', '0', '1e3', '500.5']) {
 		expect(parseMoney(bad, bad === '500.5' ? 'VND' : 'USD'), bad).toBeNull();
 	}
+});
+
+test('plainAmount writes an amount the way a person types it, so it can be read back', () => {
+	expect(plainAmount(24000, 'USD')).toBe('240.00');
+	expect(plainAmount(150000, 'VND')).toBe('150000');
+	expect(parseMoney(plainAmount(24050, 'USD'), 'USD')).toBe(24050);
 });

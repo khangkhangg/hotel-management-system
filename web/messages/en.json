@@ -752,5 +752,7 @@
 	"yield.removeBody": "Booking sites go back to their normal rooms and price: {rule}. This cannot be undone.",
 	"yield.removeConfirm": "Remove rule",
 	"yield.keep": "Keep rule",
-	"chain.col.rule": "Terms"
+	"chain.col.rule": "Terms",
+	"staff.neverSignedIn": "Not yet",
+	"promo.switchOffNamed": "Switch off {name}"
 }

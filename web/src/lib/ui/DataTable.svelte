@@ -128,10 +128,7 @@
 		}
 	}
 	.empty {
-		padding: var(--pad-card);
-		border: var(--border-width) solid var(--color-border);
-		border-radius: var(--radius-card);
-		background: var(--color-surface);
+		padding: var(--space-2) 0;
 	}
 	@media (width < 1024px) {
 		[data-priority='extra'] {
