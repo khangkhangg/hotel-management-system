@@ -6,7 +6,7 @@
 	import { api, ApiError, onUnauthorized, errorText } from '#lib/api.ts';
 	import { drafts, returnTo } from '#lib/draft.ts';
 	import { t } from '#lib/i18n.ts';
-	import { allowed, homeFor, itemsFor, roleLabels } from '#lib/nav.ts';
+	import { allowed, homeFor, itemsFor, moreGrouped, roleLabels } from '#lib/nav.ts';
 	import { session } from '#lib/session.svelte.ts';
 	import BottomBar from '#lib/shell/BottomBar.svelte';
 	import Toaster from '#lib/ui/Toaster.svelte';
@@ -95,7 +95,7 @@
 	</main>
 {:else if ready && role}
 	<div class="shell">
-		<Sidebar {items} {expanded} overlay={!desktop.current} hotel={session.current?.organization.name ?? ''} role={viewingLabel} viewing={session.viewingAs !== null} ontoggle={toggle} />
+		<Sidebar {items} more={role ? moreGrouped(role) : []} {expanded} overlay={!desktop.current} hotel={session.current?.organization.name ?? ''} role={viewingLabel} viewing={session.viewingAs !== null} ontoggle={toggle} />
 		<div class="main">
 			<TopBar />
 			{#if session.viewingAs}

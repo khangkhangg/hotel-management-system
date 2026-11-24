@@ -383,3 +383,8 @@ Not fixed, and why:
 8. Payments "Taken today" tile has no comparison, because the page asks the API for today only.
 9. Channels spec (the sync log and channels accessibility test) failed in 2 of 3 full Playwright runs and passes alone. Cause not found.
 
+### Round 4d: sidebar lists every screen a role may open
+Finding: Yield rules, Issues, Promo codes, Lost and found and others were reachable only through Overview links. Revenue and front desk have no Overview, so for them those screens had no link at all, and nothing was marked on them.
+Decision (the sidebar item from round 4c): the sidebar keeps the 5 main items, which are also the phone bottom bar, and adds a "More screens" list below them, grouped as Hotel, Prices and money, and Online and guests. It shows when the sidebar is open (desktop, and the phone menu), the marked screen scrolls into view, and it is hidden in the narrow rail. Housekeeping has no extra screens, so it shows none. Why: every screen a person may open has a visible way in, and the marked item tells them where they are.
+Also fixed: the channels accessibility test failed in full runs because the page was still fading in when the contrast check ran. It now runs without animation, as the other specs do.
+

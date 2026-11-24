@@ -108,3 +108,13 @@ describe('more screens grouped by what they are for', () => {
 		expect(moreGrouped('revenue').map((g) => g.label)).toEqual(['Prices and money']);
 	});
 });
+
+describe('the sidebar lists every screen a role may open', () => {
+	test('the grouped more screens keep every one of the more screens, none twice', () => {
+		for (const role of ['owner', 'manager', 'front_desk', 'revenue', 'housekeeping'] as Role[]) {
+			const grouped = moreGrouped(role).flatMap((g) => g.items.map((i) => i.id));
+			expect(grouped.slice().sort(), role).toEqual(moreFor(role).map((i) => i.id).sort());
+		}
+	});
+});
+

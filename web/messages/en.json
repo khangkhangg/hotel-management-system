@@ -754,5 +754,6 @@
 	"yield.keep": "Keep rule",
 	"chain.col.rule": "Terms",
 	"staff.neverSignedIn": "Not yet",
-	"promo.switchOffNamed": "Switch off {name}"
+	"promo.switchOffNamed": "Switch off {name}",
+	"nav.more": "More screens"
 }

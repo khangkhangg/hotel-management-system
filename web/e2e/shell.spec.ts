@@ -237,3 +237,20 @@ for (const width of [390, 744, 1280]) {
 		}
 	});
 }
+
+test('revenue reaches yield rules and promo codes from the sidebar, with the current one marked', async ({ page }) => {
+	await page.request.get('/api/test/login?email=rita@hotel.com');
+	await page.goto('/rates');
+	const more = page.getByRole('navigation', { name: 'More screens' });
+	await expect(more.getByRole('link', { name: 'Promo codes' })).toBeVisible();
+	await more.getByRole('link', { name: 'Yield rules' }).click();
+	await expect(page).toHaveURL('/yield');
+	await expect(more.getByRole('link', { name: 'Yield rules' })).toHaveAttribute('aria-current', 'page');
+});
+
+test('housekeeping has no more screens, so the sidebar shows none', async ({ page }) => {
+	await page.request.get('/api/test/login?email=tuan@hotel.com');
+	await page.goto('/rooms');
+	await expect(page.getByRole('navigation', { name: 'More screens' })).toHaveCount(0);
+});
+

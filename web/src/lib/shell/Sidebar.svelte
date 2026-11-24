@@ -6,8 +6,14 @@
 	import Icon from '#lib/ui/Icon.svelte';
 	import StatusBadge from '#lib/ui/StatusBadge.svelte';
 
-	type Props = { items: NavItem[]; expanded: boolean; overlay: boolean; hotel: string; role: string; viewing: boolean; ontoggle: () => void };
-	let { items, expanded, overlay, hotel, role, viewing, ontoggle }: Props = $props();
+	type Props = { items: NavItem[]; more: { id: string; label: string; items: NavItem[] }[]; expanded: boolean; overlay: boolean; hotel: string; role: string; viewing: boolean; ontoggle: () => void };
+	let { items, more, expanded, overlay, hotel, role, viewing, ontoggle }: Props = $props();
+
+	// A screen far down the list is brought into view, so the marked one is never hidden.
+	$effect(() => {
+		page.url.pathname;
+		document.querySelector('.more [aria-current="page"]')?.scrollIntoView?.({ block: 'nearest' });
+	});
 
 	const current = (href: string) => (href === '/' ? page.url.pathname === '/' : page.url.pathname === href || page.url.pathname.startsWith(href + '/'));
 </script>
@@ -38,6 +44,23 @@
 			{/each}
 		</ul>
 	</nav>
+	{#if more.length && expanded}
+		<nav class="more" aria-label={t('nav.more')}>
+			{#each more as group (group.id)}
+				<h2>{group.label}</h2>
+				<ul>
+					{#each group.items as item (item.id)}
+						<li>
+							<a href={item.href} aria-current={current(item.href) ? 'page' : undefined} onclick={() => overlay && ontoggle()}>
+								<Icon name={item.icon} />
+								<span class="label">{item.label}</span>
+							</a>
+						</li>
+					{/each}
+				</ul>
+			{/each}
+		</nav>
+	{/if}
 </aside>
 
 <style>
@@ -144,5 +167,20 @@
 		block-size: var(--size-hidden);
 		overflow: hidden;
 		clip-path: inset(50%);
+	}
+	.more {
+		display: flex;
+		flex-direction: column;
+		gap: var(--gap-related);
+		padding-block-start: var(--gap-group);
+		border-block-start: var(--border-width) solid var(--color-divider);
+		overflow-y: auto;
+		scrollbar-width: thin;
+	}
+	.more h2 {
+		margin: 0;
+		padding-inline: var(--space-3);
+		font: var(--font-caption);
+		color: var(--color-text-muted);
 	}
 </style>
